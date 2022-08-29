@@ -35,8 +35,8 @@ def get_models(args):
     elif args.architecture == 'StyleGAN':
         from models.StyleGAN import Discriminator, Generator, weights_init
     elif args.architecture == 'ProjectedGAN':
-        from models.FastGAN import Generator, weights_init
-        from models.ProjectedGAN import Discriminator
+        from models.FastGAN import Generator
+        from models.ProjectedGAN import Discriminator, weights_init
     else:
         from models.FastGAN import Discriminator, Generator, weights_init
     netG = Generator(args.z_dim).to(device)
@@ -110,7 +110,7 @@ def train(args):
         logger.aggregate_train_losses(Gloss.item(), Dloss_real.item(), Dloss_fake.item())
         if iteration % 100 == 0:
             sec_per_kimage = (time() - start) / (max(1, iteration) / 1000)
-            print(f"G loss: {Gloss:.5f}: Dloss-real: {Dloss_real.item():.5f}, Dloss-fake {Dloss_fake.item():.5f} sec/kimg: {sec_per_kimage}")
+            print(f"G loss: {Gloss:.5f}: Dloss-real: {Dloss_real.item():.5f}, Dloss-fake {Dloss_fake.item():.5f} sec/kimg: {sec_per_kimage:.1f}")
 
         if iteration % (save_interval) == 0:
             backup_para = copy_G_params(netG)

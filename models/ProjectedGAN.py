@@ -1,12 +1,20 @@
 """Code taken and slightly modified from https://github.com/RangiLyu/EfficientNet-Lite"""
 
 import math
+import os
+
 from torch import nn
 import torch.nn.functional as F
 import torch
 from torch.optim import Adam
 from torch.nn.utils import spectral_norm
-
+def weights_init(m):
+    classname = m.__class__.__name__
+    if classname.find('Conv2d') != -1:
+        m.weight.data.normal_(0.0, 0.02)
+    elif classname.find('BatchNorm') != -1:
+        m.weight.data.normal_(1.0, 0.02)
+        m.bias.data.fill_(0)
 
 def kaiming_init(module):
     classname = module.__class__.__name__
@@ -228,11 +236,11 @@ def load_checkpoint(net, checkpoint):
     temp = OrderedDict()
     if 'state_dict' in checkpoint:
         checkpoint = dict(checkpoint['state_dict'])
-    for k in checkpoint:
-        k2 = 'module.'+k if not k.startswith('module.') else k
-        temp[k2] = checkpoint[k]
+    # for k in checkpoint:
+    #     k2 = 'module.'+k if not k.startswith('module.') else k
+    #     temp[k2] = checkpoint[k]
 
-    net.load_state_dict(temp, strict=True)
+    net.load_state_dict(checkpoint, strict=True)
 
 
 class DownBlock(nn.Module):
@@ -316,12 +324,13 @@ class CSM(nn.Module):
             return high_res
 
 
-class Discriminator(nn.Module):
+class Discriminator:
     def __init__(self, img_size=128):
         super(Discriminator, self).__init__()
         self.img_size = img_size
         self.efficient_net = EfficientNetLite(widthi_multiplier=1.0, depth_multiplier=1.1, num_classes=1000, drop_connect_rate=0.2, dropout_rate=0.2)
         self.efficient_net.eval()
+        load_checkpoint(self.efficient_net, torch.load(os.path.join(os.path.dirname(__file__), 'efficientnet_lite1.pth')))
 
         feature_sizes = self.get_feature_channels()
         self.csms = nn.ModuleList([
@@ -341,6 +350,25 @@ class Discriminator(nn.Module):
     def load_state_dict(self, ckpt):
         load_checkpoint(self.efficient_net, ckpt)
 
+    def parameters(self):
+        return list(self.csms.parameters()) + list(self.discs.parameters())
+
+    def to(self, device):
+        self.efficient_net.to(device)
+        self.csms.to(device)
+        self.discs.to(device)
+        return self
+    def apply(self, weight_init):
+        self.efficient_net.apply(weight_init)
+        self.csms.apply(weight_init)
+        self.discs.apply(weight_init)
+
+    def zero_grad(self):
+        self.csms.zero_grad()
+        self.discs.zero_grad()
+
+    def state_dict(self):
+        return {"csms": self.csms.state_dict(), "discs": self.discs.state_dict()}
     def csm_forward(self, features):
         features = features[::-1]
         csm_features = []
@@ -353,7 +381,7 @@ class Discriminator(nn.Module):
                 csm_features.append(d)
         return features
 
-    def forward(self, x):
+    def __call__(self, x):
         features = self.efficient_net(x)
         features = self.csm_forward(features)
         dics_maps = []
@@ -372,5 +400,4 @@ if __name__ == '__main__':
     efficient_net = EfficientNetLite(widthi_multiplier=1.0, depth_multiplier=1.1, num_classes=1000, drop_connect_rate=0.2, dropout_rate=0.2)
     x = torch.ones((1,3,128,128))
     # print([ x.shape for x in efficient_net(x)])
-    D = Discriminator(128)
-    print(D(x).shape)
+    print([x.shape for x in efficient_net(x)])

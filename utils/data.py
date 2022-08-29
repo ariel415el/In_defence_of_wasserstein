@@ -58,7 +58,7 @@ class InfiniteSamplerWrapper(data.sampler.Sampler):
 
 
 def get_datasets(data_root, im_size, val_percentage):
-    paths = sorted([os.path.join(data_root, im_name) for im_name in os.listdir(data_root)])
+    paths = sorted([os.path.join(data_root, im_name) for im_name in os.listdir(data_root)])[:1000]
     n_val_images = int(val_percentage * len(paths))
     train_paths, test_paths = paths[n_val_images:], paths[:n_val_images]
     print(f"Train images: {len(train_paths)}, test images: {len(test_paths)}")
@@ -70,7 +70,7 @@ def get_datasets(data_root, im_size, val_percentage):
 
 
 def get_dataloader(data_root, im_size, batch_size, n_workers, val_percentage=0.1):
-    train_dataset, test_dataset = get_datasets(data_root, im_size, val_percentage=val_percentage)[:5000]
+    train_dataset, test_dataset = get_datasets(data_root, im_size, val_percentage=val_percentage)
 
     train_loader = iter(DataLoader(train_dataset, batch_size=batch_size,
                                  shuffle=False,
