@@ -40,7 +40,7 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self):
+    def __init__(self, num_outputs=1):
         super(Discriminator, self).__init__()
         channels=3
 
@@ -52,7 +52,7 @@ class Discriminator(nn.Module):
                 nn.BatchNorm2d(layer_depth[i + 1]),
                 nn.ReLU(True)
             ]
-        layers.append(nn.Conv2d(layer_depth[-1], 1, 4, 1, 0, bias=False))
+        layers.append(nn.Conv2d(layer_depth[-1], num_outputs, 4, 1, 0, bias=False))
         self.convs = nn.Sequential(*layers)
 
     def forward(self, input):
