@@ -1,4 +1,5 @@
 import itertools
+import json
 import os
 
 import numpy as np
@@ -13,7 +14,7 @@ from torchvision import utils as vutils
 import torch.nn.functional as F
 
 
-def get_data(limit_data=None):
+def get_data(data_root, limit_data=None):
     """Load entire dataset to memory as a single batch"""
     T = transforms.Compose([
         transforms.Resize((128, 128)),
@@ -37,11 +38,11 @@ def get_data(limit_data=None):
 def interpolate(G, n_zs=10, steps=10):
     """Sample n_zs images and linearly interpolate between them in the latent space """
     os.makedirs(f'{outputs_dir}/interpolations', exist_ok=True)
-    cur_z = torch.randn((1, noise_dim)).to(device)
+    cur_z = torch.randn((1, z_dim)).to(device)
     frame = 0
     f = 1 / (steps - 1)
     for i in range(n_zs):
-        next_z = torch.randn((1, noise_dim)).to(device)
+        next_z = torch.randn((1, z_dim)).to(device)
         for a in range(steps):
             noise = next_z * a * f + cur_z * (1 - a * f)
             fake_imgs = G(noise).add(1).mul(0.5)
@@ -85,7 +86,7 @@ def find_patch_nns(G, data, patch_size=24, stride=4, search_margin=6):
 
     print(f"Searching for {patch_size}x{patch_size} patch nns in {len(data)} data samples:")
     for j in range(5):
-        query_image = G(torch.randn(1, noise_dim).to(device))
+        query_image = G(torch.randn(1, z_dim).to(device))
         vutils.save_image(query_image.add(1).mul(0.5), f'{out_dir}/query_img-{j}.png', normalize=False, nrow=2)
 
         rgb_NN_patches = []
@@ -102,13 +103,14 @@ def find_patch_nns(G, data, patch_size=24, stride=4, search_margin=6):
         x = torch.cat(q_patches + rgb_NN_patches + gs_NN_patches + edge_NN_patches, dim=0)
         vutils.save_image(x.add(1).mul(0.5), f'{out_dir}/patches-{j}.png', normalize=False, nrow=len(q_patches))
 
-def find_nns(G, data):
+
+def find_nns(G, z_dim, data):
     import lpips
     os.makedirs(f'{outputs_dir}/nns', exist_ok=True)
     percept = lpips.LPIPS(net='vgg', lpips=False).to(device)
     results = []
     for i in range(8):
-        fake_image = G(torch.randn((1, noise_dim), device=device))
+        fake_image = G(torch.randn((1, z_dim), device=device))
         dists = [percept(fake_image, data[i].unsqueeze(0)).sum().item() for i in range(len(data))]
         nn_indices = np.argsort(dists)
         nns = data[nn_indices[:4]]
@@ -118,11 +120,11 @@ def find_nns(G, data):
     vutils.save_image(torch.cat(results, dim=0).add(1).mul(0.5), f'{outputs_dir}/nns/im.png', normalize=False, nrow=5)
 
 
-def inverse_image(G, real_images):
+def inverse_image(G, z_dim, real_images):
     import torch.nn.functional as F
     os.makedirs(f"{outputs_dir}/inverse_z", exist_ok=True)
 
-    fixed_noise = torch.randn((len(real_images), noise_dim), requires_grad=True, device=device)
+    fixed_noise = torch.randn((len(real_images), z_dim), requires_grad=True, device=device)
     optimizerG = optim.Adam([fixed_noise], lr=0.001)
 
     for iteration in tqdm(range(10000)):
@@ -143,30 +145,28 @@ def inverse_image(G, real_images):
 
 
 if __name__ == '__main__':
-    noise_dim = 128
-    # data_root = '/cs/labs/yweiss/ariel1/data/FFHQ_128'
-    # train_dir = 'train_results/FFHQ-70k_3_FastGAN_Z-128_B-64'
-    # ckpt_path = f'{train_dir}/models/70000.pth'  # path to the checkpoint
-    data_root = '/cs/labs/yweiss/ariel1/data/FFHQ_1000_images'
-    train_dir = 'train_results/FFHQ-1k+gp_2_FastGAN_Z-128_B-64'
-    ckpt_path = f'{train_dir}/models/10000.pth'  # path to the checkpoint
-    outputs_dir = f'{train_dir}/test_outputs'
-    os.makedirs(outputs_dir, exist_ok=True)
     device = torch.device('cpu')
+    model_dir = 'train_results/FFHQ-1k+gp_2_FastGAN_Z-128_B-64'
+    ckpt_path = f'{model_dir}/models/10000.pth'  # path to the checkpoint
+    outputs_dir = f'{model_dir}/test_outputs'
 
-    G = Generator(z_dim=noise_dim)
-    G.to(device)
+    os.makedirs(outputs_dir, exist_ok=True)
+    args = json.load(open(os.path.join(model_dir, "args.txt")))
+    z_dim = args['z_dim']
+    data_root = args['data_path']
 
+    G = Generator(z_dim)
     weights = {k.replace('module.', ''): v for k, v in torch.load(ckpt_path)['g'].items()}
     G.load_state_dict(weights)
     G.to(device)
     G.eval()
 
-    data = get_data()
+    data = get_data(args['data_path'], limit_data=None)
     data = data.to(device)
 
+
     with torch.no_grad():
-        # interpolate(G, n_zs=15)
+        interpolate(G, n_zs=15)
         # find_nns(G, data)
         find_patch_nns(G, data, 16, 4, 6)
         find_patch_nns(G, data, 24, 4, 6)

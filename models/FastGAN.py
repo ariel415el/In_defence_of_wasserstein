@@ -98,8 +98,9 @@ class SEBlock(nn.Module):
 
 
 class Generator(nn.Module):
-    def __init__(self, z_dim=100):
+    def __init__(self, z_dim=100, skip_connections=False):
         super(Generator, self).__init__()
+        self.skip_connections = skip_connections
         ngf = 64
         nfc_multi = {4 :16, 8 :8, 16 :4, 32 :2, 64 :2, 128 :1}
         nfc = {}
@@ -116,10 +117,10 @@ class Generator(nn.Module):
         self.feat_64  = UpBlock(nfc[32], nfc[64])
         self.feat_128 = UpBlockComp(nfc[64], nfc[128])
 
-        # self.se_64  = SEBlock(nfc[4], nfc[64])
-        # self.se_128 = SEBlock(nfc[8], nfc[128])
+        if self.skip_connections:
+            self.se_64  = SEBlock(nfc[4], nfc[64])
+            self.se_128 = SEBlock(nfc[8], nfc[128])
 
-        # self.to_small = conv2d(nfc[64], nc, 3, 1, 1, bias=False)
         self.to_full = conv2d(nfc[128], 3, 1, 1, 0, bias=False)
 
     def forward(self, input):
@@ -128,12 +129,13 @@ class Generator(nn.Module):
         feat_16  = self.feat_16(feat_8)
         feat_32  = self.feat_32(feat_16)
         feat_64 = self.feat_64(feat_32)
-        # feat_64  = self.se_64(feat_4, feat_64)
+        if self.skip_connections:
+            feat_64  = self.se_64(feat_4, feat_64)
         feat_128 = self.feat_128(feat_64)
-        # feat_128 = self.se_128(feat_8, feat_128)
+        if self.skip_connections:
+            feat_128 = self.se_128(feat_8, feat_128)
 
         im_full = torch.tanh(self.to_full(feat_128))
-        # im_small = torch.tanh(self.to_small(feat_64))
 
         return im_full
 
@@ -171,41 +173,13 @@ class DownBlockComp(nn.Module):
         return (self.main(feat) + self.direct(feat)) / 2
 
 
-class SimpleDecoder(nn.Module):
-    """docstring for CAN_SimpleDecoder"""
-    def __init__(self, nfc_in=64, nc=3):
-        super(SimpleDecoder, self).__init__()
-
-        nfc_multi = {16:4, 32:2, 64:2}
-        nfc = {}
-        for k, v in nfc_multi.items():
-            nfc[k] = int(v*32)
-
-        def upBlock(in_planes, out_planes):
-            block = nn.Sequential(
-                nn.Upsample(scale_factor=2, mode='nearest'),
-                conv2d(in_planes, out_planes*2, 3, 1, 1, bias=False),
-                batchNorm2d(out_planes*2), GLU())
-            return block
-
-        self.main = nn.Sequential(  nn.AdaptiveAvgPool2d(8),
-                                    upBlock(nfc_in, nfc[16]) ,
-                                    upBlock(nfc[16], nfc[32]),
-                                    upBlock(nfc[32], nfc[64]),
-                                    conv2d(nfc[64], nc, 3, 1, 1, bias=False),
-                                    nn.Tanh() )
-
-    def forward(self, input):
-        # input shape: c x 4 x 4
-        return self.main(input)
-
 
 class Discriminator(nn.Module):
-    def __init__(self):
+    def __init__(self, output_dim=1):
         super(Discriminator, self).__init__()
-        self.ndf = 64
+        self.ndf = 48
         nc = 3
-        nfc_multi = {4: 16, 8: 16, 16: 8, 32: 4, 64: 2, 128: 1, 256:0.5}
+        nfc_multi = {4: 16, 8: 16, 16: 8, 32: 4, 64: 2, 128: 1}
         nfc = {}
         for k, v in nfc_multi.items():
             nfc[k] = int(v * self.ndf)
@@ -218,19 +192,28 @@ class Discriminator(nn.Module):
         self.down_32 = DownBlockComp(nfc[64], nfc[32])
         self.down_16 = DownBlockComp(nfc[32], nfc[16])
         self.down_8 = DownBlockComp(nfc[16], nfc[8])
+        # self.down_4 = DownBlockComp(nfc[8], nfc[4])
 
         self.spatial_logits = nn.Sequential(
-            conv2d(nfc[8], nfc[4], 1, 1, 0, bias=False),
-            batchNorm2d(nfc[4]), nn.LeakyReLU(0.2, inplace=True),
-            conv2d(nfc[4], 1, 4, 1, 0, bias=False))
+            conv2d(nfc[8], nfc[4], 4, 2, 0, bias=False),
+            batchNorm2d(nfc[4]),
+            nn.LeakyReLU(0.2, inplace=True),
+            conv2d(nfc[4], output_dim, 3, 1, 0, bias=False))
 
-    def forward(self, img):
+    def features(self, img):
         feat_128 = self.down_from_full(img)
         feat_64 = self.down_64(feat_128)
         feat_32 = self.down_32(feat_64)
         feat_16 = self.down_16(feat_32)
         feat_8 = self.down_8(feat_16)
+        return feat_8
+    def forward(self, img):
+        feat_8 = self.features(img)
+        output = self.spatial_logits(feat_8).view(len(img), -1)
 
-        spatial_logits = self.spatial_logits(feat_8).view(-1)
+        return output
 
-        return spatial_logits
+if __name__ == '__main__':
+    D = Discriminator(output_dim=1)
+    x = torch.ones((6,3,128,128))
+    print(D(x).shape)

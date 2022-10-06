@@ -1,9 +1,6 @@
-import argparse
 from math import sqrt
 
-from torch import nn
 from tqdm import tqdm
-from copy import deepcopy
 from time import time
 
 import torch
@@ -12,14 +9,12 @@ import torch.nn.functional as F
 from torchvision import utils as vutils
 
 from diffaug import DiffAugment
+from utils.common import copy_G_params, load_params
 from utils.data import get_dataloader
-from utils.logging import get_dir, LossLogger
+from utils.logger import get_dir, LossLogger
 
-from benchmarking.patch_swd import patch_swd
-from benchmarking.patch_swd import swd
-from benchmarking.fid import  FID_score
+from benchmarking.fid import FID_score
 from benchmarking.lap_swd import lap_swd
-
 
 
 def train_d(net, data, label="real"):
@@ -32,16 +27,9 @@ def train_d(net, data, label="real"):
 
 
 def get_models(args):
-    if args.architecture == 'DCGAN':
-        from models.DCGAN import Discriminator, Generator, weights_init
-    elif args.architecture == 'StyleGAN':
-        from models.StyleGAN import Discriminator, Generator, weights_init
-    elif args.architecture == 'ProjectedGAN':
-        from models.FastGAN import Generator
-        from models.ProjectedGAN import Discriminator, weights_init
-    else:
-        from models.FastGAN import Discriminator, Generator, weights_init
-    netG = Generator(args.z_dim).to(device)
+    from models.FastGAN import Discriminator, Generator, weights_init
+
+    netG = Generator(args.z_dim, skip_connections=True).to(device)
     netG.apply(weights_init)
 
     netD = Discriminator().to(device)
@@ -50,27 +38,13 @@ def get_models(args):
     print("D params: ", sum(p.numel() for p in netD.parameters() if p.requires_grad))
     print("G params: ", sum(p.numel() for p in netG.parameters() if p.requires_grad))
 
-    netG = nn.DataParallel(netG)
-    netD = nn.DataParallel(netD)
+    # netG = nn.DataParallel(netG)
+    # netD = nn.DataParallel(netD)
 
     return netG, netD
 
 
-def copy_G_params(model):
-    flatten = deepcopy(list(p.data for p in model.parameters()))
-    return flatten
-
-
-def load_params(model, new_param):
-    for p, new_p in zip(model.parameters(), new_param):
-        p.data.copy_(new_p)
-
-
-def train(args):
-    saved_model_folder, saved_image_folder = get_dir(args)
-
-    train_loader, test_loader = get_dataloader(args.data_path, args.im_size, args.batch_size, n_workers)
-
+def train_GAN(args):
     debug_fixed_noise = torch.randn((args.batch_size, args.z_dim)).to(device)
     debug_fixed_reals = next(train_loader).to(device)
     debug_fixed_reals_test = next(test_loader).to(device)
@@ -84,6 +58,7 @@ def train(args):
 
     optimizerG = optim.Adam(netG.parameters(), lr=args.lr, betas=(args.nbeta1, 0.999))
     optimizerD = optim.Adam(netD.parameters(), lr=args.lr, betas=(args.nbeta1, 0.999))
+
     logger = LossLogger(saved_image_folder)
     start = time()
     for iteration in tqdm(range(args.n_iterations + 1)):
@@ -101,10 +76,10 @@ def train(args):
 
         Dloss_real = train_d(netD, real_image, label="real")
         Dloss_fake = train_d(netD, fake_images.detach(), label="fake")
-        gp = 10 * calc_gradient_penalty(netD, real_image, fake_images, device)
+        # gp = 10 * calc_gradient_penalty(netD, real_image, fake_images, device)
         Dloss_real.backward()
         Dloss_fake.backward()
-        gp.backward()
+        # gp.backward()
 
         optimizerD.step()
 
@@ -118,12 +93,12 @@ def train(args):
         for p, avg_p in zip(netG.parameters(), avg_param_G):
             avg_p.mul_(0.999).add_(0.001 * p.data)
 
-        logger.aggregate_train_losses(Gloss.item(), Dloss_real.item(), Dloss_fake.item())
+        logger.aggregate_data({"Gloss":Gloss.item(), "Dloss_real": Dloss_real.item(), "Dloss_fake":Dloss_fake.item()})
         if iteration % 100 == 0:
             sec_per_kimage = (time() - start) / (max(1, iteration) / 1000)
             print(f"G loss: {Gloss:.5f}: Dloss-real: {Dloss_real.item():.5f}, Dloss-fake {Dloss_fake.item():.5f} sec/kimg: {sec_per_kimage:.1f}")
 
-        if iteration % (save_interval) == 0:
+        if iteration % (args.save_interval) == 0:
             backup_para = copy_G_params(netG)
             load_params(netG, avg_param_G)
 
@@ -151,67 +126,40 @@ def evaluate(netG, netD, debug_fixed_noise,
         vutils.save_image(fixed_noise_fake_images.add(1).mul(0.5), saved_image_folder + '/%d.jpg' % iteration, nrow=nrow)
 
         fake_images = [netG(torch.randn_like(debug_fixed_noise).to(device)) for _ in range(16)]
-        logger.log_other_losses({
+        logger.add_data({
             'fixed_batch_fid_to_train': train_fid_calculator.calc_fid([fixed_noise_fake_images]).item(),
             'fixed_batch_fid_to_test': test_fid_calculator.calc_fid([fixed_noise_fake_images]).item(),
             'full_fid_to_train': train_fid_calculator.calc_fid(fake_images).item(),
             'full_fid_to_test': test_fid_calculator.calc_fid(fake_images).item(),
         })
 
-        x = debug_fixed_reals
-        y = fixed_noise_fake_images
-        logger.log_other_losses({
-            # 'swd': swd(x.cpu(), y.cpu()).item(),
-            # 'patch_swd': patch_swd(x.cpu(), y.cpu()).item(),
-            'lap_swd': lap_swd(x, y).item()
+        logger.add_data({
+            'lap_swd_train': lap_swd(fixed_noise_fake_images, debug_fixed_reals).item(),
+            'lap_swd_test': lap_swd(fixed_noise_fake_images, debug_fixed_reals_test).item()
         })
 
         Dloss_real_train = train_d(netD, debug_fixed_reals, label="real").item()
         Dloss_real_test = train_d(netD, debug_fixed_reals_test, label="real").item()
-        logger.log_eval_losses(Dloss_real_train, Dloss_real_test)
-        logger.plot()
+        logger.add_data({'Dloss_real_train': Dloss_real_train, 'Dloss_real_test':Dloss_real_test})
+        logger.plot({"D_eval": ["Dloss_real_train", "Dloss_real_test"],
+                     "D_train": ["Dloss_real", "Dloss_fake"],
+                     "FIDs": ['fixed_batch_fid_to_train', 'fixed_batch_fid_to_test', 'full_fid_to_train', 'full_fid_to_test'],
+                     "lap_SWD": ['lap_swd_train', 'lap_swd_test']
+                     })
 
     print(f"Evaluation finished in {time()-start} seconds")
 
 
-
-def calc_gradient_penalty(netD, real_data, fake_data, device):
-    alpha = torch.rand(1, 1)
-    alpha = alpha.expand(real_data.size())
-    alpha = alpha.to(device)
-
-    interpolates = alpha * real_data + ((1 - alpha) * fake_data)
-
-    interpolates = interpolates.to(device)
-    interpolates = torch.autograd.Variable(interpolates, requires_grad=True)
-
-    disc_interpolates = netD(interpolates)
-
-    gradients = torch.autograd.grad(outputs=disc_interpolates, inputs=interpolates,
-                              grad_outputs=torch.ones(disc_interpolates.size()).to(device),
-                              create_graph=True, retain_graph=True, only_inputs=True)[0]
-
-    gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
-    return gradient_penalty
-
 if __name__ == "__main__":
-    args = argparse.Namespace()
-    args.data_path = '/cs/labs/yweiss/ariel1/data/FFHQ_1000_images'
-    args.architecture = 'FastGAN'
-    args.batch_size = 64
-    args.n_iterations = 100000
-    args.im_size = 128
-    args.z_dim = 128
-    args.lr = 0.0002
-    args.nbeta1 = 0.5
-    args.augmentaion='color,translation'
-    args.name = f"FFHQ-1k+gp-10_{args.architecture}_Z-{args.z_dim}_B-{args.batch_size}"
+    from config import args
 
-    n_workers = 8
-    save_interval = 1000
     device = torch.device("cuda")
 
-    train(args)
+    saved_model_folder, saved_image_folder = get_dir(args)
+
+    train_loader, test_loader = get_dataloader(args.data_path, args.im_size, args.batch_size, args.n_workers)
+
+    train_GAN(args)
 
 
 
