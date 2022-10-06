@@ -5,6 +5,7 @@ import torch.utils.data as data
 from torch.utils.data import Dataset, DataLoader
 from PIL import Image
 from torchvision import transforms
+from tqdm import tqdm
 
 
 class ImageFolder(Dataset):
@@ -19,7 +20,7 @@ class ImageFolder(Dataset):
         ])
 
         self.images = []
-        for path in paths:
+        for path in tqdm(paths, desc="Loading images into memory"):
             img = Image.open(path).convert('RGB')
             if transform is not None:
                 img = transform(img)
@@ -58,7 +59,8 @@ class InfiniteSamplerWrapper(data.sampler.Sampler):
 
 
 def get_datasets(data_root, im_size, val_percentage):
-    paths = sorted([os.path.join(data_root, im_name) for im_name in os.listdir(data_root)])[:1000]
+    paths = sorted([os.path.join(data_root, im_name) for im_name in os.listdir(data_root)])
+
     n_val_images = int(val_percentage * len(paths))
     train_paths, test_paths = paths[n_val_images:], paths[:n_val_images]
     print(f"Train images: {len(train_paths)}, test images: {len(test_paths)}")

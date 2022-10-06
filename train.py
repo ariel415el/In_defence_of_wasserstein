@@ -1,4 +1,7 @@
 import argparse
+from math import sqrt
+
+from torch import nn
 from tqdm import tqdm
 from copy import deepcopy
 from time import time
@@ -14,10 +17,9 @@ from utils.logging import get_dir, LossLogger
 
 from benchmarking.patch_swd import patch_swd
 from benchmarking.patch_swd import swd
-from benchmarking.fid import fid_loss
+from benchmarking.fid import  FID_score
 from benchmarking.lap_swd import lap_swd
-policy = 'color,translation'
-# policy = 'add_noise'
+
 
 
 def train_d(net, data, label="real"):
@@ -48,6 +50,9 @@ def get_models(args):
     print("D params: ", sum(p.numel() for p in netD.parameters() if p.requires_grad))
     print("G params: ", sum(p.numel() for p in netG.parameters() if p.requires_grad))
 
+    netG = nn.DataParallel(netG)
+    netD = nn.DataParallel(netD)
+
     return netG, netD
 
 
@@ -70,6 +75,9 @@ def train(args):
     debug_fixed_reals = next(train_loader).to(device)
     debug_fixed_reals_test = next(test_loader).to(device)
 
+    train_fid_calculator = FID_score([next(train_loader).to(device) for _ in range(16)], device)
+    test_fid_calculator = FID_score([next(train_loader).to(device) for _ in range(16)], device)
+
     netG, netD = get_models(args)
 
     avg_param_G = copy_G_params(netG)
@@ -85,16 +93,19 @@ def train(args):
         noise = torch.randn((b, args.z_dim)).to(device)
         fake_images = netG(noise)
 
-        real_image = DiffAugment(real_image, policy=policy)
-        fake_images = DiffAugment(fake_images, policy=policy)
+        real_image = DiffAugment(real_image, policy=args.augmentaion)
+        fake_images = DiffAugment(fake_images, policy=args.augmentaion)
 
         ## 1. train Discriminator
         netD.zero_grad()
 
         Dloss_real = train_d(netD, real_image, label="real")
         Dloss_fake = train_d(netD, fake_images.detach(), label="fake")
+        gp = 10 * calc_gradient_penalty(netD, real_image, fake_images, device)
         Dloss_real.backward()
         Dloss_fake.backward()
+        gp.backward()
+
         optimizerD.step()
 
         ## 2. train Generator
@@ -115,44 +126,90 @@ def train(args):
         if iteration % (save_interval) == 0:
             backup_para = copy_G_params(netG)
             load_params(netG, avg_param_G)
-            with torch.no_grad():
-                generated_images = netG(debug_fixed_noise)
-                vutils.save_image(generated_images.add(1).mul(0.5), saved_image_folder + '/%d.jpg' % iteration, nrow=4)
 
-                x = debug_fixed_reals.cpu()
-                y = generated_images.cpu()
-                logger.log_other_losses({'fid_loss': fid_loss(x, y).item(),
-                                       'swd': swd(x, y).item(),
-                                       'patch_swd': patch_swd(x, y).item(),
-                                       'lap_swd': lap_swd(x, y).item()
-                                        })
-
-                Dloss_real_train = train_d(netD, debug_fixed_reals, label="real").item()
-                Dloss_real_test = train_d(netD, debug_fixed_reals_test, label="real").item()
-                logger.log_eval_losses(Dloss_real_train, Dloss_real_test)
-
-                logger.plot()
-
+            evaluate(netG, netD, debug_fixed_noise,
+                     debug_fixed_reals,
+                     debug_fixed_reals_test, logger,
+                     train_fid_calculator,
+                     test_fid_calculator,
+                     saved_image_folder, iteration)
             torch.save({'g': netG.state_dict(), 'd': netD.state_dict()}, saved_model_folder + '/%d.pth' % iteration)
 
             load_params(netG, backup_para)
 
 
+def evaluate(netG, netD, debug_fixed_noise,
+             debug_fixed_reals,
+             debug_fixed_reals_test, logger,
+             train_fid_calculator,
+             test_fid_calculator,
+             saved_image_folder, iteration):
+    start = time()
+    with torch.no_grad():
+        fixed_noise_fake_images = netG(debug_fixed_noise)
+        nrow = int(sqrt(len(fixed_noise_fake_images)))
+        vutils.save_image(fixed_noise_fake_images.add(1).mul(0.5), saved_image_folder + '/%d.jpg' % iteration, nrow=nrow)
+
+        fake_images = [netG(torch.randn_like(debug_fixed_noise).to(device)) for _ in range(16)]
+        logger.log_other_losses({
+            'fixed_batch_fid_to_train': train_fid_calculator.calc_fid([fixed_noise_fake_images]).item(),
+            'fixed_batch_fid_to_test': test_fid_calculator.calc_fid([fixed_noise_fake_images]).item(),
+            'full_fid_to_train': train_fid_calculator.calc_fid(fake_images).item(),
+            'full_fid_to_test': test_fid_calculator.calc_fid(fake_images).item(),
+        })
+
+        x = debug_fixed_reals
+        y = fixed_noise_fake_images
+        logger.log_other_losses({
+            # 'swd': swd(x.cpu(), y.cpu()).item(),
+            # 'patch_swd': patch_swd(x.cpu(), y.cpu()).item(),
+            'lap_swd': lap_swd(x, y).item()
+        })
+
+        Dloss_real_train = train_d(netD, debug_fixed_reals, label="real").item()
+        Dloss_real_test = train_d(netD, debug_fixed_reals_test, label="real").item()
+        logger.log_eval_losses(Dloss_real_train, Dloss_real_test)
+        logger.plot()
+
+    print(f"Evaluation finished in {time()-start} seconds")
+
+
+
+def calc_gradient_penalty(netD, real_data, fake_data, device):
+    alpha = torch.rand(1, 1)
+    alpha = alpha.expand(real_data.size())
+    alpha = alpha.to(device)
+
+    interpolates = alpha * real_data + ((1 - alpha) * fake_data)
+
+    interpolates = interpolates.to(device)
+    interpolates = torch.autograd.Variable(interpolates, requires_grad=True)
+
+    disc_interpolates = netD(interpolates)
+
+    gradients = torch.autograd.grad(outputs=disc_interpolates, inputs=interpolates,
+                              grad_outputs=torch.ones(disc_interpolates.size()).to(device),
+                              create_graph=True, retain_graph=True, only_inputs=True)[0]
+
+    gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
+    return gradient_penalty
+
 if __name__ == "__main__":
     args = argparse.Namespace()
-    args.data_path = '/mnt/storage_ssd/datasets/FFHQ_128'
-    args.architecture = 'ProjectedGAN'
-    args.batch_size = 8
-    args.n_iterations = 50000
+    args.data_path = '/cs/labs/yweiss/ariel1/data/FFHQ_1000_images'
+    args.architecture = 'FastGAN'
+    args.batch_size = 64
+    args.n_iterations = 100000
     args.im_size = 128
-    args.z_dim = 64
+    args.z_dim = 128
     args.lr = 0.0002
     args.nbeta1 = 0.5
-    args.name = f"FFHQ-5k_{args.architecture}_Z-{args.z_dim}_B-{args.batch_size}"
+    args.augmentaion='color,translation'
+    args.name = f"FFHQ-1k+gp-10_{args.architecture}_Z-{args.z_dim}_B-{args.batch_size}"
 
-    n_workers = 0
+    n_workers = 8
     save_interval = 1000
-    device = torch.device("cuda:0")
+    device = torch.device("cuda")
 
     train(args)
 

@@ -10,11 +10,11 @@ from tqdm import tqdm
 
 from models.FastGAN import Generator
 from torchvision import utils as vutils
+import torch.nn.functional as F
 
-from utils.data import get_datasets
 
-
-def get_data():
+def get_data(limit_data=None):
+    """Load entire dataset to memory as a single batch"""
     T = transforms.Compose([
         transforms.Resize((128, 128)),
         transforms.ToTensor(),
@@ -22,7 +22,11 @@ def get_data():
     ])
 
     images = []
-    for fname in os.listdir(data_root):
+    print("Loading data to memory to find NNs")
+    img_names = os.listdir(data_root)
+    if limit_data is not None:
+        img_names = img_names[:limit_data]
+    for fname in tqdm(img_names):
         im = Image.open(os.path.join(data_root, fname))
         im = T(im)
         images += [im]
@@ -31,6 +35,7 @@ def get_data():
 
 
 def interpolate(G, n_zs=10, steps=10):
+    """Sample n_zs images and linearly interpolate between them in the latent space """
     os.makedirs(f'{outputs_dir}/interpolations', exist_ok=True)
     cur_z = torch.randn((1, noise_dim)).to(device)
     frame = 0
@@ -45,44 +50,62 @@ def interpolate(G, n_zs=10, steps=10):
         cur_z = next_z
 
 
-def _batch_nns(img, data, row_interval, col_interval):
-    if row_interval is not None:
-        img = img[..., row_interval[0]:row_interval[1], col_interval[0]: col_interval[1]]
-        ref = data[..., row_interval[0]:row_interval[1], col_interval[0]: col_interval[1]]
+def _batch_nns(img, data, center, p, s):
+    h = p // 2
+    query_patch = img[..., center[0]-h:center[0]+h, center[1]-h:center[1]+h]
+    refs = data[..., center[0]-h-s:center[0]+h+s, center[1]-h-s:center[1]+h+s]
+    refs = F.unfold(refs, kernel_size=p, stride=1) # shape (b, 3*p*p, N_patches)
+    refs = refs.permute(0, 2, 1).reshape(-1, 3, p, p)
 
-    dists = (ref - img).reshape(ref.shape[0], -1)
-    return torch.sort(torch.norm(dists, dim=1))[1]
+    dists = (refs - query_patch).reshape(refs.shape[0], -1)
+    rgb_nn_index = torch.sort(torch.norm(dists, dim=1, p=1))[1][0]
 
+    dists = (refs.mean(1) - query_patch.mean(1)).reshape(refs.shape[0], -1) # Compare gray scale images
+    gs_nn_index = torch.sort(torch.norm(dists, dim=1, p=1))[1][0]
 
-def find_patch_nns(G, data):
-    os.makedirs(f'{outputs_dir}/patch_nns', exist_ok=True)
-    with torch.no_grad():
-        for i in range(5):
-            query_image = G(torch.randn(1, noise_dim).to(device))
-            # x = _find_crop_nns(fake_img, data)
+    a = torch.Tensor([[1, 0, -1],
+                      [2, 0, -2],
+                      [1, 0, -1]]).view((1,1,3,3))
+    dists = (F.conv2d(torch.mean(refs, dim=1, keepdim=True), a) - F.conv2d(torch.mean(query_patch, dim=1, keepdim=True), a)).reshape(refs.shape[0], -1)
+    edge_nn_index = torch.sort(torch.norm(dists, dim=1, p=1))[1][0]
 
-            NN_images = []
-            img_dim = query_image.shape[-1]
-            d = img_dim // 4
+    return refs[rgb_nn_index].clone(), refs[gs_nn_index].clone(), refs[edge_nn_index].clone()
 
-            all_slices = np.arange(d, img_dim - d, d)
-            all_slices = list(zip(all_slices, all_slices + d))
-            all_pairs_of_slices = itertools.product(all_slices, repeat=2)
-            for i, (row_interval, col_interval) in enumerate(all_pairs_of_slices):
-                nn_indices = _batch_nns(query_image, data, row_interval, col_interval)
-                nn = data[nn_indices[0].cpu().numpy()].clone() * 0.5
-                nn[..., row_interval[0]:row_interval[1], col_interval[0]: col_interval[1]] *= 2
-                NN_images.append(nn.unsqueeze(0))
+def find_patch_nns(G, data, patch_size=24, stride=4, search_margin=6):
+    """
+    Search for nearest patch in data to patches from generated images.
+    Search is performed in a constrained locality of the query patch location
+    """
+    out_dir = f'{outputs_dir}/patch_nns(p-{patch_size}_s-{search_margin})'
+    os.makedirs(out_dir, exist_ok=True)
+    h = patch_size // 2
+    img_dim = data.shape[-1]
+    centers = np.arange(patch_size, img_dim - patch_size, stride)
+    centers = list(itertools.product(centers, repeat=2))
 
-            x = torch.cat([query_image] + NN_images, dim=0)
+    print(f"Searching for {patch_size}x{patch_size} patch nns in {len(data)} data samples:")
+    for j in range(5):
+        query_image = G(torch.randn(1, noise_dim).to(device))
+        vutils.save_image(query_image.add(1).mul(0.5), f'{out_dir}/query_img-{j}.png', normalize=False, nrow=2)
 
-            vutils.save_image(x.add(1).mul(0.5), f'{outputs_dir}/patch_nns/im-{i}.png', normalize=False)
+        rgb_NN_patches = []
+        gs_NN_patches = []
+        edge_NN_patches = []
+        q_patches = []
+        for i, center in enumerate(tqdm(centers)):
+            q_patches.append(query_image[..., center[0]-h:center[0]+h, center[1]-h:center[1]+h])
+            rgb_nn_patch, gs_nn_patch, edge_nn_patch = _batch_nns(query_image, data, center, p=patch_size, s=search_margin)
+            rgb_NN_patches.append(rgb_nn_patch.unsqueeze(0))
+            gs_NN_patches.append(gs_nn_patch.unsqueeze(0))
+            edge_NN_patches.append(edge_nn_patch.unsqueeze(0))
 
+        x = torch.cat(q_patches + rgb_NN_patches + gs_NN_patches + edge_NN_patches, dim=0)
+        vutils.save_image(x.add(1).mul(0.5), f'{out_dir}/patches-{j}.png', normalize=False, nrow=len(q_patches))
 
 def find_nns(G, data):
     import lpips
     os.makedirs(f'{outputs_dir}/nns', exist_ok=True)
-    percept = lpips.PerceptualLoss(model='net-lin', net='vgg', use_gpu=True)
+    percept = lpips.LPIPS(net='vgg', lpips=False).to(device)
     results = []
     for i in range(8):
         fake_image = G(torch.randn((1, noise_dim), device=device))
@@ -120,27 +143,32 @@ def inverse_image(G, real_images):
 
 
 if __name__ == '__main__':
-    noise_dim = 64
-    data_root = '/mnt/storage_ssd/datasets/FFHQ_128'
-    ckpt_path = 'train_results/FFHQ_FastGAN_Z-64_B-8/models/50000.pth'  # path to the checkpoint
-    outputs_dir = 'train_results/FFHQ_FastGAN_Z-64_B-8/test_outputs'
+    noise_dim = 128
+    # data_root = '/cs/labs/yweiss/ariel1/data/FFHQ_128'
+    # train_dir = 'train_results/FFHQ-70k_3_FastGAN_Z-128_B-64'
+    # ckpt_path = f'{train_dir}/models/70000.pth'  # path to the checkpoint
+    data_root = '/cs/labs/yweiss/ariel1/data/FFHQ_1000_images'
+    train_dir = 'train_results/FFHQ-1k+gp_2_FastGAN_Z-128_B-64'
+    ckpt_path = f'{train_dir}/models/10000.pth'  # path to the checkpoint
+    outputs_dir = f'{train_dir}/test_outputs'
     os.makedirs(outputs_dir, exist_ok=True)
-    device = torch.device('cuda:0')
+    device = torch.device('cpu')
 
     G = Generator(z_dim=noise_dim)
     G.to(device)
 
-    G.load_state_dict(torch.load(ckpt_path)['g'])
+    weights = {k.replace('module.', ''): v for k, v in torch.load(ckpt_path)['g'].items()}
+    G.load_state_dict(weights)
     G.to(device)
     G.eval()
 
-    with torch.no_grad():
-        interpolate(G, n_zs=15)
-
     data = get_data()
+    data = data.to(device)
 
     with torch.no_grad():
-        find_nns(G, data)
-        find_patch_nns(G, data)
+        # interpolate(G, n_zs=15)
+        # find_nns(G, data)
+        find_patch_nns(G, data, 16, 4, 6)
+        find_patch_nns(G, data, 24, 4, 6)
 
-    inverse_image(G, data[:10])
+    # inverse_image(G, data[:10])
