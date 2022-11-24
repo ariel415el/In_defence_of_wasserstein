@@ -37,6 +37,7 @@ def get_c_transform_scores(reals, fakes, f_reals):
 
 
 def get_models(args):
+    # from models.FastGAN import Discriminator, Generator, weights_init
     from models.FastGAN import Discriminator, Generator, weights_init
 
     netG = Generator(args.z_dim, skip_connections=False).to(device)
@@ -44,7 +45,7 @@ def get_models(args):
 
     netD = Discriminator().to(device)
     # netD = BagNet(Bottleneck, [3, 4, 6, 3], strides=[2, 2, 2, 1], kernel3=[1, 1, 1, 1], num_classes=1).to(device)
-    # netD.apply(weights_init)
+    netD.apply(weights_init)
 
     print("D params: ", sum(p.numel() for p in netD.parameters() if p.requires_grad))
     print("G params: ", sum(p.numel() for p in netG.parameters() if p.requires_grad))
@@ -64,8 +65,6 @@ def train_GAN(args):
     test_fid_calculator = FID_score([next(train_loader).to(device) for _ in range(16)], device)
 
     netG, netC = get_models(args)
-
-    avg_param_G = copy_G_params(netG)
 
     optimizerG = optim.Adam(netG.parameters(), lr=args.lr, betas=(args.nbeta1, 0.999))
     optimizerC = optim.Adam(netC.parameters(), lr=args.lr, betas=(args.nbeta1, 0.999))
@@ -89,7 +88,7 @@ def train_GAN(args):
         ## 1. train Discriminator
         netC.zero_grad()
 
-        Closs = real_scores.mean() + fake_scores.mean().detach()
+        Closs = -(real_scores.mean() + fake_scores.mean().detach())
         Closs.backward()
 
         optimizerC.step()
@@ -99,14 +98,9 @@ def train_GAN(args):
             netG.zero_grad()
             real_scores = netC(real_image)
             fake_scores = get_c_transform_scores(real_image, fake_images, real_scores)
-            Gloss = -(real_scores.mean() + fake_scores.mean())
-            # Gloss = -(netC(fake_images).mean() + fake_scores.mean())
+            Gloss = real_scores.mean() + fake_scores.mean()
             Gloss.backward()
             optimizerG.step()
-
-        # Update avg weights
-        for p, avg_p in zip(netG.parameters(), avg_param_G):
-            avg_p.mul_(0.999).add_(0.001 * p.data)
 
         logger.aggregate_data({"Gloss":Gloss.item(), "Closs": Closs.item()})
         if iteration % 100 == 0:
@@ -114,9 +108,6 @@ def train_GAN(args):
             print(f"G loss: {Gloss:.5f}: Closs: {Closs.item():.5f}, sec/kimg: {sec_per_kimage:.1f}")
 
         if iteration % (args.save_interval) == 0:
-            backup_para = copy_G_params(netG)
-            load_params(netG, avg_param_G)
-
             evaluate(netG, netC, debug_fixed_noise,
                      debug_fixed_reals,
                      debug_fixed_reals_test, logger,
@@ -124,8 +115,6 @@ def train_GAN(args):
                      test_fid_calculator,
                      saved_image_folder, iteration)
             torch.save({'g': netG.state_dict(), 'c': netC.state_dict()}, saved_model_folder + '/%d.pth' % iteration)
-
-            load_params(netG, backup_para)
 
 
 def evaluate(netG, netC, debug_fixed_noise,
@@ -140,13 +129,13 @@ def evaluate(netG, netC, debug_fixed_noise,
         nrow = int(sqrt(len(fixed_noise_fake_images)))
         vutils.save_image(fixed_noise_fake_images.add(1).mul(0.5), saved_image_folder + '/%d.jpg' % iteration, nrow=nrow)
 
-        fake_images = [netG(torch.randn_like(debug_fixed_noise).to(device)) for _ in range(16)]
-        logger.add_data({
-            'fixed_batch_fid_to_train': train_fid_calculator.calc_fid([fixed_noise_fake_images]).item(),
-            'fixed_batch_fid_to_test': test_fid_calculator.calc_fid([fixed_noise_fake_images]).item(),
-            'full_fid_to_train': train_fid_calculator.calc_fid(fake_images).item(),
-            'full_fid_to_test': test_fid_calculator.calc_fid(fake_images).item(),
-        })
+        # fake_images = [netG(torch.randn_like(debug_fixed_noise).to(device)) for _ in range(16)]
+        # logger.add_data({
+        #     'fixed_batch_fid_to_train': train_fid_calculator.calc_fid([fixed_noise_fake_images]).item(),
+        #     'fixed_batch_fid_to_test': test_fid_calculator.calc_fid([fixed_noise_fake_images]).item(),
+        #     'full_fid_to_train': train_fid_calculator.calc_fid(fake_images).item(),
+        #     'full_fid_to_test': test_fid_calculator.calc_fid(fake_images).item(),
+        # })
 
         logger.add_data({
             'lap_swd_train': lap_swd(fixed_noise_fake_images, debug_fixed_reals).item(),
@@ -158,7 +147,7 @@ def evaluate(netG, netC, debug_fixed_noise,
         logger.add_data({'real_scores_train': Dloss_real_train, 'real_scores_test':Dloss_real_test})
         logger.plot({"C_eval": ["real_scores_train", "real_scores_test"],
                      "C_train": ["Gloss", "Closs"],
-                     "FIDs": ['fixed_batch_fid_to_train', 'fixed_batch_fid_to_test', 'full_fid_to_train', 'full_fid_to_test'],
+                     # "FIDs": ['fixed_batch_fid_to_train', 'fixed_batch_fid_to_test', 'full_fid_to_train', 'full_fid_to_test'],
                      "lap_SWD": ['lap_swd_train', 'lap_swd_test']
                      })
 

@@ -35,7 +35,7 @@ def get_models(args):
 
     netD = Discriminator().to(device)
     # netD = BagNet(Bottleneck, [3, 4, 6, 3], strides=[2, 2, 2, 1], kernel3=[1, 1, 1, 1], num_classes=1).to(device)
-    # netD.apply(weights_init)
+    netD.apply(weights_init)
 
     print("D params: ", sum(p.numel() for p in netD.parameters() if p.requires_grad))
     print("G params: ", sum(p.numel() for p in netG.parameters() if p.requires_grad))
