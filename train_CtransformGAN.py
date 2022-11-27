@@ -17,30 +17,43 @@ from utils.logger import get_dir, LossLogger
 from benchmarking.fid import FID_score
 from benchmarking.lap_swd import lap_swd
 
-def get_c_transform_scores(reals, fakes, f_reals):
+def get_dist_mat(X,Y):
+    D = (X * X).sum(1)[:, None] + (Y * Y).sum(1)[None, :] - 2.0 * X @ Y.T
+    d = X.shape[1]
+    D = D / d # normalize by size of vector to make dists independent of the size of d ( use same alpha for all patche-sizes)
+    return D
+
+def get_c_transform_scores(reals, fakes, f_reals, f_fakes):
     """
     reals.shape = (b1, ...)
     fakes.shape = (b2, ...)
     f_reals.shape = (b1)
     dist.shape = (b2, b1)
     """
-    X = fakes.reshape(fakes.shape[0], -1)
-    Y = reals.reshape(reals.shape[0], -1)
-    dist = (X * X).sum(1)[:, None] + (Y * Y).sum(1)[None, :] - 2.0 * X @ Y.T
-    d = X.shape[1]
-    dist = dist / d # normalize by size of vector to make dists independent of the size of d ( use same alpha for all patche-sizes)
-    dist = dist - f_reals[None, :, 0]
+    Bxs = reals.reshape(reals.shape[0], -1)
+    Bys = fakes.reshape(fakes.shape[0], -1)
+    n_reals =  len(Bxs)
+    B = torch.cat([Bxs, Bys], dim=0)
+    fs = torch.cat([f_reals, f_fakes])
+    D = get_dist_mat(B, B)
+    D = D - fs[None, :, 0]
 
-    return torch.min(dist, dim=1)[0]
-    # return dist[:, NNs.long()]
+    nns = torch.min(D, dim=1)[0]
+    fc_fakes = nns[n_reals:]
+
+    # D = D - nns[:, None]
+    # P1 = (D**2).mean()
+    # D[D>0] = 0
+    # P2 = (D**2).mean()
+    return fc_fakes#, P1, P2
 
 
 
 def get_models(args):
     # from models.FastGAN import Discriminator, Generator, weights_init
-    from models.FastGAN import Discriminator, Generator, weights_init
+    from models.DCGAN import Discriminator, Generator, weights_init
 
-    netG = Generator(args.z_dim, skip_connections=False).to(device)
+    netG = Generator(args.z_dim).to(device)
     netG.apply(weights_init)
 
     netD = Discriminator().to(device)
@@ -61,8 +74,8 @@ def train_GAN(args):
     debug_fixed_reals = next(train_loader).to(device)
     debug_fixed_reals_test = next(test_loader).to(device)
 
-    train_fid_calculator = FID_score([next(train_loader).to(device) for _ in range(16)], device)
-    test_fid_calculator = FID_score([next(train_loader).to(device) for _ in range(16)], device)
+    # train_fid_calculator = FID_score([next(train_loader).to(device) for _ in range(16)], device)
+    # test_fid_calculator = FID_score([next(train_loader).to(device) for _ in range(16)], device)
 
     netG, netC = get_models(args)
 
@@ -81,31 +94,34 @@ def train_GAN(args):
         real_image = DiffAugment(real_image, policy=args.augmentaion)
         fake_images = DiffAugment(fake_images, policy=args.augmentaion)
 
-        # Define c-transform
-        real_scores = netC(real_image)
-        fake_scores = get_c_transform_scores(real_image, fake_images, real_scores)
-
         ## 1. train Discriminator
         netC.zero_grad()
-
-        Closs = -(real_scores.mean() + fake_scores.mean().detach())
-        Closs.backward()
-
+        f_reals = netC(real_image)
+        f_fakes = netC(fake_images)
+        fc_fakes = get_c_transform_scores(real_image, fake_images, f_reals, f_fakes)
+        Closs = -(f_reals.mean() + fc_fakes.mean())
+        Closs.backward(retain_graph=True)
         optimizerC.step()
+        Closs = Closs.item()
 
         ## 2. train Generator
-        if iteration % 5 ==0:
+        if iteration % 5 == 0:
             netG.zero_grad()
-            real_scores = netC(real_image)
-            fake_scores = get_c_transform_scores(real_image, fake_images, real_scores)
-            Gloss = real_scores.mean() + fake_scores.mean()
+            netC.zero_grad()
+
+            f_reals = netC(real_image)
+            f_fakes = netC(fake_images)
+            fc_fakes = get_c_transform_scores(real_image, fake_images, f_reals, f_fakes)
+            Gloss = f_reals.mean() + fc_fakes.mean()
             Gloss.backward()
             optimizerG.step()
+            Gloss = Gloss.item()
 
-        logger.aggregate_data({"Gloss":Gloss.item(), "Closs": Closs.item()})
+        if iteration > 0:
+            logger.aggregate_data({"Gloss":Gloss, "Closs": Closs})
         if iteration % 100 == 0:
             sec_per_kimage = (time() - start) / (max(1, iteration) / 1000)
-            print(f"G loss: {Gloss:.5f}: Closs: {Closs.item():.5f}, sec/kimg: {sec_per_kimage:.1f}")
+            print(f"G loss: {Gloss:.5f}: Closs: {Closs:.5f}, sec/kimg: {sec_per_kimage:.1f}")
 
         if iteration % (args.save_interval) == 0:
             evaluate(netG, netC, debug_fixed_noise,
@@ -142,10 +158,14 @@ def evaluate(netG, netC, debug_fixed_noise,
             'lap_swd_test': lap_swd(fixed_noise_fake_images, debug_fixed_reals_test).item()
         })
 
-        Dloss_real_train = netC(debug_fixed_reals).mean()
-        Dloss_real_test = netC(debug_fixed_reals_test).mean()
-        logger.add_data({'real_scores_train': Dloss_real_train, 'real_scores_test':Dloss_real_test})
-        logger.plot({"C_eval": ["real_scores_train", "real_scores_test"],
+        f_fixed_fake = netC(fixed_noise_fake_images)
+        f_fixed_real_train = netC(debug_fixed_reals)
+        fc_fixed_fake_train = get_c_transform_scores(debug_fixed_reals, fixed_noise_fake_images, f_fixed_real_train, f_fixed_fake)
+        f_fixed_real_test = netC(debug_fixed_reals_test)
+        fc_fixed_fake_test = get_c_transform_scores(debug_fixed_reals_test, fixed_noise_fake_images, f_fixed_real_test, f_fixed_fake)
+        logger.add_data({'f_fixed_real_train': f_fixed_real_train.mean(), 'f_fixed_real_test':f_fixed_real_test.mean(),
+                         'fc_fixed_fake_train':fc_fixed_fake_train.mean(), 'fc_fixed_fake_test': fc_fixed_fake_test.mean()})
+        logger.plot({"C_eval": ["f_fixed_real_train", "f_fixed_real_test", "fc_fixed_fake_train", "fc_fixed_fake_test"],
                      "C_train": ["Gloss", "Closs"],
                      # "FIDs": ['fixed_batch_fid_to_train', 'fixed_batch_fid_to_test', 'full_fid_to_train', 'full_fid_to_test'],
                      "lap_SWD": ['lap_swd_train', 'lap_swd_test']

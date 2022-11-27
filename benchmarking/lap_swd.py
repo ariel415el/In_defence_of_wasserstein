@@ -156,3 +156,11 @@ def lap_swd(image1, image2,
             return result.cpu()
         else:
             return torch.mean(result).cpu()
+
+
+class LapSWD:
+    def __str__(self):
+        return "LapSWD"
+
+    def __call__(self, x,y):
+        return lap_swd(x,y)

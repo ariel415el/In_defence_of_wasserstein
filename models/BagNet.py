@@ -1,20 +1,5 @@
 import torch.nn as nn
 import math
-import torch
-from collections import OrderedDict
-from torch.utils import model_zoo
-
-import os
-
-dir_path = os.path.dirname(os.path.realpath(__file__))
-
-__all__ = ['bagnet9', 'bagnet17', 'bagnet33']
-
-model_urls = {
-    'bagnet9': 'https://bitbucket.org/wielandbrendel/bag-of-feature-pretrained-models/raw/249e8fa82c0913623a807d9d35eeab9da7dcc2a8/bagnet8-34f4ccd2.pth.tar',
-    'bagnet17': 'https://bitbucket.org/wielandbrendel/bag-of-feature-pretrained-models/raw/249e8fa82c0913623a807d9d35eeab9da7dcc2a8/bagnet16-105524de.pth.tar',
-    'bagnet33': 'https://bitbucket.org/wielandbrendel/bag-of-feature-pretrained-models/raw/249e8fa82c0913623a807d9d35eeab9da7dcc2a8/bagnet32-2ddd53ed.pth.tar',
-}
 
 
 class Bottleneck(nn.Module):
@@ -22,11 +7,9 @@ class Bottleneck(nn.Module):
 
     def __init__(self, inplanes, planes, stride=1, downsample=None, kernel_size=1):
         super(Bottleneck, self).__init__()
-        # print('Creating bottleneck with kernel size {} and stride {} with padding {}'.format(kernel_size, stride, (kernel_size - 1) // 2))
         self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm2d(planes)
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=kernel_size, stride=stride,
-                               padding=0, bias=False)  # changed padding from (kernel_size - 1) // 2
+        self.conv2 = nn.Conv2d(planes, planes, kernel_size=kernel_size, stride=stride, padding=0, bias=False)  # changed padding from (kernel_size - 1) // 2
         self.bn2 = nn.BatchNorm2d(planes)
         self.conv3 = nn.Conv2d(planes, planes * 4, kernel_size=1, bias=False)
         self.bn3 = nn.BatchNorm2d(planes * 4)
@@ -62,7 +45,7 @@ class Bottleneck(nn.Module):
 
 
 class BagNet(nn.Module):
-    def __init__(self, block, layers, strides=[1, 2, 2, 2], kernel3=[0, 0, 0, 0], num_classes=1000, avg_pool=True):
+    def __init__(self, block, layers=[3, 4, 6, 3], strides=[2, 2, 2, 1], kernel3=[0, 0, 0, 0], num_classes=1000, avg_pool=True):
         self.inplanes = 64
         super(BagNet, self).__init__()
         self.conv1 = nn.Conv2d(3, 64, kernel_size=1, stride=1, padding=0,
@@ -129,37 +112,13 @@ class BagNet(nn.Module):
         return x
 
 
-def bagnet33(pretrained=False, strides=[2, 2, 2, 1], **kwargs):
-    """Constructs a Bagnet-33 model.
 
-    Args:
-        pretrained (bool): If True, returns a model pre-trained on ImageNet
-    """
-    model = BagNet(Bottleneck, [3, 4, 6, 3], strides=strides, kernel3=[1, 1, 1, 1], **kwargs)
-    if pretrained:
-        model.load_state_dict(model_zoo.load_url(model_urls['bagnet33']))
-    return model
+if __name__ == '__main__':
+    import torchvision
 
+    bagnet9 = BagNet(Bottleneck,  kernel3=[1, 1, 0, 0])
+    bagnet17 = BagNet(Bottleneck, kernel3=[1, 1, 1, 0])
+    bagnet33 = BagNet(Bottleneck, kernel3=[1, 1, 1, 1])
+    resnet50 = torchvision.models.resnet50()
 
-def bagnet17(pretrained=False, strides=[2, 2, 2, 1], **kwargs):
-    """Constructs a Bagnet-17 model.
-
-    Args:
-        pretrained (bool): If True, returns a model pre-trained on ImageNet
-    """
-    model = BagNet(Bottleneck, [3, 4, 6, 3], strides=strides, kernel3=[1, 1, 1, 0], **kwargs)
-    if pretrained:
-        model.load_state_dict(model_zoo.load_url(model_urls['bagnet17']))
-    return model
-
-
-def bagnet9(pretrained=False, strides=[2, 2, 2, 1], **kwargs):
-    """Constructs a Bagnet-9 model.
-
-    Args:
-        pretrained (bool): If True, returns a model pre-trained on ImageNet
-    """
-    model = BagNet(Bottleneck, [3, 4, 6, 3], strides=strides, kernel3=[1, 1, 0, 0], **kwargs)
-    if pretrained:
-        model.load_state_dict(model_zoo.load_url(model_urls['bagnet9']))
-    return model
+    x =1

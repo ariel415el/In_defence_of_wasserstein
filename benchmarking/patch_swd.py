@@ -39,3 +39,15 @@ def swd(x, y, num_proj=1024):
     loss = torch.abs(projx - projy).mean()
 
     return loss
+
+
+class PatchSWD:
+    def __init__(self, p, n):
+        self.p = p
+        self.n = n
+
+    def __str__(self):
+        return f"PatchSWD_P-{self.p}_Np-{self.n}"
+
+    def __call__(self, x, y):
+        return patch_swd(x, y, patch_size=self.p, num_proj=self.n)
