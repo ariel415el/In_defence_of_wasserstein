@@ -55,9 +55,9 @@ class LossLogger:
 
 
 def get_dir(args):
-    task_name = 'train_results/' + args.name
-    saved_model_folder = os.path.join( task_name, 'models')
-    saved_image_folder = os.path.join( task_name, 'images')
+    task_name = os.path.join(args.outputs_root,  args.name)
+    saved_model_folder = os.path.join(task_name, 'models')
+    saved_image_folder = os.path.join(task_name, 'images')
     
     os.makedirs(saved_model_folder, exist_ok=True)
     os.makedirs(saved_image_folder, exist_ok=True)

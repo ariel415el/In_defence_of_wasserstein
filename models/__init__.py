@@ -34,7 +34,7 @@ def get_discriminator(name, res, num_outputs):
 
     elif 'BagNet' in name:
         from models.BagNet import BagNet, Bottleneck
-        kernel_dict = {"BagNet-9": [1, 1, 0, 0], "BagNet-17": [1, 1, 1, 0], "BagNet-33": [1, 1, 1, 1], }
+        kernel_dict = {"BagNet-9": [1, 1, 0, 0], "BagNet-17": [1, 1, 1, 0], "BagNet-33": [1, 1, 1, 1]}
         netD = BagNet(Bottleneck, kernel3=kernel_dict[name], num_classes=1)
 
     print("D params: ", sum(p.numel() for p in netD.parameters() if p.requires_grad))

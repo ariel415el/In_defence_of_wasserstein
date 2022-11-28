@@ -13,7 +13,8 @@ from torchvision import utils as vutils
 from benchmarking.patch_swd import PatchSWD
 from diffaug import DiffAugment
 from models import get_models
-from utils.common import copy_G_params, load_params, get_loss_function
+from utils.common import copy_G_params, load_params
+from utils.losses import get_loss_function
 from utils.data import get_dataloader
 from utils.logger import get_dir, LossLogger
 
@@ -70,10 +71,11 @@ def train_GAN(args):
         optimizerD.step()
 
         # #####  2. train Generator #####
-        netG.zero_grad()
-        Gloss, debug_Glosses = loss_function.trainG(netD, real_images, fake_images)
-        Gloss.backward()
-        optimizerG.step()
+        if iteration % args.n_D_steps == 0:
+            netG.zero_grad()
+            Gloss, debug_Glosses = loss_function.trainG(netD, real_images, fake_images)
+            Gloss.backward()
+            optimizerG.step()
 
         # Update avg weights
         for p, avg_p in zip(netG.parameters(), avg_param_G):
@@ -85,7 +87,7 @@ def train_GAN(args):
             sec_per_kimage = (time() - start) / (max(1, iteration) / 1000)
             print(str({k: f"{v:.6f}" for k, v in debug_Dlosses.items()}) + f"sec/kimg: {sec_per_kimage:.1f}")
 
-        if iteration % (args.save_interval) == 0:
+        if iteration % args.save_interval == 0:
             backup_para = copy_G_params(netG)
             load_params(netG, avg_param_G)
 
@@ -144,20 +146,21 @@ if __name__ == "__main__":
     parser.add_argument('--im_size', default=64, type=int)
     parser.add_argument('--z_dim', default=64, type=int)
     parser.add_argument('--batch_size', default=64, type=int)
-    parser.add_argument('--loss_fucntion', default="SoftHingeLoss", type=str)
+    parser.add_argument('--loss_fucntion', default="CtransformLoss", type=str)
     parser.add_argument('--lr', default=0.0001, type=float)
     parser.add_argument('--n_iterations', default=100000, type=int)
+    parser.add_argument('--n_D_steps', default=5, type=int, help="How many D optimization steps before generator step")
     parser.add_argument('--augmentaion', default='color,translation', help="comma separated data augmentaitons")
     parser.add_argument('--save_interval', default=1000, type=int)
     parser.add_argument('--fid_freq', default=10000, type=int)
     parser.add_argument('--fid_n_batches', default=0, type=int, help="How many batches of train/test to compute "
                                                                      "reference FID statistics (0 turns off FID)")
-    parser.add_argument('--tag', default='test')
+    parser.add_argument('--outputs_root', default='Outputs')
 
     args = parser.parse_args()
     args.n_workers = 4
     args.name = f"{os.path.basename(args.data_path)}_{args.im_size}x{args.im_size}_G-{args.Generator_architecture}" \
-                f"_D-{args.Discriminator_architecture}_Z-{args.z_dim}_B-{args.batch_size}_{args.tag}"
+                f"_D-{args.Discriminator_architecture}_L-{args.loss_fucntion}_Z-{args.z_dim}_B-{args.batch_size}"
 
     device = torch.device(args.device)
 
