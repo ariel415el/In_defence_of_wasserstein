@@ -36,7 +36,7 @@ class WGANloss:
 
     def trainG(self, netD, real_data, fake_data):
         Gloss = -netD(fake_data).mean()
-        return Gloss, {"Gloss": Gloss}
+        return Gloss, {"Gloss": Gloss.item()}
 
 
 class SoftHingeLoss:

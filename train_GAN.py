@@ -44,6 +44,8 @@ def train_GAN(args):
               ]
 
     netG, netD = get_models(args, device)
+    netG.train()
+    netD.train()
 
     loss_function = get_loss_function(args.loss_fucntion)
 
@@ -104,6 +106,8 @@ def evaluate(netG, netD,
              fid_metric, other_metrics,
              fixed_noise, debug_fixed_reals, debug_fixed_reals_test,
              logger, saved_image_folder, iteration, args):
+    netG.eval()
+    netD.eval()
     start = time()
     with torch.no_grad():
 
@@ -134,6 +138,8 @@ def evaluate(netG, netD,
 
         logger.plot()
 
+    netG.train()
+    netD.train()
     print(f"Evaluation finished in {time()-start} seconds")
 
 
@@ -145,7 +151,7 @@ if __name__ == "__main__":
     parser.add_argument('--Discriminator_architecture', default='DCGAN')
     parser.add_argument('--im_size', default=64, type=int)
     parser.add_argument('--z_dim', default=64, type=int)
-    parser.add_argument('--batch_size', default=64, type=int)
+    parser.add_argument('--batch_size', default=128, type=int)
     parser.add_argument('--loss_fucntion', default="CtransformLoss", type=str)
     parser.add_argument('--lr', default=0.0001, type=float)
     parser.add_argument('--n_iterations', default=100000, type=int)
