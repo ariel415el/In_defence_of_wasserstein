@@ -1,7 +1,5 @@
-
-
 def get_generator(name, res, z_dim):
-    if name  == "FastGAN":
+    if name == "FastGAN":
         if res != 128:
             raise ValueError("FastGan only implemented for 128x128 images")
         from models.FastGAN import Generator, weights_init
@@ -34,9 +32,10 @@ def get_discriminator(name, res, num_outputs):
         netD = Discriminator(num_outputs=num_outputs)
         netD.apply(weights_init)
 
-    elif name =="BagNet-9":
+    elif 'BagNet' in name:
         from models.BagNet import BagNet, Bottleneck
-        netD = BagNet(Bottleneck, [3, 4, 6, 3], strides=[2, 2, 2, 1], kernel3=[1, 1, 0, 0], num_classes=1)
+        kernel_dict = {"BagNet-9": [1, 1, 0, 0], "BagNet-17": [1, 1, 1, 0], "BagNet-33": [1, 1, 1, 1], }
+        netD = BagNet(Bottleneck, kernel3=kernel_dict[name], num_classes=1)
 
     print("D params: ", sum(p.numel() for p in netD.parameters() if p.requires_grad))
     return netD
