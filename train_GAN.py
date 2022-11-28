@@ -115,9 +115,9 @@ def evaluate(netG, netD,
 
         fake_images = netG(torch.randn_like(fixed_noise).to(device))
 
-        if fid_metric is not None and iteration % args.fid_n_batches == 0:
+        if fid_metric is not None and iteration % args.fid_freq == 0:
             fixed_fid = fid_metric([fixed_noise_fake_images])
-            fid = fid_metric([fake_images])
+            fid = fid_metric([netG(torch.randn_like(fixed_noise).to(device)) for _ in range(args.fid_n_batches)])
             logger.add_data({
                 'fixed_fid_train': fixed_fid['train'], 'fixed_fid_test': fixed_fid['test'], 'fid_train': fid['train'], 'fid_test': fid['test']
             }, group_name="FID")
