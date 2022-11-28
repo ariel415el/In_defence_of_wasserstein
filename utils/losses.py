@@ -27,14 +27,16 @@ class WGANloss:
         real_score = critic(real_data).mean()
         fake_score = critic(fake_data.detach()).mean()
         Dloss = fake_score - real_score
+        debug_dict = {"real_score": real_score.item(), "fake_score": fake_score.item()}
         if self.gp_factor > 0:
             gp = calc_gradient_penalty(critic, real_data, fake_data, real_data.device)
             Dloss += self.gp_factor * gp
-        return Dloss
+            debug_dict['gp'] = gp.item()
+        return Dloss, debug_dict
 
     def trainG(self, netD, real_data, fake_data):
         Gloss = -netD(fake_data).mean()
-        return Gloss
+        return Gloss, {"Gloss": Gloss}
 
 
 class SoftHingeLoss:
