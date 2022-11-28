@@ -33,7 +33,6 @@ class GLU(nn.Module):
 class NoiseInjection(nn.Module):
     def __init__(self):
         super().__init__()
-
         self.weight = nn.Parameter(torch.zeros(1), requires_grad=True)
 
     def forward(self, feat, noise=None):
@@ -61,7 +60,6 @@ def UpBlock(in_planes, out_planes):
     block = nn.Sequential(
         nn.Upsample(scale_factor=2, mode='nearest'),
         conv2d(in_planes, out_planes*2, 3, 1, 1, bias=False),
-        #convTranspose2d(in_planes, out_planes*2, 4, 2, 1, bias=False),
         batchNorm2d(out_planes*2), GLU())
     return block
 
@@ -70,7 +68,6 @@ def UpBlockComp(in_planes, out_planes):
     block = nn.Sequential(
         nn.Upsample(scale_factor=2, mode='nearest'),
         conv2d(in_planes, out_planes*2, 3, 1, 1, bias=False),
-        #convTranspose2d(in_planes, out_planes*2, 4, 2, 1, bias=False),
         NoiseInjection(),
         batchNorm2d(out_planes*2), GLU(),
         conv2d(out_planes, out_planes*2, 3, 1, 1, bias=False),
@@ -106,8 +103,6 @@ class Generator(nn.Module):
         nfc = {}
         for k, v in nfc_multi.items():
             nfc[k] = int( v *ngf)
-
-        self.im_size = 128
 
         self.init = InitLayer(z_dim, channel=nfc[4])
 

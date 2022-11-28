@@ -82,6 +82,7 @@ def get_dataloader(data_root, im_size, batch_size, n_workers, val_percentage=0.1
 
     test_loader = iter(DataLoader(test_dataset, batch_size=batch_size,
                                  shuffle=False,
+                                 sampler=InfiniteSamplerWrapper(test_dataset),
                                  num_workers=n_workers,
                                  pin_memory=True))
 

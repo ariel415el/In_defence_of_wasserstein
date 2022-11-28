@@ -15,16 +15,21 @@ class LossLogger:
         os.makedirs(save_dir, exist_ok=True)
         self.aggregated_data = defaultdict(list)
         self.data = defaultdict(list)
+        self.group_names = dict()
 
-    def aggregate_data(self, data_dict):
+    def aggregate_data(self, data_dict, group_name):
+        if group_name not in self.group_names:
+            self.group_names[group_name] = list(data_dict.keys())
         for k, v in data_dict.items():
             self.aggregated_data[k].append(v)
 
-    def add_data(self, data_dict):
+    def add_data(self, data_dict, group_name):
+        if group_name not in self.group_names:
+            self.group_names[group_name] = list(data_dict.keys())
         for k, v in data_dict.items():
             self.data[k].append(v)
 
-    def plot(self, data_group_names):
+    def plot(self):
         # Add averaged aggregated data
         for k, v in self.aggregated_data.items():
             self.data[k].append(np.mean(v))
@@ -32,7 +37,7 @@ class LossLogger:
 
         # Plot grouped data
         all_names = []
-        for title, names in data_group_names.items():
+        for title, names in self.group_names.items():
             for i, name in enumerate(names):
                 plt.plot(np.arange(len(self.data[name])), self.data[name], label=name, color=COLORS[i])
                 all_names.append(name)
@@ -57,7 +62,6 @@ def get_dir(args):
     os.makedirs(saved_model_folder, exist_ok=True)
     os.makedirs(saved_image_folder, exist_ok=True)
 
-    
     with open( os.path.join(saved_model_folder, '../args.txt'), 'w') as f:
         json.dump(args.__dict__, f, indent=2)
 
