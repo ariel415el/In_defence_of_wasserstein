@@ -67,10 +67,11 @@ def train_GAN(args):
         fake_images = DiffAugment(fake_images, policy=args.augmentaion)
 
         # #####  1. train Discriminator #####
-        netD.zero_grad()
-        Dloss, debug_Dlosses = loss_function.trainD(netD, real_images, fake_images)
-        Dloss.backward()
-        optimizerD.step()
+        for i in range(args.n_D_steps):
+            netD.zero_grad()
+            Dloss, debug_Dlosses = loss_function.trainD(netD, real_images, fake_images)
+            Dloss.backward()
+            optimizerD.step()
 
         # #####  2. train Generator #####
         if iteration % args.n_D_steps == 0:
@@ -151,11 +152,12 @@ if __name__ == "__main__":
     parser.add_argument('--Discriminator_architecture', default='DCGAN')
     parser.add_argument('--im_size', default=64, type=int)
     parser.add_argument('--z_dim', default=64, type=int)
-    parser.add_argument('--batch_size', default=128, type=int)
+    parser.add_argument('--batch_size', default=16, type=int)
     parser.add_argument('--loss_fucntion', default="CtransformLoss", type=str)
     parser.add_argument('--lr', default=0.0001, type=float)
     parser.add_argument('--n_iterations', default=100000, type=int)
-    parser.add_argument('--n_D_steps', default=5, type=int, help="How many D optimization steps before generator step")
+    parser.add_argument('--n_D_steps', default=5, type=int, help="Number of repeated D updates with each batch")
+    parser.add_argument('--G_step_every', default=1, type=int, help="Update G only evry 'G_step_every' iterations")
     parser.add_argument('--augmentaion', default='color,translation', help="comma separated data augmentaitons")
     parser.add_argument('--save_interval', default=1000, type=int)
     parser.add_argument('--fid_freq', default=10000, type=int)

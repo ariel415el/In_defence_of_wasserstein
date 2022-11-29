@@ -59,37 +59,43 @@ class SoftHingeLoss:
 
 
 class CtransformLoss:
-    def __init__(self, search_space='full', c1=0.1, c2=10):
+    def __init__(self, search_space='full', c1=0.1, c2=0.1):
         self.search_space = search_space
         self.c1 = c1
         self.c2 = c2
 
     @staticmethod
-    def get_c_transform_loss(f, reals, fakes, compute_penalties):
+    def get_c_transform_loss(f, reals, fakes, compute_penalties=True, search_space='full'):
         f_reals = f(reals)
-        f_fakes = f(fakes)
 
         Bxs = reals.reshape(reals.shape[0], -1)
         Bys = fakes.reshape(fakes.shape[0], -1)
         b = len(Bxs)
 
-        # if search_space=='full':
-        B = torch.cat([Bxs, Bys], dim=0)
-        fs = torch.cat([f_reals, f_fakes])
+        if search_space=='full':
+            Bxs = Bys = torch.cat([Bxs, Bys], dim=0)
+            f_fakes = f(fakes)
+            fs = torch.cat([f_reals, f_fakes])
+        else:
+            fs = f_reals
 
-        D = get_dist_mat(B, B)
+        D = torch.norm(Bxs[:, None] - Bys[None, :], p=1, dim=-1)  # D[i,j] = norm(Bxs[i]-Bys[j])
+        f_cs = torch.min(D - fs[:, None, 0], dim=0)[0]      # f_cs[j] = min_i {D[i,j] - f[i]}
 
-        f_cs = torch.min(D - fs[None, :, 0], dim=1)[0]
+        # i,j = torch.randint(len(D), (2,)).numpy()
+        # assert D[i,j] == torch.norm(Bxs[i]-Bys[j], p=1, dim=-1) - fs[i]
 
-        f_c_fakes = f_cs[b:]
+        f_c_fakes = f_cs[b:] if search_space == 'full' else f_cs
 
         OT = f_reals.mean() + f_c_fakes.mean()
         if compute_penalties:
-            couples_admisibility_gap = D[:b, b:] - fs[None, :b, 0] - f_cs[b:, None]
+            full_admisibility_gap = D - fs[:, None, 0] - f_cs[None, :]  # full_admisibility_gap[i,j] = norm(Bxs[i]-Bys[j]) - f[Bxs[i]] - f_C[Bys[j]]
+            if search_space == 'full':
+                couples_admisibility_gap = D[:b, b:] - f_reals[:, None, 0] - f_c_fakes[None, :]
+            else:
+                couples_admisibility_gap = full_admisibility_gap
             penalty1 = torch.mean(couples_admisibility_gap**2)
-
-            full_admisibility_gap = D - fs[None, :, 0] - f_cs[:, None]
-            penalty2 = torch.mean(torch.clamp(full_admisibility_gap, max=0)**2)
+            penalty2 = torch.mean(torch.clamp(full_admisibility_gap, min=0)**2)
 
             return OT, penalty1, penalty2
 
