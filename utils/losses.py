@@ -65,13 +65,30 @@ class CtransformLoss:
         self.c2 = c2
 
     @staticmethod
-    def get_c_transform_loss(f, reals, fakes, compute_penalties=True, search_space='full'):
-        f_reals = f(reals)
+    def get_c_transform_loss(critic, batch, gen_batch, compute_penalties=False):
+        C = torch.norm(batch[:, None, ...] - gen_batch[None, ...], p=1, dim=(2, 3, 4))
+        fs = critic(batch)
+        f_cs = torch.min(C - fs[:, None], dim=0)[0]
+        ot = fs.mean() + f_cs.mean().mean()
+
+        if compute_penalties:
+            admisibility_gap = C - fs[:, None] - f_cs[None, :]  # admisibility_gap[i,j] = norm(Bxs[i]-Bys[j]) - f[Bxs[i]] - f_C[Bys[j]]
+
+            penalty1 = torch.mean(admisibility_gap**2)
+            penalty2 = torch.mean(torch.clamp(admisibility_gap, min=0)**2)
+
+            return ot, penalty1, penalty2
+
+        return ot
+
+    @staticmethod
+    def asd(f, reals, fakes, compute_penalties=True, search_space='x'):
 
         Bxs = reals.reshape(reals.shape[0], -1)
         Bys = fakes.reshape(fakes.shape[0], -1)
         b = len(Bxs)
 
+        f_reals = f(reals)
         if search_space=='full':
             Bxs = Bys = torch.cat([Bxs, Bys], dim=0)
             f_fakes = f(fakes)
@@ -80,22 +97,19 @@ class CtransformLoss:
             fs = f_reals
 
         D = torch.norm(Bxs[:, None] - Bys[None, :], p=1, dim=-1)  # D[i,j] = norm(Bxs[i]-Bys[j])
-        f_cs = torch.min(D - fs[:, None, 0], dim=0)[0]      # f_cs[j] = min_i {D[i,j] - f[i]}
-
-        # i,j = torch.randint(len(D), (2,)).numpy()
-        # assert D[i,j] == torch.norm(Bxs[i]-Bys[j], p=1, dim=-1) - fs[i]
+        f_cs = torch.min(D - fs[:, None], dim=0)[0]      # f_cs[j] = min_i {D[i,j] - f[i]}
 
         f_c_fakes = f_cs[b:] if search_space == 'full' else f_cs
 
         OT = f_reals.mean() + f_c_fakes.mean()
         if compute_penalties:
-            full_admisibility_gap = D - fs[:, None, 0] - f_cs[None, :]  # full_admisibility_gap[i,j] = norm(Bxs[i]-Bys[j]) - f[Bxs[i]] - f_C[Bys[j]]
+            full_admisibility_gap = D - fs[:, None] - f_cs[None, :]  # full_admisibility_gap[i,j] = norm(Bxs[i]-Bys[j]) - f[Bxs[i]] - f_C[Bys[j]]
             if search_space == 'full':
-                couples_admisibility_gap = D[:b, b:] - f_reals[:, None, 0] - f_c_fakes[None, :]
+                couples_admisibility_gap = D[:b, b:] - f_reals[:, None] - f_c_fakes[None, :]
             else:
                 couples_admisibility_gap = full_admisibility_gap
             penalty1 = torch.mean(couples_admisibility_gap**2)
-            penalty2 = torch.mean(torch.clamp(full_admisibility_gap, min=0)**2)
+            penalty2 = torch.mean(torch.clamp(full_admisibility_gap, max=0)**2)
 
             return OT, penalty1, penalty2
 
@@ -103,30 +117,23 @@ class CtransformLoss:
             return OT
 
     def trainD(self, netD, real_data, fake_data):
-        OT, penalty1, penalty2 = self.get_c_transform_loss(netD, real_data, fake_data.detach(), compute_penalties=True)
-        Dloss = -OT + self.c1*penalty1 + self.c2*penalty2 # Maximize OT with penalties
+        OT, penalty1, penalty2 = CtransformLoss.get_c_transform_loss(netD, real_data, fake_data, compute_penalties=True)
+        Dloss = -OT + self.c1 * penalty1 + self.c2 * penalty2  # Maximize OT with penalties
         return Dloss, {"OT": OT.item(), "penalty1": penalty1.item(), "penalty2": penalty2.item()}
 
     def trainG(self, netD, real_data, fake_data):
-        OT = self.get_c_transform_loss(netD, real_data, fake_data, compute_penalties=False)
-        Gloss = OT # Minimize OT
+        OT = CtransformLoss.get_c_transform_loss(netD, real_data, fake_data)
+        Gloss = OT  # Minimize OT
         return Gloss, {"OT": OT.item()}
 
 
 def get_loss_function(loss_name):
     return getattr(sys.modules[__name__], loss_name)()
 
+
 #########################
 # #### Utilities ###### #
 #########################
-
-def get_dist_mat(X,Y):
-    D = (X * X).sum(1)[:, None] + (Y * Y).sum(1)[None, :] - 2.0 * X @ Y.T
-    d = X.shape[1]
-    D = D / d
-    return D
-
-
 def calc_gradient_penalty(netD, real_data, fake_data, device):
     alpha = torch.rand(1, 1)
     alpha = alpha.expand(real_data.size())

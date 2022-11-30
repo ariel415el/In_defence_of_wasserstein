@@ -109,7 +109,7 @@ class BagNet(nn.Module):
             x = x.permute(0, 2, 3, 1)
             x = self.fc(x)
 
-        return x
+        return x.reshape(-1)
 
 
 

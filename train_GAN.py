@@ -19,16 +19,7 @@ from utils.data import get_dataloader
 from utils.logger import get_dir, LossLogger
 
 from benchmarking.fid import FID_score
-from benchmarking.lap_swd import lap_swd, LapSWD
-
-
-def train_d(net, data, label="real"):
-    """FastGAN train loss"""
-    pred = net(data)
-    if label == 'real':
-        pred *= -1
-    D_loss = F.relu(torch.rand_like(pred) * 0.2 + 0.8 + pred).mean()
-    return D_loss
+from benchmarking.lap_swd import LapSWD
 
 
 def train_GAN(args):
@@ -46,10 +37,9 @@ def train_GAN(args):
     netG, netD = get_models(args, device)
     netG.train()
     netD.train()
+    avg_param_G = copy_G_params(netG)
 
     loss_function = get_loss_function(args.loss_fucntion)
-
-    avg_param_G = copy_G_params(netG)
 
     optimizerG = optim.Adam(netG.parameters(), lr=args.lr, betas=(0.5, 0.999))
     optimizerD = optim.Adam(netD.parameters(), lr=args.lr, betas=(0.5, 0.999))
@@ -68,21 +58,21 @@ def train_GAN(args):
 
         # #####  1. train Discriminator #####
         for i in range(args.n_D_steps):
-            netD.zero_grad()
             Dloss, debug_Dlosses = loss_function.trainD(netD, real_images, fake_images)
-            Dloss.backward()
+            netD.zero_grad()
+            Dloss.backward(retain_graph=args.n_D_steps > 1)
             optimizerD.step()
 
         # #####  2. train Generator #####
-        if iteration % args.n_D_steps == 0:
-            netG.zero_grad()
+        if iteration % args.G_step_every == 0:
             Gloss, debug_Glosses = loss_function.trainG(netD, real_images, fake_images)
+            netG.zero_grad()
             Gloss.backward()
             optimizerG.step()
 
         # Update avg weights
         for p, avg_p in zip(netG.parameters(), avg_param_G):
-            avg_p.mul_(0.999).add_(0.001 * p.data)
+            avg_p.mul_(1 - args.avg_update_factor).add_(args.avg_update_factor * p.data)
 
         logger.aggregate_data(debug_Dlosses, group_name="D_train")
         logger.aggregate_data(debug_Glosses, group_name="G_train")
@@ -111,10 +101,9 @@ def evaluate(netG, netD,
     netD.eval()
     start = time()
     with torch.no_grad():
-
-        Dloss_fixed_real_train = train_d(netD, debug_fixed_reals, label="real").item()
-        Dloss_fixed_real_test = train_d(netD, debug_fixed_reals_test, label="real").item()
-        logger.add_data({'Dloss_fixed_reals_train': Dloss_fixed_real_train, 'Dloss_fixed_reals_test':Dloss_fixed_real_test}, group_name="D_eval")
+        D_on_fixed_real_train = netD(debug_fixed_reals).mean().item()
+        D_on_fixed_real_test = netD(debug_fixed_reals_test).mean().item()
+        logger.add_data({'D_on_fixed_real_train': D_on_fixed_real_train, 'D_on_fixed_real_test':D_on_fixed_real_test}, group_name="D_eval")
 
         fixed_noise_fake_images = netG(fixed_noise)
         nrow = int(sqrt(len(fixed_noise_fake_images)))
@@ -147,17 +136,18 @@ def evaluate(netG, netD,
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--device', default="cuda:0")
-    parser.add_argument('--data_path', default="/mnt/storage_ssd/datasets/FFHQ_1000_images", help="Path to train images")
+    parser.add_argument('--data_path', default="/mnt/storage_ssd/datasets/FFHQ_1000/FFHQ_1000", help="Path to train images")
     parser.add_argument('--Generator_architecture', default='DCGAN')
     parser.add_argument('--Discriminator_architecture', default='DCGAN')
     parser.add_argument('--im_size', default=64, type=int)
     parser.add_argument('--z_dim', default=64, type=int)
-    parser.add_argument('--batch_size', default=16, type=int)
-    parser.add_argument('--loss_fucntion', default="CtransformLoss", type=str)
+    parser.add_argument('--batch_size', default=64, type=int)
+    parser.add_argument('--loss_fucntion', default="SoftHingeLoss", type=str)
     parser.add_argument('--lr', default=0.0001, type=float)
-    parser.add_argument('--n_iterations', default=100000, type=int)
+    parser.add_argument('--avg_update_factor', default=0.001, type=float, help='moving average factor weight of updating generator (1 means none)')
     parser.add_argument('--n_D_steps', default=5, type=int, help="Number of repeated D updates with each batch")
     parser.add_argument('--G_step_every', default=1, type=int, help="Update G only evry 'G_step_every' iterations")
+    parser.add_argument('--n_iterations', default=100000, type=int)
     parser.add_argument('--augmentaion', default='color,translation', help="comma separated data augmentaitons")
     parser.add_argument('--save_interval', default=1000, type=int)
     parser.add_argument('--fid_freq', default=10000, type=int)
@@ -166,7 +156,7 @@ if __name__ == "__main__":
     parser.add_argument('--outputs_root', default='Outputs')
 
     args = parser.parse_args()
-    args.n_workers = 4
+    args.n_workers = 0
     args.name = f"{os.path.basename(args.data_path)}_{args.im_size}x{args.im_size}_G-{args.Generator_architecture}" \
                 f"_D-{args.Discriminator_architecture}_L-{args.loss_fucntion}_Z-{args.z_dim}_B-{args.batch_size}"
 

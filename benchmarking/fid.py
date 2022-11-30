@@ -41,11 +41,12 @@ class FID_score:
     def __init__(self, loaders, num_batches, device):
         self.device = device
         print("Computing reference Inception features", end='...', flush=True)
-        global inception
-        if inception is None:
-            inception = InceptionV3([3], normalize_input=False).to(device)
-        self.ref_stats_dict = {k: self.get_multi_batch_statistics([next(loader).to(device) for _ in range(num_batches)]) for k,loader in loaders.items()}
-        print("Done")
+        with torch.no_grad():
+            global inception
+            if inception is None:
+                inception = InceptionV3([3], normalize_input=False).to(device)
+            self.ref_stats_dict = {k: self.get_multi_batch_statistics([next(loader).to(device) for _ in range(num_batches)]) for k,loader in loaders.items()}
+            print("Done")
 
     def __call__(self, batches):
         stats = self.get_multi_batch_statistics(batches)

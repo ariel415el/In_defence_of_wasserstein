@@ -9,7 +9,6 @@ from tqdm import tqdm
 
 
 class ImageFolder(Dataset):
-    """docstring for ArtDataset"""
     def __init__(self, paths, im_size):
         super(ImageFolder, self).__init__()
 

@@ -170,7 +170,7 @@ class DownBlockComp(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, num_outputs=1):
+    def __init__(self):
         super(Discriminator, self).__init__()
         self.ndf = 48
         nc = 3
@@ -193,7 +193,7 @@ class Discriminator(nn.Module):
             conv2d(nfc[8], nfc[4], 4, 2, 0, bias=False),
             batchNorm2d(nfc[4]),
             nn.LeakyReLU(0.2, inplace=True),
-            conv2d(nfc[4], num_outputs, 3, 1, 0, bias=False))
+            conv2d(nfc[4], 1, 3, 1, 0, bias=False))
 
     def features(self, img):
         feat_128 = self.down_from_full(img)
@@ -202,13 +202,14 @@ class Discriminator(nn.Module):
         feat_16 = self.down_16(feat_32)
         feat_8 = self.down_8(feat_16)
         return feat_8
+
     def forward(self, img):
         feat_8 = self.features(img)
-        output = self.spatial_logits(feat_8).view(len(img), -1)
+        output = self.spatial_logits(feat_8).view(len(img))
 
         return output
 
 if __name__ == '__main__':
-    D = Discriminator(num_outputs=1)
+    D = Discriminator()
     x = torch.ones((6,3,128,128))
     print(D(x).shape)
