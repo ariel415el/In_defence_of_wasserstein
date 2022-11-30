@@ -8,16 +8,14 @@ def get_generator(name, res, z_dim):
 
     elif name == 'DCGAN':
         if res != 64:
-            raise ValueError("FastGan only implemented for 128x128 images")
+            raise ValueError("DCGAN only implemented for 64x64 images")
         from models.DCGAN import Generator, weights_init
         netG = Generator(z_dim)
         # netG.apply(weights_init)
 
     elif name == 'FC':
-        if res != 64:
-            raise ValueError("FastGan only implemented for 128x128 images")
         from models.FC import Generator
-        netG = Generator(z_dim)
+        netG = Generator(z_dim, output_dim=res)
 
     return netG
 
@@ -32,7 +30,7 @@ def get_discriminator(name, res):
 
     elif name == 'DCGAN':
         if res != 64:
-            raise ValueError("FastGan only implemented for 64x64 images")
+            raise ValueError("DCGAN only implemented for 64x64 images")
         from models.DCGAN import Discriminator, weights_init
         netD = Discriminator()
         # netD.apply(weights_init)
@@ -43,10 +41,8 @@ def get_discriminator(name, res):
         netD = BagNet(Bottleneck, kernel3=kernel_dict[name], num_classes=1)
 
     elif name == 'FC':
-        if res != 64:
-            raise ValueError("FastGan only implemented for 128x128 images")
         from models.FC import Discriminator
-        netD = Discriminator()
+        netD = Discriminator(in_dim=res)
 
     return netD
 
@@ -78,7 +74,7 @@ def print_num_params(model):
 
 
 if __name__ == '__main__':
-    for arch_name, s in [('FC', 64), ("DCGAN", 64), ("FastGAN", 128)]:
+    for arch_name, s in [('FC', 64), ("DCGAN", 64), ("FastGAN", 128), ('FC', 128)]:
         netG = get_generator(arch_name, s, s)
         netD = get_discriminator(arch_name, s)
         print(arch_name)

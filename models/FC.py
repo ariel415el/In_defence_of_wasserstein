@@ -5,7 +5,7 @@ class Generator(nn.Module):
     def __init__(self, z_dim, output_dim=64):
         super(Generator, self).__init__()
         self.output_dim = output_dim
-
+        nf = 128 if output_dim == 64 else 64
         def block(in_feat, out_feat, normalize=True):
             layers = [nn.Linear(in_feat, out_feat)]
             if normalize:
@@ -14,11 +14,11 @@ class Generator(nn.Module):
             return layers
 
         self.model = nn.Sequential(
-            *block(z_dim, 128, normalize=False),
-            *block(128, 256),
-            *block(256, 512),
-            *block(512, 1024),
-            nn.Linear(1024, 3*output_dim**2),
+            *block(z_dim, nf, normalize=False),
+            *block(nf, 2*nf),
+            *block(2*nf, 4*nf),
+            *block(4*nf, 8*nf),
+            nn.Linear(8*nf, 3*output_dim**2),
             nn.Tanh()
         )
 
@@ -29,15 +29,15 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self):
+    def __init__(self, in_dim=64):
         super(Discriminator, self).__init__()
-
+        nf = 256 if in_dim == 64 else 128
         self.model = nn.Sequential(
-            nn.Linear(3*64**2, 512),
+            nn.Linear(3*in_dim**2, 2*nf),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(512, 256),
+            nn.Linear(2*nf, nf),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(256, 1),
+            nn.Linear(nf, 1),
             nn.Sigmoid(),
         )
 
