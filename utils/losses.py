@@ -75,41 +75,36 @@ class CtransformLoss:
             admisibility_gap = C - fs[:, None] - f_cs[None, :]  # admisibility_gap[i,j] = norm(Bxs[i]-Bys[j]) - f[Bxs[i]] - f_C[Bys[j]]
 
             penalty1 = torch.mean(admisibility_gap**2)
-            penalty2 = torch.mean(torch.clamp(admisibility_gap, min=0)**2)
+            penalty2 = torch.mean(torch.clamp(admisibility_gap, max=0)**2)
 
             return ot, penalty1, penalty2
-
         return ot
 
     @staticmethod
-    def asd(f, reals, fakes, compute_penalties=True, search_space='x'):
+    def special_CtransformLoss(f, reals, fakes, compute_penalties=True, run_in_batch=True):
 
-        Bxs = reals.reshape(reals.shape[0], -1)
-        Bys = fakes.reshape(fakes.shape[0], -1)
-        b = len(Bxs)
+        b = len(reals)
+        Bxs = torch.cat([reals, fakes], dim=0)
+        Bys = torch.cat([reals, fakes], dim=0)
 
-        f_reals = f(reals)
-        if search_space=='full':
-            Bxs = Bys = torch.cat([Bxs, Bys], dim=0)
-            f_fakes = f(fakes)
-            fs = torch.cat([f_reals, f_fakes])
+        if run_in_batch:
+            fs = f(Bxs)
         else:
-            fs = f_reals
+            fs = torch.cat([f(reals), f(fakes)])
 
-        D = torch.norm(Bxs[:, None] - Bys[None, :], p=1, dim=-1)  # D[i,j] = norm(Bxs[i]-Bys[j])
-        f_cs = torch.min(D - fs[:, None], dim=0)[0]      # f_cs[j] = min_i {D[i,j] - f[i]}
+        C = torch.norm(Bxs[:, None, ...] - Bys[None, ...], p=1, dim=(2, 3, 4))
+        f_cs = torch.min(C - fs[:, None], dim=0)[0]      # f_cs[j] = min_i {D[i,j] - f[i]}
 
-        f_c_fakes = f_cs[b:] if search_space == 'full' else f_cs
+        f_reals = fs[:b]
+        f_c_fakes = f_cs[b:]
 
         OT = f_reals.mean() + f_c_fakes.mean()
         if compute_penalties:
-            full_admisibility_gap = D - fs[:, None] - f_cs[None, :]  # full_admisibility_gap[i,j] = norm(Bxs[i]-Bys[j]) - f[Bxs[i]] - f_C[Bys[j]]
-            if search_space == 'full':
-                couples_admisibility_gap = D[:b, b:] - f_reals[:, None] - f_c_fakes[None, :]
-            else:
-                couples_admisibility_gap = full_admisibility_gap
+            full_admisibility_gap = C - fs[:, None] - f_cs[None, :]  # full_admisibility_gap[i,j] = norm(Bxs[i]-Bys[j]) - f[Bxs[i]] - f_C[Bys[j]]
+            couples_admisibility_gap = C[:b, b:] - f_reals[:, None] - f_c_fakes[None, :]
+
             penalty1 = torch.mean(couples_admisibility_gap**2)
-            penalty2 = torch.mean(torch.clamp(full_admisibility_gap, max=0)**2)
+            penalty2 = torch.mean(torch.clamp(full_admisibility_gap, min=0)**2)
 
             return OT, penalty1, penalty2
 
@@ -117,12 +112,12 @@ class CtransformLoss:
             return OT
 
     def trainD(self, netD, real_data, fake_data):
-        OT, penalty1, penalty2 = CtransformLoss.get_c_transform_loss(netD, real_data, fake_data, compute_penalties=True)
+        OT, penalty1, penalty2 = CtransformLoss.special_CtransformLoss(netD, real_data, fake_data, compute_penalties=True, run_in_batch=True)
         Dloss = -OT + self.c1 * penalty1 + self.c2 * penalty2  # Maximize OT with penalties
         return Dloss, {"OT": OT.item(), "penalty1": penalty1.item(), "penalty2": penalty2.item()}
 
     def trainG(self, netD, real_data, fake_data):
-        OT = CtransformLoss.get_c_transform_loss(netD, real_data, fake_data)
+        OT = CtransformLoss.special_CtransformLoss(netD, real_data, fake_data, compute_penalties=False, run_in_batch=True)
         Gloss = OT  # Minimize OT
         return Gloss, {"OT": OT.item()}
 
