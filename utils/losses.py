@@ -65,9 +65,13 @@ class CtransformLoss:
         self.c2 = c2
 
     @staticmethod
-    def get_c_transform_loss(critic, batch, gen_batch, compute_penalties=False):
+    def compute_ot(critic, batch, gen_batch, compute_penalties=False, run_in_batch=True):
+        if run_in_batch:
+            fs = critic(torch.cat([batch, gen_batch]))
+        else:
+            fs = torch.cat([critic(batch), critic(gen_batch)])
+
         C = torch.norm(batch[:, None, ...] - gen_batch[None, ...], p=1, dim=(2, 3, 4))
-        fs = critic(batch)
         f_cs = torch.min(C - fs[:, None], dim=0)[0]
         ot = fs.mean() + f_cs.mean().mean()
 
@@ -81,18 +85,17 @@ class CtransformLoss:
         return ot
 
     @staticmethod
-    def special_CtransformLoss(f, reals, fakes, compute_penalties=True, run_in_batch=True):
-
+    def compute_full_space_ot(f, reals, fakes, compute_penalties=True, run_in_batch=False):
         b = len(reals)
-        Bxs = torch.cat([reals, fakes], dim=0)
-        Bys = torch.cat([reals, fakes], dim=0)
+        B = torch.cat([reals, fakes], dim=0)
+        # Bys = torch.cat([reals, fakes], dim=0)
 
         if run_in_batch:
-            fs = f(Bxs)
+            fs = f(B)
         else:
             fs = torch.cat([f(reals), f(fakes)])
 
-        C = torch.norm(Bxs[:, None, ...] - Bys[None, ...], p=1, dim=(2, 3, 4))
+        C = torch.norm(B[:, None, ...] - B[None, ...], p=1, dim=(2, 3, 4))
         f_cs = torch.min(C - fs[:, None], dim=0)[0]      # f_cs[j] = min_i {D[i,j] - f[i]}
 
         f_reals = fs[:b]
@@ -112,12 +115,12 @@ class CtransformLoss:
             return OT
 
     def trainD(self, netD, real_data, fake_data):
-        OT, penalty1, penalty2 = CtransformLoss.special_CtransformLoss(netD, real_data, fake_data, compute_penalties=True, run_in_batch=True)
+        OT, penalty1, penalty2 = CtransformLoss.compute_full_space_ot(netD, real_data, fake_data, compute_penalties=True, run_in_batch=True)
         Dloss = -OT + self.c1 * penalty1 + self.c2 * penalty2  # Maximize OT with penalties
         return Dloss, {"OT": OT.item(), "penalty1": penalty1.item(), "penalty2": penalty2.item()}
 
     def trainG(self, netD, real_data, fake_data):
-        OT = CtransformLoss.special_CtransformLoss(netD, real_data, fake_data, compute_penalties=False, run_in_batch=True)
+        OT = CtransformLoss.compute_full_space_ot(netD, real_data, fake_data, compute_penalties=False, run_in_batch=True)
         Gloss = OT  # Minimize OT
         return Gloss, {"OT": OT.item()}
 

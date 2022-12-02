@@ -107,7 +107,7 @@ def evaluate(netG, netD,
 
         fixed_noise_fake_images = netG(fixed_noise)
         nrow = int(sqrt(len(fixed_noise_fake_images)))
-        vutils.save_image(fixed_noise_fake_images.add(1).mul(0.5), saved_image_folder + '/%d.jpg' % iteration, nrow=nrow)
+        vutils.save_image(fixed_noise_fake_images, saved_image_folder + '/%d.jpg' % iteration, nrow=nrow, normalize=True)
 
         fake_images = netG(torch.randn_like(fixed_noise).to(device))
 
@@ -154,11 +154,11 @@ if __name__ == "__main__":
     parser.add_argument('--fid_n_batches', default=0, type=int, help="How many batches of train/test to compute "
                                                                      "reference FID statistics (0 turns off FID)")
     parser.add_argument('--outputs_root', default='Outputs')
-
+    parser.add_argument('--tag', default='test')
+    parser.add_argument('--n_workers', default=0, type=int)
     args = parser.parse_args()
-    args.n_workers = 0
     args.name = f"{os.path.basename(args.data_path)}_{args.im_size}x{args.im_size}_G-{args.Generator_architecture}" \
-                f"_D-{args.Discriminator_architecture}_L-{args.loss_fucntion}_Z-{args.z_dim}_B-{args.batch_size}"
+                f"_D-{args.Discriminator_architecture}_L-{args.loss_fucntion}_Z-{args.z_dim}_B-{args.batch_size}_{args.tag}"
 
     device = torch.device(args.device)
 
