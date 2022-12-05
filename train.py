@@ -10,7 +10,6 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torchvision import utils as vutils
 
-from benchmarking.patch_swd import PatchSWD
 from diffaug import DiffAugment
 from models import get_models
 from utils.common import copy_G_params, load_params
@@ -20,6 +19,8 @@ from utils.logger import get_dir, LossLogger
 
 from benchmarking.fid import FID_score
 from benchmarking.lap_swd import LapSWD
+from benchmarking.swd import PatchSWD
+from benchmarking.emd import patchEMD, EMD
 
 
 def train_GAN(args):
@@ -30,8 +31,14 @@ def train_GAN(args):
     fid_metric = FID_score({"train": train_loader, "test":test_loader}, args.fid_n_batches, torch.device("cpu")) if args.fid_n_batches else None
 
     other_metrics = [
+                EMD(),
+                patchEMD(p=9, n=128),
+                patchEMD(p=17, n=128),
+                patchEMD(p=33, n=128),
                 LapSWD(),
-                PatchSWD(p=9, n=128)
+                PatchSWD(p=9, n=128),
+                PatchSWD(p=17, n=128),
+                PatchSWD(p=33, n=128)
               ]
 
     netG, netD = get_models(args, device)
@@ -109,7 +116,6 @@ def evaluate(netG, netD,
         nrow = int(sqrt(len(fixed_noise_fake_images)))
         vutils.save_image(fixed_noise_fake_images, saved_image_folder + '/%d.jpg' % iteration, nrow=nrow, normalize=True)
 
-        fake_images = netG(torch.randn_like(fixed_noise).to(device))
 
         if fid_metric is not None and iteration % args.fid_freq == 0:
             fixed_fid = fid_metric([fixed_noise_fake_images])
@@ -118,12 +124,13 @@ def evaluate(netG, netD,
                 'fixed_fid_train': fixed_fid['train'], 'fixed_fid_test': fixed_fid['test'], 'fid_train': fid['train'], 'fid_test': fid['test']
             }, group_name="FID")
 
+        # fake_images = netG(torch.randn_like(fixed_noise).to(device))
         for metric in other_metrics:
             logger.add_data({
-                f'{metric}_train_fixed': metric(fixed_noise_fake_images, debug_fixed_reals).item(),
-                f'{metric}_test_fixed': metric(fixed_noise_fake_images, debug_fixed_reals_test).item(),
-                f'{metric}_train': metric(fake_images, debug_fixed_reals).item(),
-                f'{metric}_test': metric(fake_images, debug_fixed_reals_test).item(),
+                f'{metric}_fixed_noise_gen_to_trin': metric(fixed_noise_fake_images, debug_fixed_reals),
+                f'{metric}_fixed_noise_gen_to_test': metric(fixed_noise_fake_images, debug_fixed_reals_test),
+                # f'{metric}_gen_to_train': metric(fake_images, debug_fixed_reals),
+                # f'{metric}_gen_to_test': metric(fake_images, debug_fixed_reals_test),
             }, group_name=f"{metric}")
 
         logger.plot()

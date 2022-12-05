@@ -163,4 +163,4 @@ class LapSWD:
         return "LapSWD"
 
     def __call__(self, x,y):
-        return lap_swd(x,y)
+        return lap_swd(x,y).item()

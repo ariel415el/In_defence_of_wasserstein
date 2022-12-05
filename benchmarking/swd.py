@@ -21,24 +21,24 @@ def patch_swd(x, y, patch_size=7, num_proj=1024):
 
     loss = torch.abs(projx - projy).mean()
 
-    return loss
+    return loss.item()
 
 
-def swd(x, y, num_proj=1024):
-    b, c = x.shape[0], np.prod(x.shape[1:])
-
-    # Sample random normalized projections
-    rand = torch.randn((num_proj, c)).to(x.device)  # (slice_size**2*ch)
-    rand = rand / torch.norm(rand, dim=1, keepdim=True)  # noramlize to unit directions
-    # rand = rand.reshape(self.num_proj, c, h, )
-
-    # Sort and compute L1 loss
-    projx = x.reshape(b, -1) @ rand.T
-    projy = y.reshape(b, -1) @ rand.T
-
-    loss = torch.abs(projx - projy).mean()
-
-    return loss
+# def swd(x, y, num_proj=1024):
+#     b, c = x.shape[0], np.prod(x.shape[1:])
+#
+#     # Sample random normalized projections
+#     rand = torch.randn((num_proj, c)).to(x.device)  # (slice_size**2*ch)
+#     rand = rand / torch.norm(rand, dim=1, keepdim=True)  # noramlize to unit directions
+#     # rand = rand.reshape(self.num_proj, c, h, )
+#
+#     # Sort and compute L1 loss
+#     projx = x.reshape(b, -1) @ rand.T
+#     projy = y.reshape(b, -1) @ rand.T
+#
+#     loss = torch.abs(projx - projy).mean()
+#
+#     return loss.i
 
 
 class PatchSWD:
