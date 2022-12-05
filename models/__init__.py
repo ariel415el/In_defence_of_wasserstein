@@ -17,6 +17,10 @@ def get_generator(name, res, z_dim):
         from models.FC import Generator
         netG = Generator(z_dim, output_dim=res)
 
+    elif name == 'Resnet':
+        from models.Resnet import ResNet_G
+        netG = ResNet_G(z_dim, size=res)
+
     return netG
 
 
@@ -43,6 +47,10 @@ def get_discriminator(name, res):
     elif name == 'FC':
         from models.FC import Discriminator
         netD = Discriminator(in_dim=res)
+
+    elif name == 'Resnet':
+        from models.Resnet import ResNet_D
+        netD = ResNet_D(size=res)
 
     return netD
 

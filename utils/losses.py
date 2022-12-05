@@ -40,8 +40,10 @@ class WGANloss:
 
 
 class SoftHingeLoss:
-    """The core idea for hinge loss is: D is no longer be optimized when if performs good enough.
+    """
+    The core idea for hinge loss is: D is no longer be optimized when if performs good enough.
     Here we use Relu(-x) instead of min(x,0) since -min(-x,0) == max(x,0) == Relu(x)
+    See "Geometric GAN" by Lim et al. for more details
     """
     def trainD(self, netD, real_data, fake_data):
         D_scores_real = netD(real_data)
@@ -114,6 +116,23 @@ class CtransformLoss:
         else:
             return OT
 
+    def trainD(self, netD, real_data, fake_data):
+        OT, penalty1, penalty2 = CtransformLoss.compute_full_space_ot(netD, real_data, fake_data, compute_penalties=True, run_in_batch=True)
+        Dloss = -OT + self.c1 * penalty1 + self.c2 * penalty2  # Maximize OT with penalties
+        return Dloss, {"OT": OT.item(), "penalty1": penalty1.item(), "penalty2": penalty2.item()}
+
+    def trainG(self, netD, real_data, fake_data):
+        OT = CtransformLoss.compute_full_space_ot(netD, real_data, fake_data, compute_penalties=False, run_in_batch=True)
+        Gloss = OT  # Minimize OT
+        return Gloss, {"OT": OT.item()}
+
+
+class AmortizedDualWasserstein:
+    """
+    Idea used in "Wasserstein GAN With Quadratic Transport Cost" and
+    "A Two-Step Computation of the Exact GAN Wasserstein Distance"
+    Solve the linear dual problem for each batch and regress the discriminator to one of the potentials
+    """
     def trainD(self, netD, real_data, fake_data):
         OT, penalty1, penalty2 = CtransformLoss.compute_full_space_ot(netD, real_data, fake_data, compute_penalties=True, run_in_batch=True)
         Dloss = -OT + self.c1 * penalty1 + self.c2 * penalty2  # Maximize OT with penalties
