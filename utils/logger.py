@@ -1,4 +1,5 @@
 import os
+import pickle
 from collections import defaultdict
 
 import numpy as np
@@ -16,6 +17,9 @@ class LossLogger:
         self.aggregated_data = defaultdict(list)
         self.data = defaultdict(list)
         self.group_names = dict()
+        self.log_file = f"{self.save_dir}/log.pkl"
+        if os.path.exists(self.log_file):
+            self.data = pickle.load(open(self.log_file, "rb"))
 
     def aggregate_data(self, data_dict, group_name):
         if group_name not in self.group_names:
@@ -53,18 +57,20 @@ class LossLogger:
                 plt.savefig(self.save_dir + f"/{k}.png")
                 plt.clf()
 
-
+        pickle.dump(self.data, open(self.log_file, "wb"))
 def get_dir(args):
     task_name = os.path.join(args.outputs_root,  args.name)
     saved_model_folder = os.path.join(task_name, 'models')
     saved_image_folder = os.path.join(task_name, 'images')
-    
+    plots_image_folder = os.path.join(task_name, 'plots')
+
     os.makedirs(saved_model_folder, exist_ok=True)
     os.makedirs(saved_image_folder, exist_ok=True)
+    os.makedirs(plots_image_folder, exist_ok=True)
 
-    with open( os.path.join(saved_model_folder, '../args.txt'), 'w') as f:
+    with open(os.path.join(saved_model_folder, '../args.txt'), 'w') as f:
         json.dump(args.__dict__, f, indent=2)
 
-    return saved_model_folder, saved_image_folder
+    return saved_model_folder, saved_image_folder, plots_image_folder
 
 

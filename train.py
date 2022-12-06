@@ -1,4 +1,5 @@
 import argparse
+import glob
 import os.path
 from math import sqrt
 
@@ -22,12 +23,33 @@ from benchmarking.lap_swd import LapSWD
 from benchmarking.swd import PatchSWD
 from benchmarking.emd import patchEMD, EMD
 
+def get_models_and_optimizers(args):
+    netG, netD = get_models(args, device)
+    netG.train()
+    netD.train()
+
+    optimizerG = optim.Adam(netG.parameters(), lr=args.lr, betas=(0.5, 0.999))
+    optimizerD = optim.Adam(netD.parameters(), lr=args.lr, betas=(0.5, 0.999))
+
+    start_iteration = 0
+    if args.resume_last_ckpt:
+        ckpts = glob.glob(f'{saved_model_folder}/*.pth')
+        if ckpts:
+            latest_ckpt = max(ckpts, key = os.path.getctime)
+            ckpt = torch.load(latest_ckpt)
+            netG.load_state_dict(ckpt['netG'])
+            netD.load_state_dict(ckpt['netD'])
+            optimizerG.load_state_dict(ckpt['optimizerG'])
+            optimizerD.load_state_dict(ckpt['optimizerD'])
+            start_iteration = ckpt['iteration']
+            print(f"Loaded ckpt of iteration: {start_iteration}")
+    return netG, netD, optimizerG, optimizerD, start_iteration
 
 def train_GAN(args):
+    logger = LossLogger(saved_image_folder)
     debug_fixed_noise = torch.randn((args.batch_size, args.z_dim)).to(device)
     debug_fixed_reals = next(train_loader).to(device)
     debug_fixed_reals_test = next(test_loader).to(device)
-
     fid_metric = FID_score({"train": train_loader, "test":test_loader}, args.fid_n_batches, torch.device("cpu")) if args.fid_n_batches else None
 
     other_metrics = [
@@ -41,19 +63,14 @@ def train_GAN(args):
                 PatchSWD(p=33, n=128)
               ]
 
-    netG, netD = get_models(args, device)
-    netG.train()
-    netD.train()
-    avg_param_G = copy_G_params(netG)
-
     loss_function = get_loss_function(args.loss_fucntion)
 
-    optimizerG = optim.Adam(netG.parameters(), lr=args.lr, betas=(0.5, 0.999))
-    optimizerD = optim.Adam(netD.parameters(), lr=args.lr, betas=(0.5, 0.999))
+    netG, netD, optimizerG, optimizerD, start_iteration = get_models_and_optimizers(args)
 
-    logger = LossLogger(saved_image_folder)
+    avg_param_G = copy_G_params(netG)
+
     start = time()
-    for iteration in tqdm(range(args.n_iterations + 1)):
+    for iteration in range(start_iteration, args.n_iterations + 1):
         real_images = next(train_loader).to(device)
         b = real_images.size(0)
 
@@ -85,7 +102,7 @@ def train_GAN(args):
         logger.aggregate_data(debug_Glosses, group_name="G_train")
         if iteration % 100 == 0:
             sec_per_kimage = (time() - start) / (max(1, iteration) / 1000)
-            print(str({k: f"{v:.6f}" for k, v in debug_Dlosses.items()}) + f"sec/kimg: {sec_per_kimage:.1f}")
+            print(f"Iteration: {iteration} " + str({k: f"{v:.6f}" for k, v in debug_Dlosses.items()}) + f" sec/kimg: {sec_per_kimage:.1f}")
 
         if iteration % args.save_interval == 0:
             backup_para = copy_G_params(netG)
@@ -95,7 +112,9 @@ def train_GAN(args):
                      fid_metric, other_metrics,
                      debug_fixed_noise, debug_fixed_reals, debug_fixed_reals_test,
                      logger, saved_image_folder, iteration, args)
-            torch.save({'g': netG.state_dict(), 'd': netD.state_dict()}, saved_model_folder + '/%d.pth' % iteration)
+            torch.save({"iteration": iteration, 'netG': netG.state_dict(), 'netD': netD.state_dict(),
+                        "optimizerG":optimizerG.state_dict(), "optimizerD": optimizerD.state_dict()},
+                       saved_model_folder + '/%d.pth' % iteration)
 
             load_params(netG, backup_para)
 
@@ -144,7 +163,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     # Model and data
-    parser.add_argument('--data_path', default="/mnt/storage_ssd/datasets/FFHQ_1000/FFHQ_1000", help="Path to train images")
+    parser.add_argument('--data_path', default="/mnt/storage_ssd/datasets/FFHQ_1000/FFHQ_1000",
+                        help="Path to train images")
     parser.add_argument('--augmentaion', default='color,translation', help="comma separated data augmentaitons")
     parser.add_argument('--Generator_architecture', default='DCGAN')
     parser.add_argument('--Discriminator_architecture', default='DCGAN')
@@ -155,8 +175,8 @@ if __name__ == "__main__":
     parser.add_argument('--batch_size', default=64, type=int)
     parser.add_argument('--loss_fucntion', default="SoftHingeLoss", type=str)
     parser.add_argument('--lr', default=0.0001, type=float)
-    parser.add_argument('--avg_update_factor', default=0.001, type=float, help='moving average factor weight of '
-                                                                               'updating generator (1 means none)')
+    parser.add_argument('--avg_update_factor', default=0.001, type=float,
+                        help='moving average factor weight of updating generator (1 means none)')
     parser.add_argument('--n_D_steps', default=1, type=int, help="Number of repeated D updates with each batch")
     parser.add_argument('--G_step_every', default=1, type=int, help="Update G only evry 'G_step_every' iterations")
     parser.add_argument('--n_iterations', default=100000, type=int)
@@ -171,6 +191,8 @@ if __name__ == "__main__":
 
     #Other
     parser.add_argument('--n_workers', default=0, type=int)
+    parser.add_argument('--resume_last_ckpt', action='store_true', default=False,
+                        help="Search for the latest ckpt in the same folder to resume trining")
     parser.add_argument('--load_data_to_memory', action='store_true', default=False)
     parser.add_argument('--device', default="cuda:0")
 
@@ -180,7 +202,7 @@ if __name__ == "__main__":
 
     device = torch.device(args.device)
 
-    saved_model_folder, saved_image_folder = get_dir(args)
+    saved_model_folder, saved_image_folder, plots_image_folder = get_dir(args)
 
     train_loader, test_loader = get_dataloader(args.data_path, args.im_size, args.batch_size, args.n_workers,
                                                load_to_memory=args.load_data_to_memory)
