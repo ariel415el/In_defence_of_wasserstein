@@ -15,10 +15,10 @@ class Generator(nn.Module):
     def __init__(self, z_dim):
         channels = 3
         super(Generator, self).__init__()
-        layer_depths = [z_dim, 512, 512, 256, 128, 64]
-        kernel_dim = [4, 4, 4, 4, 4, 4]
-        strides = [1, 2, 2, 2, 2, 2]
-        padding = [0, 1, 1, 1, 1, 1]
+        layer_depths = [z_dim, 512, 512, 256, 128]
+        kernel_dim = [4, 4, 4, 4, 4]
+        strides = [1, 2, 2, 2, 2]
+        padding = [0, 1, 1, 1, 1]
         layers = []
         for i in range(len(layer_depths) - 1):
             layers += [
@@ -40,11 +40,11 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, num_outputs=1):
+    def __init__(self):
         super(Discriminator, self).__init__()
         channels=3
 
-        layer_depth = [channels, 64, 128, 256, 512, 512]
+        layer_depth = [channels, 64, 128, 256, 512]
         layers = []
         for i in range(len(layer_depth) - 1):
             layers += [
@@ -52,10 +52,10 @@ class Discriminator(nn.Module):
                 nn.BatchNorm2d(layer_depth[i + 1]),
                 nn.ReLU(True)
             ]
-        layers.append(nn.Conv2d(layer_depth[-1], num_outputs, 4, 1, 0, bias=False))
+        layers.append(nn.Conv2d(layer_depth[-1], 1, 4, 1, 0, bias=False))
         self.convs = nn.Sequential(*layers)
 
     def forward(self, input):
         input = input
-        output = self.convs(input).view(input.size(0), -1)
+        output = self.convs(input).view(input.size(0))
         return output

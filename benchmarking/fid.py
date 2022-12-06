@@ -38,22 +38,25 @@ inception = None
 
 
 class FID_score:
-    def __init__(self, reference_batches, device):
+    def __init__(self, loaders, num_batches, device):
+        self.device = device
         print("Computing reference Inception features", end='...', flush=True)
-        global inception
-        if inception is None:
-            inception = InceptionV3([3], normalize_input=False).to(device)
-        self.ref_stats = self.get_multi_batch_statistics(reference_batches)
-        print("Done")
+        with torch.no_grad():
+            global inception
+            if inception is None:
+                inception = InceptionV3([3], normalize_input=False).to(device)
+            self.ref_stats_dict = {k: self.get_multi_batch_statistics([next(loader).to(device) for _ in range(num_batches)]) for k,loader in loaders.items()}
+            print("Done")
+
+    def __call__(self, batches):
+        stats = self.get_multi_batch_statistics(batches)
+        return {k: calc_fid(ref_stats, stats) for k, ref_stats in self.ref_stats_dict.items()}
+
 
     def get_multi_batch_statistics(self, batches):
         global inception
         with torch.no_grad():
-            features = [inception(batch)[0].view(batch.shape[0], -1).cpu().numpy() for batch in batches]
+            features = [inception(batch.to(self.device))[0].view(batch.shape[0], -1).cpu().numpy() for batch in batches]
         features = np.concatenate(features, axis=0)
         return np.mean(features, 0), np.cov(features, rowvar=False)
 
-    def calc_fid(self, batches):
-        stats = self.get_multi_batch_statistics(batches)
-
-        return calc_fid(self.ref_stats, stats)

@@ -1,4 +1,5 @@
 import os
+import pickle
 from collections import defaultdict
 
 import numpy as np
@@ -15,16 +16,24 @@ class LossLogger:
         os.makedirs(save_dir, exist_ok=True)
         self.aggregated_data = defaultdict(list)
         self.data = defaultdict(list)
+        self.group_names = dict()
+        self.log_file = f"{self.save_dir}/log.pkl"
+        if os.path.exists(self.log_file):
+            self.data = pickle.load(open(self.log_file, "rb"))
 
-    def aggregate_data(self, data_dict):
+    def aggregate_data(self, data_dict, group_name):
+        if group_name not in self.group_names:
+            self.group_names[group_name] = list(data_dict.keys())
         for k, v in data_dict.items():
             self.aggregated_data[k].append(v)
 
-    def add_data(self, data_dict):
+    def add_data(self, data_dict, group_name):
+        if group_name not in self.group_names:
+            self.group_names[group_name] = list(data_dict.keys())
         for k, v in data_dict.items():
             self.data[k].append(v)
 
-    def plot(self, data_group_names):
+    def plot(self):
         # Add averaged aggregated data
         for k, v in self.aggregated_data.items():
             self.data[k].append(np.mean(v))
@@ -32,7 +41,7 @@ class LossLogger:
 
         # Plot grouped data
         all_names = []
-        for title, names in data_group_names.items():
+        for title, names in self.group_names.items():
             for i, name in enumerate(names):
                 plt.plot(np.arange(len(self.data[name])), self.data[name], label=name, color=COLORS[i])
                 all_names.append(name)
@@ -48,19 +57,20 @@ class LossLogger:
                 plt.savefig(self.save_dir + f"/{k}.png")
                 plt.clf()
 
-
+        pickle.dump(self.data, open(self.log_file, "wb"))
 def get_dir(args):
-    task_name = 'train_results/' + args.name
-    saved_model_folder = os.path.join( task_name, 'models')
-    saved_image_folder = os.path.join( task_name, 'images')
-    
+    task_name = os.path.join(args.outputs_root,  args.name)
+    saved_model_folder = os.path.join(task_name, 'models')
+    saved_image_folder = os.path.join(task_name, 'images')
+    plots_image_folder = os.path.join(task_name, 'plots')
+
     os.makedirs(saved_model_folder, exist_ok=True)
     os.makedirs(saved_image_folder, exist_ok=True)
+    os.makedirs(plots_image_folder, exist_ok=True)
 
-    
-    with open( os.path.join(saved_model_folder, '../args.txt'), 'w') as f:
+    with open(os.path.join(saved_model_folder, '../args.txt'), 'w') as f:
         json.dump(args.__dict__, f, indent=2)
 
-    return saved_model_folder, saved_image_folder
+    return saved_model_folder, saved_image_folder, plots_image_folder
 
 
