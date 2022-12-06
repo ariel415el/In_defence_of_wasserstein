@@ -19,7 +19,7 @@ class NonSaturatingGANLoss:
         return GLoss
 
 
-class WGANloss:
+class WGANLoss:
     def __init__(self, gp_factor=10):
         self.gp_factor = gp_factor
 
@@ -27,11 +27,15 @@ class WGANloss:
         real_score = critic(real_data).mean()
         fake_score = critic(fake_data.detach()).mean()
         Dloss = fake_score - real_score
-        debug_dict = {"real_score": real_score.item(), "fake_score": fake_score.item()}
+
+        res = 3 * real_data.shape[-1] **2
+        debug_dict = {"W1 / res": (real_score - fake_score).item() / res}
+
         if self.gp_factor > 0:
             gp = calc_gradient_penalty(critic, real_data, fake_data, real_data.device)
             Dloss += self.gp_factor * gp
-            debug_dict['gp'] = gp.item()
+            # debug_dict['gp'] = gp.item()
+
         return Dloss, debug_dict
 
     def trainG(self, netD, real_data, fake_data):
@@ -67,11 +71,8 @@ class CtransformLoss:
         self.c2 = c2
 
     @staticmethod
-    def compute_ot(critic, batch, gen_batch, compute_penalties=False, run_in_batch=True):
-        if run_in_batch:
-            fs = critic(torch.cat([batch, gen_batch]))
-        else:
-            fs = torch.cat([critic(batch), critic(gen_batch)])
+    def compute_ot(critic, batch, gen_batch, compute_penalties=False):
+        fs = critic(batch)
 
         C = torch.norm(batch[:, None, ...] - gen_batch[None, ...], p=1, dim=(2, 3, 4))
         f_cs = torch.min(C - fs[:, None], dim=0)[0]
@@ -90,6 +91,7 @@ class CtransformLoss:
     def compute_full_space_ot(f, reals, fakes, compute_penalties=True, run_in_batch=False):
         b = len(reals)
         B = torch.cat([reals, fakes], dim=0)
+
         # Bys = torch.cat([reals, fakes], dim=0)
 
         if run_in_batch:
@@ -117,31 +119,34 @@ class CtransformLoss:
             return OT
 
     def trainD(self, netD, real_data, fake_data):
-        OT, penalty1, penalty2 = CtransformLoss.compute_full_space_ot(netD, real_data, fake_data, compute_penalties=True, run_in_batch=True)
+        OT, penalty1, penalty2 = CtransformLoss.compute_ot(netD, real_data, fake_data.detach(), compute_penalties=True)
         Dloss = -OT + self.c1 * penalty1 + self.c2 * penalty2  # Maximize OT with penalties
-        return Dloss, {"OT": OT.item(), "penalty1": penalty1.item(), "penalty2": penalty2.item()}
+        res = 3 * real_data.shape[-1] **2
+        return Dloss, {"OT/res": OT.item() / res, "penalty1": penalty1.item(), "penalty2": penalty2.item()}
 
     def trainG(self, netD, real_data, fake_data):
-        OT = CtransformLoss.compute_full_space_ot(netD, real_data, fake_data, compute_penalties=False, run_in_batch=True)
+        OT = CtransformLoss.compute_ot(netD, real_data, fake_data, compute_penalties=False)
         Gloss = OT  # Minimize OT
-        return Gloss, {"OT": OT.item()}
+
+        res = 3 * real_data.shape[-1] **2
+        return Gloss, {"OT/res": OT.item() / res}
 
 
-class AmortizedDualWasserstein:
-    """
-    Idea used in "Wasserstein GAN With Quadratic Transport Cost" and
-    "A Two-Step Computation of the Exact GAN Wasserstein Distance"
-    Solve the linear dual problem for each batch and regress the discriminator to one of the potentials
-    """
-    def trainD(self, netD, real_data, fake_data):
-        OT, penalty1, penalty2 = CtransformLoss.compute_full_space_ot(netD, real_data, fake_data, compute_penalties=True, run_in_batch=True)
-        Dloss = -OT + self.c1 * penalty1 + self.c2 * penalty2  # Maximize OT with penalties
-        return Dloss, {"OT": OT.item(), "penalty1": penalty1.item(), "penalty2": penalty2.item()}
-
-    def trainG(self, netD, real_data, fake_data):
-        OT = CtransformLoss.compute_full_space_ot(netD, real_data, fake_data, compute_penalties=False, run_in_batch=True)
-        Gloss = OT  # Minimize OT
-        return Gloss, {"OT": OT.item()}
+# class AmortizedDualWasserstein:
+#     """
+#     Idea used in "Wasserstein GAN With Quadratic Transport Cost" and
+#     "A Two-Step Computation of the Exact GAN Wasserstein Distance"
+#     Solve the linear dual problem for each batch and regress the discriminator to one of the potentials
+#     """
+#     def trainD(self, netD, real_data, fake_data):
+#         OT, penalty1, penalty2 = CtransformLoss.compute_ot(netD, real_data, fake_data, compute_penalties=True, run_in_batch=True)
+#         Dloss = -OT + self.c1 * penalty1 + self.c2 * penalty2  # Maximize OT with penalties
+#         return Dloss, {"OT": OT.item(), "penalty1": penalty1.item(), "penalty2": penalty2.item()}
+#
+#     def trainG(self, netD, real_data, fake_data):
+#         OT = CtransformLoss.compute_ot(netD, real_data, fake_data, compute_penalties=False, run_in_batch=True)
+#         Gloss = OT  # Minimize OT
+#         return Gloss, {"OT": OT.item()}
 
 
 def get_loss_function(loss_name):

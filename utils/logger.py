@@ -6,7 +6,8 @@ import numpy as np
 
 from matplotlib import pyplot as plt
 import json
-
+import matplotlib as mpl
+mpl.use('Agg')
 COLORS=['r','g','b','k','pink', 'yellow']
 
 

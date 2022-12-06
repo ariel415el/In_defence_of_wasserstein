@@ -63,7 +63,7 @@ def train_GAN(args):
                 PatchSWD(p=33, n=128)
               ]
 
-    loss_function = get_loss_function(args.loss_fucntion)
+    loss_function = get_loss_function(args.loss_function)
 
     netG, netD, optimizerG, optimizerD, start_iteration = get_models_and_optimizers(args)
 
@@ -77,8 +77,8 @@ def train_GAN(args):
         noise = torch.randn((b, args.z_dim)).to(device)
         fake_images = netG(noise)
 
-        real_images = DiffAugment(real_images, policy=args.augmentaion)
-        fake_images = DiffAugment(fake_images, policy=args.augmentaion)
+        real_images = DiffAugment(real_images, policy=args.augmentation)
+        fake_images = DiffAugment(fake_images, policy=args.augmentation)
 
         # #####  1. train Discriminator #####
         for i in range(args.n_D_steps):
@@ -161,10 +161,12 @@ def evaluate(netG, netD,
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    # Model and data
+    # Data
     parser.add_argument('--data_path', default="/mnt/storage_ssd/datasets/FFHQ_1000/FFHQ_1000",
                         help="Path to train images")
-    parser.add_argument('--augmentaion', default='color,translation', help="comma separated data augmentaitons")
+    parser.add_argument('--augmentation', default='color,translation', help="comma separated data augmentation")
+
+    # Model
     parser.add_argument('--Generator_architecture', default='DCGAN')
     parser.add_argument('--Discriminator_architecture', default='DCGAN')
     parser.add_argument('--im_size', default=64, type=int)
@@ -172,7 +174,7 @@ if __name__ == "__main__":
 
     # Training
     parser.add_argument('--batch_size', default=64, type=int)
-    parser.add_argument('--loss_fucntion', default="SoftHingeLoss", type=str)
+    parser.add_argument('--loss_function', default="SoftHingeLoss", type=str)
     parser.add_argument('--lr', default=0.0001, type=float)
     parser.add_argument('--avg_update_factor', default=0.001, type=float,
                         help='moving average factor weight of updating generator (1 means none)')
@@ -180,23 +182,23 @@ if __name__ == "__main__":
     parser.add_argument('--G_step_every', default=1, type=int, help="Update G only evry 'G_step_every' iterations")
     parser.add_argument('--n_iterations', default=100000, type=int)
 
-    # verbose
+    # Evaluation
+    parser.add_argument('--outputs_root', default='Outputs')
     parser.add_argument('--save_interval', default=1000, type=int)
     parser.add_argument('--fid_freq', default=10000, type=int)
     parser.add_argument('--fid_n_batches', default=0, type=int, help="How many batches of train/test to compute "
                                                                      "reference FID statistics (0 turns off FID)")
-    parser.add_argument('--outputs_root', default='Outputs')
     parser.add_argument('--tag', default='test')
 
-    #Other
+    # Other
     parser.add_argument('--n_workers', default=4, type=int)
     parser.add_argument('--resume_last_ckpt', action='store_true', default=False,
-                        help="Search for the latest ckpt in the same folder to resume trining")
+                        help="Search for the latest ckpt in the same folder to resume training")
     parser.add_argument('--device', default="cuda:0")
 
     args = parser.parse_args()
     args.name = f"{os.path.basename(args.data_path)}_{args.im_size}x{args.im_size}_G-{args.Generator_architecture}" \
-                f"_D-{args.Discriminator_architecture}_L-{args.loss_fucntion}_Z-{args.z_dim}_B-{args.batch_size}_{args.tag}"
+                f"_D-{args.Discriminator_architecture}_L-{args.loss_function}_Z-{args.z_dim}_B-{args.batch_size}_{args.tag}"
 
     device = torch.device(args.device)
 
