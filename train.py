@@ -46,7 +46,7 @@ def get_models_and_optimizers(args):
     return netG, netD, optimizerG, optimizerD, start_iteration
 
 def train_GAN(args):
-    logger = LossLogger(saved_image_folder)
+    logger = LossLogger(plots_image_folder)
     debug_fixed_noise = torch.randn((args.batch_size, args.z_dim)).to(device)
     debug_fixed_reals = next(train_loader).to(device)
     debug_fixed_reals_test = next(test_loader).to(device)
@@ -101,7 +101,7 @@ def train_GAN(args):
         logger.aggregate_data(debug_Dlosses, group_name="D_train")
         logger.aggregate_data(debug_Glosses, group_name="G_train")
         if iteration % 100 == 0:
-            sec_per_kimage = (time() - start) / (max(1, iteration) / 1000)
+            sec_per_kimage = (time() - start) / (max(1, iteration - start_iteration) / 1000)
             print(f"Iteration: {iteration} " + str({k: f"{v:.6f}" for k, v in debug_Dlosses.items()}) + f" sec/kimg: {sec_per_kimage:.1f}")
 
         if iteration % args.save_interval == 0:
@@ -135,7 +135,6 @@ def evaluate(netG, netD,
         nrow = int(sqrt(len(fixed_noise_fake_images)))
         vutils.save_image(fixed_noise_fake_images, saved_image_folder + '/%d.jpg' % iteration, nrow=nrow, normalize=True)
 
-
         if fid_metric is not None and iteration % args.fid_freq == 0:
             fixed_fid = fid_metric([fixed_noise_fake_images])
             fid = fid_metric([netG(torch.randn_like(fixed_noise).to(device)) for _ in range(args.fid_n_batches)])
@@ -146,7 +145,7 @@ def evaluate(netG, netD,
         # fake_images = netG(torch.randn_like(fixed_noise).to(device))
         for metric in other_metrics:
             logger.add_data({
-                f'{metric}_fixed_noise_gen_to_trin': metric(fixed_noise_fake_images, debug_fixed_reals),
+                f'{metric}_fixed_noise_gen_to_train': metric(fixed_noise_fake_images, debug_fixed_reals),
                 f'{metric}_fixed_noise_gen_to_test': metric(fixed_noise_fake_images, debug_fixed_reals_test),
                 # f'{metric}_gen_to_train': metric(fake_images, debug_fixed_reals),
                 # f'{metric}_gen_to_test': metric(fake_images, debug_fixed_reals_test),
@@ -190,10 +189,9 @@ if __name__ == "__main__":
     parser.add_argument('--tag', default='test')
 
     #Other
-    parser.add_argument('--n_workers', default=0, type=int)
+    parser.add_argument('--n_workers', default=4, type=int)
     parser.add_argument('--resume_last_ckpt', action='store_true', default=False,
                         help="Search for the latest ckpt in the same folder to resume trining")
-    parser.add_argument('--load_data_to_memory', action='store_true', default=False)
     parser.add_argument('--device', default="cuda:0")
 
     args = parser.parse_args()
@@ -204,8 +202,7 @@ if __name__ == "__main__":
 
     saved_model_folder, saved_image_folder, plots_image_folder = get_dir(args)
 
-    train_loader, test_loader = get_dataloader(args.data_path, args.im_size, args.batch_size, args.n_workers,
-                                               load_to_memory=args.load_data_to_memory)
+    train_loader, test_loader = get_dataloader(args.data_path, args.im_size, args.batch_size, args.n_workers)
 
     train_GAN(args)
 

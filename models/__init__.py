@@ -42,7 +42,7 @@ def get_discriminator(name, res):
     elif 'BagNet' in name:
         from models.BagNet import BagNet, Bottleneck
         kernel_dict = {"BagNet-9": [1, 1, 0, 0], "BagNet-17": [1, 1, 1, 0], "BagNet-33": [1, 1, 1, 1]}
-        netD = BagNet(Bottleneck, kernel3=kernel_dict[name], num_classes=1)
+        netD = BagNet(Bottleneck, kernel3=kernel_dict[name])
 
     elif name == 'FC':
         from models.FC import Discriminator

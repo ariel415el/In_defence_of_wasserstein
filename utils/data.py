@@ -5,31 +5,6 @@ import torch.utils.data as data
 from torch.utils.data import Dataset, DataLoader
 from PIL import Image
 from torchvision import transforms as T
-from tqdm import tqdm
-
-
-class MemoryDataset(Dataset):
-    def __init__(self, paths, im_size):
-        super(MemoryDataset, self).__init__()
-        transforms = T.Compose([
-             T.ToTensor(),
-             T.Resize(im_size),
-             T.Normalize((0.5,), (0.5,))
-        ])
-
-        self.images = []
-        for path in tqdm(paths, desc="Loading images into memory"):
-            img = Image.open(path).convert('RGB')
-            if transforms is not None:
-                img = transforms(img)
-            self.images.append(img)
-
-    def __len__(self):
-        return len(self.images)
-
-    def __getitem__(self, idx):
-        return self.images[idx]
-
 
 class DiskDataset(Dataset):
     def __init__(self, paths, im_size):
@@ -76,17 +51,15 @@ class InfiniteSamplerWrapper(data.sampler.Sampler):
         return 2 ** 31
 
 
-def get_dataloader(data_root, im_size, batch_size, n_workers, val_percentage=0.1, load_to_memory=False):
+def get_dataloader(data_root, im_size, batch_size, n_workers, val_percentage=0.1):
     paths = sorted([os.path.join(data_root, im_name) for im_name in os.listdir(data_root)])
 
     n_val_images = int(val_percentage * len(paths))
     train_paths, test_paths = paths[n_val_images:], paths[:n_val_images]
     print(f"Train images: {len(train_paths)}, test images: {len(test_paths)}")
 
-    dataset_class = MemoryDataset if load_to_memory else DiskDataset
-
-    train_dataset = dataset_class(paths=train_paths, im_size=im_size)
-    test_dataset = dataset_class(paths=test_paths, im_size=im_size)
+    train_dataset = DiskDataset(paths=train_paths, im_size=im_size)
+    test_dataset = DiskDataset(paths=test_paths, im_size=im_size)
 
     train_loader = iter(DataLoader(train_dataset, batch_size=batch_size,
                                  shuffle=False,
