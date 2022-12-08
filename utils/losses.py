@@ -2,6 +2,8 @@ import sys
 
 import torch
 from torch.nn import functional as F
+import numpy as np
+import cvxopt
 
 
 class NonSaturatingGANLoss:
@@ -17,30 +19,6 @@ class NonSaturatingGANLoss:
         labels = torch.ones(len(real_data), 1).to(real_data.device)
         GLoss = F.binary_cross_entropy_with_logits(preds, labels)
         return GLoss
-
-
-class WGANLoss:
-    def __init__(self, gp_factor=10):
-        self.gp_factor = gp_factor
-
-    def trainD(self, critic, real_data, fake_data):
-        real_score = critic(real_data).mean()
-        fake_score = critic(fake_data.detach()).mean()
-        Dloss = fake_score - real_score
-
-        res = 3 * real_data.shape[-1] **2
-        debug_dict = {"W1 / res": (real_score - fake_score).item() / res}
-
-        if self.gp_factor > 0:
-            gp = calc_gradient_penalty(critic, real_data, fake_data, real_data.device)
-            Dloss += self.gp_factor * gp
-            # debug_dict['gp'] = gp.item()
-
-        return Dloss, debug_dict
-
-    def trainG(self, netD, real_data, fake_data):
-        Gloss = -netD(fake_data).mean()
-        return Gloss, {"Gloss": Gloss.item()}
 
 
 class SoftHingeLoss:
@@ -59,12 +37,40 @@ class SoftHingeLoss:
 
     def trainG(self, netD, real_data, fake_data):
         D_scores_fake = netD(fake_data)
-        # Gloss = -F.relu(torch.rand_like(fake_data) * 0.2 + 0.8 + D_scores_fake).mean()
         Gloss = -D_scores_fake.mean()
         return Gloss, {"D_scores_fake": D_scores_fake.mean().item()}
 
 
+class WGANLoss:
+    def __init__(self, gp_factor=10):
+        self.gp_factor = gp_factor
+
+    def trainD(self, netD, real_data, fake_data):
+        real_score = netD(real_data).mean()
+        fake_score = netD(fake_data.detach()).mean()
+        WD = real_score - fake_score
+        Dloss = -1 * WD  # Maximize WD
+
+        debug_dict = {"W1 ": WD.item()}
+        if self.gp_factor > 0:
+            gp = calc_gradient_penalty(netD, real_data, fake_data, real_data.device)
+            Dloss += self.gp_factor * gp
+
+        from benchmarking.emd import EMD
+        debug_dict['Primal-OT'] = EMD()(real_data, fake_data)
+
+        return Dloss, debug_dict
+
+    def trainG(self, netD, real_data, fake_data):
+        Gloss = -netD(fake_data).mean()
+        return Gloss, {"Gloss": Gloss.item()}
+
+
 class CtransformLoss:
+    """Following c-transform WGAN from:
+     "(p,q)-WGAN defined at Mallasto, Anton, et al. "(q, p)-Wasserstein GANs: Comparing Ground Metrics for Wasserstein GANs."
+    Code inspired by https://github.com/sverdoot/qp-wgan
+    """
     def __init__(self, search_space='full', c1=0.1, c2=0.1):
         self.search_space = search_space
         self.c1 = c1
@@ -74,7 +80,9 @@ class CtransformLoss:
     def compute_ot(critic, batch, gen_batch, compute_penalties=False):
         fs = critic(batch)
 
-        C = torch.norm(batch[:, None, ...] - gen_batch[None, ...], p=1, dim=(2, 3, 4))
+        # C = torch.mean(torch.abs(batch[:, None, ...] - gen_batch[None, ...]), dim=(2, 3, 4))
+        C = torch.mean((batch[:, None] - gen_batch[None, :]) ** 2, dim=(-3, -2,-1))
+
         f_cs = torch.min(C - fs[:, None], dim=0)[0]
         ot = fs.mean() + f_cs.mean().mean()
 
@@ -111,7 +119,7 @@ class CtransformLoss:
             couples_admisibility_gap = C[:b, b:] - f_reals[:, None] - f_c_fakes[None, :]
 
             penalty1 = torch.mean(couples_admisibility_gap**2)
-            penalty2 = torch.mean(torch.clamp(full_admisibility_gap, min=0)**2)
+            penalty2 = torch.mean(torch.clamp(full_admisibility_gap, max=0)**2)
 
             return OT, penalty1, penalty2
 
@@ -121,32 +129,102 @@ class CtransformLoss:
     def trainD(self, netD, real_data, fake_data):
         OT, penalty1, penalty2 = CtransformLoss.compute_ot(netD, real_data, fake_data.detach(), compute_penalties=True)
         Dloss = -OT + self.c1 * penalty1 + self.c2 * penalty2  # Maximize OT with penalties
-        res = 3 * real_data.shape[-1] **2
-        return Dloss, {"OT/res": OT.item() / res, "penalty1": penalty1.item(), "penalty2": penalty2.item()}
+        debug_dict = {"OT": OT.item()}
+
+        from benchmarking.emd import EMD
+        debug_dict['emd'] = EMD()(real_data, fake_data)
+
+        return Dloss, debug_dict
+        # return Dloss, {"OT/res": OT.item() / res, "penalty1": penalty1.item(), "penalty2": penalty2.item()}
 
     def trainG(self, netD, real_data, fake_data):
         OT = CtransformLoss.compute_ot(netD, real_data, fake_data, compute_penalties=False)
         Gloss = OT  # Minimize OT
 
-        res = 3 * real_data.shape[-1] **2
-        return Gloss, {"OT/res": OT.item() / res}
+        return Gloss, {"OT": OT.item()}
 
 
-# class AmortizedDualWasserstein:
-#     """
-#     Idea used in "Wasserstein GAN With Quadratic Transport Cost" and
-#     "A Two-Step Computation of the Exact GAN Wasserstein Distance"
-#     Solve the linear dual problem for each batch and regress the discriminator to one of the potentials
-#     """
-#     def trainD(self, netD, real_data, fake_data):
-#         OT, penalty1, penalty2 = CtransformLoss.compute_ot(netD, real_data, fake_data, compute_penalties=True, run_in_batch=True)
-#         Dloss = -OT + self.c1 * penalty1 + self.c2 * penalty2  # Maximize OT with penalties
-#         return Dloss, {"OT": OT.item(), "penalty1": penalty1.item(), "penalty2": penalty2.item()}
-#
-#     def trainG(self, netD, real_data, fake_data):
-#         OT = CtransformLoss.compute_ot(netD, real_data, fake_data, compute_penalties=False, run_in_batch=True)
-#         Gloss = OT  # Minimize OT
-#         return Gloss, {"OT": OT.item()}
+class AmortizedDualWasserstein:
+    """
+    Introduced in "A Two-Step Computation of the Exact GAN Wasserstein Distance"
+    and used in "Wasserstein GAN With Quadratic Transport Cost"
+    Solve the linear dual problem for each batch and regress the discriminator to one of the potentials
+    Code inspired by https://github.com/harryliew/WGAN-QC.git
+
+    dual furmulation is max{f,g} [a | b]^T @ [f | g] s.t f_i+g_j <= C_(i,j)
+    and is solved in the primal form as min{f,g} [-a | -b]^T @ [f | g] s.t f_i+g_j <= C_(i,j)
+    """
+    def __init__(self):
+        self.init = False
+        self.d = None
+        self.fi_gj = None
+        self.ab = None
+        self.criterion = None
+
+    @staticmethod
+    def fast_dist_mat(X, Y):
+        dist = (X * X).sum(1)[:, None] + (Y * Y).sum(1)[None, :] - 2.0 * torch.mm(X, torch.transpose(Y, 0, 1))
+        d = X.shape[1]
+        dist /= d
+        return dist
+
+    def set_foundations(self, d):
+        fi_plus_gj_extraction_matrix = np.zeros((d ** 2, 2 * d))
+        for i in range(d):
+            for j in range(d):
+                fi_plus_gj_extraction_matrix[i * d + j, i] = 1
+                fi_plus_gj_extraction_matrix[i * d + j, d + j] = 1
+
+        self.d = d
+        self.fi_gj = cvxopt.sparse(cvxopt.matrix(fi_plus_gj_extraction_matrix))
+        self.ab = cvxopt.matrix(-1 * np.ones(2 * d) / d)
+        self.criterion = torch.nn.MSELoss()
+
+        # this seem to make a faster computation
+        self.pStart = {}
+        self.pStart['x'] = cvxopt.matrix([cvxopt.matrix([1.0] * d), cvxopt.matrix([1.0] * d)])
+        self.pStart['s'] = cvxopt.matrix([1.0] * (2 * d))
+
+        cvxopt.solvers.options['show_progress'] = False
+        cvxopt.solvers.options['glpk'] = {'msg_lev': 'GLP_MSG_OFF'}
+
+    def solve_dual(self, reals, fakes):
+        assert len(reals) == len(fakes)
+        if not self.init:
+            self.init = True
+            self.set_foundations(len(reals))
+
+        dist = self.fast_dist_mat(reals.reshape(self.d, -1), fakes.reshape(self.d, -1)).cpu().numpy()
+        # dist = torch.mean((reals[:, None] - fakes[None, :]) ** 2, dim=(-3, -2,-1)).cpu().numpy()
+        constraints = cvxopt.matrix(dist.reshape(-1).astype(np.float64))
+        sol = cvxopt.solvers.lp(self.ab, self.fi_gj, constraints, primalstart=self.pStart, solver='glpk')
+
+        x = np.array(sol['x'])[:, 0]
+        x = x - x.mean()  # Since the solution is shift invariant we may as well take take the zero shirt one
+        fg = torch.from_numpy(x).to(reals.device).float()
+        f = fg[:self.d]
+        g = fg[self.d:]
+
+        return f, g, -1 * sol['primal objective']
+
+    def trainD(self, netD, real_data, fake_data):
+        f, g, WD = self.solve_dual(real_data, fake_data.detach())
+        # for i in range(self.n_iters):
+        real_score = netD(real_data)
+        real_score_mean = real_score.mean()
+        fake_score = netD(fake_data.detach())
+
+        L2LossD_fake = self.criterion(fake_score[:, 0], g)
+        L2LossD_real = self.criterion(real_score_mean, f.mean())
+        Dloss = 0.5 * L2LossD_real + 0.5 * L2LossD_fake
+        WD_D = real_score_mean + fake_score.mean()
+
+        return Dloss, {"WD-D": WD_D.item(), "Dual-OT": WD}
+
+    def trainG(self, netD, real_data, fake_data):
+        Gloss = netD(fake_data).mean()
+        return Gloss, {"Gloss": Gloss.item()}
+
 
 
 def get_loss_function(loss_name):

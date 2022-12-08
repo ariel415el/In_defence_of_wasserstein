@@ -30,7 +30,7 @@ class ResNet_G(nn.Module):
             nf1 = min(nf * 2 ** i, nf_max)
             blocks += [
                 ResNetBlock(nf0, nf1, bn=self.bn, res_ratio=res_ratio),
-                ResNetBlock(nf1, nf1, bn=self.bn, res_ratio=res_ratio),
+                # ResNetBlock(nf1, nf1, bn=self.bn, res_ratio=res_ratio),
                 nn.Upsample(scale_factor=2)
             ]
 
@@ -84,7 +84,7 @@ class ResNet_D(nn.Module):
             nf1 = min(nf * 2 ** (i + 1), nf_max)
             blocks += [
                 nn.AvgPool2d(3, stride=2, padding=1),
-                ResNetBlock(nf0, nf0, bn=False, res_ratio=res_ratio),
+                # ResNetBlock(nf0, nf0, bn=False, res_ratio=res_ratio),
                 ResNetBlock(nf0, nf1, bn=False, res_ratio=res_ratio),
             ]
 

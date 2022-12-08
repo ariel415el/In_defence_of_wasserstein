@@ -23,6 +23,7 @@ from benchmarking.lap_swd import LapSWD
 from benchmarking.swd import PatchSWD
 from benchmarking.emd import patchEMD, EMD
 
+
 def get_models_and_optimizers(args):
     netG, netD = get_models(args, device)
     netG.train()
@@ -101,8 +102,8 @@ def train_GAN(args):
         logger.aggregate_data(debug_Dlosses, group_name="D_train")
         logger.aggregate_data(debug_Glosses, group_name="G_train")
         if iteration % 100 == 0:
-            sec_per_kimage = (time() - start) / (max(1, iteration - start_iteration) / 1000)
-            print(f"Iteration: {iteration} " + str({k: f"{v:.6f}" for k, v in debug_Dlosses.items()}) + f" sec/kimg: {sec_per_kimage:.1f}")
+            it_sec = max(1, iteration - start_iteration) / (time() - start)
+            print(f"Iteration: {iteration} " + str({k: f"{v:.6f}" for k, v in debug_Dlosses.items()}) + f" it/sec: {it_sec:.1f}")
 
         if iteration % args.save_interval == 0:
             backup_para = copy_G_params(netG)
