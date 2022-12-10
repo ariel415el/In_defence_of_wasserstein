@@ -17,7 +17,7 @@ def get_generator(name, res, z_dim):
         from models.FC import Generator
         netG = Generator(z_dim, output_dim=res)
 
-    elif name == 'Resnet':
+    elif name == 'ResNet':
         from models.Resnet import ResNet_G
         netG = ResNet_G(z_dim, size=res)
 
@@ -48,7 +48,7 @@ def get_discriminator(name, res):
         from models.FC import Discriminator
         netD = Discriminator(in_dim=res)
 
-    elif name == 'Resnet':
+    elif name == 'ResNet':
         from models.Resnet import ResNet_D
         netD = ResNet_D(size=res)
 
@@ -56,8 +56,8 @@ def get_discriminator(name, res):
 
 
 def get_models(args, device):
-    netG = get_generator(args.Generator_architecture, args.im_size, args.z_dim).to(device)
-    netD = get_discriminator(args.Discriminator_architecture, args.im_size).to(device)
+    netG = get_generator(args.gen_arch, args.im_size, args.z_dim).to(device)
+    netD = get_discriminator(args.disc_arch, args.im_size).to(device)
 
     return netG, netD
 
@@ -82,7 +82,7 @@ def print_num_params(model):
 
 
 if __name__ == '__main__':
-    for arch_name, s in [('FC', 64), ("DCGAN", 64), ("FastGAN", 128), ('FC', 128)]:
+    for arch_name, s in [('FC', 64), ("DCGAN", 64), ("FastGAN", 128), ('FC', 128), ('ResNet', 64), ('ResNet', 128)]:
         netG = get_generator(arch_name, s, s)
         netD = get_discriminator(arch_name, s)
         print(arch_name)

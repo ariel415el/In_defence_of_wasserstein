@@ -5,6 +5,22 @@ import torch.utils.data
 import torch.utils.data.distributed
 import numpy as np
 
+def weights_init_D(m):
+    classname = m.__class__.__name__
+    if classname.find('Conv') != -1:
+        nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='leaky_relu')
+    elif classname.find('BatchNorm') != -1:
+        nn.init.constant_(m.weight, 1)
+        nn.init.constant_(m.bias, 0)
+
+
+def weights_init_G(m):
+    classname = m.__class__.__name__
+    if classname.find('Conv') != -1:
+        nn.init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity='leaky_relu')
+    elif classname.find('BatchNorm') != -1:
+        nn.init.constant_(m.weight, 1)
+        nn.init.constant_(m.bias, 0)
 
 class ResNet_G(nn.Module):
     def __init__(self, z_dim, size, nfilter=64, nfilter_max=512, bn=True, res_ratio=0.1, **kwargs):
@@ -43,6 +59,8 @@ class ResNet_G(nn.Module):
 
         self.resnet = nn.Sequential(*blocks)
         self.conv_img = nn.Conv2d(nf, 3, 3, padding=1)
+
+        self.apply(weights_init_G)
 
     def forward(self, z):
         batch_size = z.size(0)
@@ -93,13 +111,15 @@ class ResNet_D(nn.Module):
         self.resnet = nn.Sequential(*blocks)
         self.fc = nn.Linear(self.nf0 * s0 * s0, 1)
 
+        self.apply(weights_init_D)
+
     def forward(self, x):
         batch_size = x.size(0)
 
         out = self.relu((self.conv_img(x)))
         out = self.resnet(out)
         out = out.view(batch_size, self.nf0 * self.s0 * self.s0)
-        out = self.fc(out)
+        out = self.fc(out).reshape(-1)
 
         return out
 

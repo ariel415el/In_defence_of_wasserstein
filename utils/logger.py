@@ -7,12 +7,29 @@ import numpy as np
 from matplotlib import pyplot as plt
 import json
 import matplotlib as mpl
+
+import wandb
+
 mpl.use('Agg')
 COLORS=['r','g','b','k','pink', 'yellow']
 
 
-class LossLogger:
-    def __init__(self, save_dir):
+class WandBLogger:
+    def __init__(self, save_dir, name):
+        wandb.init(project="Gan-training", dir=save_dir, name=name)
+
+    def aggregate_data(self, data_dict, group_name):
+        wandb.log(data_dict)
+
+    def add_data(self, data_dict, group_name):
+        wandb.log(data_dict)
+
+    def plot(self):
+        pass
+
+
+class PLTLogger:
+    def __init__(self, save_dir, use_wandb=False):
         self.save_dir = save_dir
         os.makedirs(save_dir, exist_ok=True)
         self.aggregated_data = defaultdict(list)

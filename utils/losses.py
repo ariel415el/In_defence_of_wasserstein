@@ -135,7 +135,6 @@ class CtransformLoss:
         debug_dict['emd'] = EMD()(real_data, fake_data)
 
         return Dloss, debug_dict
-        # return Dloss, {"OT/res": OT.item() / res, "penalty1": penalty1.item(), "penalty2": penalty2.item()}
 
     def trainG(self, netD, real_data, fake_data):
         OT = CtransformLoss.compute_ot(netD, real_data, fake_data, compute_penalties=False)
@@ -208,23 +207,28 @@ class AmortizedDualWasserstein:
         return f, g, -1 * sol['primal objective']
 
     def trainD(self, netD, real_data, fake_data):
-        f, g, WD = self.solve_dual(real_data, fake_data.detach())
+        with torch.no_grad():
+            f, g, WD = self.solve_dual(real_data, fake_data)
         # for i in range(self.n_iters):
         real_score = netD(real_data)
         real_score_mean = real_score.mean()
         fake_score = netD(fake_data.detach())
 
-        L2LossD_fake = self.criterion(fake_score[:, 0], g)
+        L2LossD_fake = self.criterion(fake_score, g)
         L2LossD_real = self.criterion(real_score_mean, f.mean())
         Dloss = 0.5 * L2LossD_real + 0.5 * L2LossD_fake
-        WD_D = real_score_mean + fake_score.mean()
+        WD_D = real_score_mean - fake_score.mean()
 
-        return Dloss, {"WD-D": WD_D.item(), "Dual-OT": WD}
+        debug_dict = {"WD-D": WD_D.item(), "Dual-OT": WD}
+
+        from benchmarking.emd import EMD
+        debug_dict['Primal-OT'] = EMD()(real_data, fake_data)
+
+        return Dloss, debug_dict
 
     def trainG(self, netD, real_data, fake_data):
-        Gloss = netD(fake_data).mean()
+        Gloss = -1 * netD(fake_data).mean()
         return Gloss, {"Gloss": Gloss.item()}
-
 
 
 def get_loss_function(loss_name):

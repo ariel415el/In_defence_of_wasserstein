@@ -16,7 +16,7 @@ from models import get_models
 from utils.common import copy_G_params, load_params
 from utils.losses import get_loss_function
 from utils.data import get_dataloader
-from utils.logger import get_dir, LossLogger
+from utils.logger import get_dir, PLTLogger, WandBLogger
 
 from benchmarking.fid import FID_score
 from benchmarking.lap_swd import LapSWD
@@ -47,7 +47,7 @@ def get_models_and_optimizers(args):
     return netG, netD, optimizerG, optimizerD, start_iteration
 
 def train_GAN(args):
-    logger = LossLogger(plots_image_folder)
+    logger = WandBLogger(plots_image_folder, args.name)
     debug_fixed_noise = torch.randn((args.batch_size, args.z_dim)).to(device)
     debug_fixed_reals = next(train_loader).to(device)
     debug_fixed_reals_test = next(test_loader).to(device)
@@ -135,7 +135,6 @@ def evaluate(netG, netD,
         fixed_noise_fake_images = netG(fixed_noise)
         nrow = int(sqrt(len(fixed_noise_fake_images)))
         vutils.save_image(fixed_noise_fake_images, saved_image_folder + '/%d.jpg' % iteration, nrow=nrow, normalize=True)
-
         if fid_metric is not None and iteration % args.fid_freq == 0:
             fixed_fid = fid_metric([fixed_noise_fake_images])
             fid = fid_metric([netG(torch.randn_like(fixed_noise).to(device)) for _ in range(args.fid_n_batches)])
@@ -168,8 +167,8 @@ if __name__ == "__main__":
     parser.add_argument('--augmentation', default='color,translation', help="comma separated data augmentation")
 
     # Model
-    parser.add_argument('--Generator_architecture', default='DCGAN')
-    parser.add_argument('--Discriminator_architecture', default='DCGAN')
+    parser.add_argument('--gen_arch', default='DCGAN')
+    parser.add_argument('--disc_arch', default='DCGAN')
     parser.add_argument('--im_size', default=64, type=int)
     parser.add_argument('--z_dim', default=64, type=int)
 
@@ -198,8 +197,8 @@ if __name__ == "__main__":
     parser.add_argument('--device', default="cuda:0")
 
     args = parser.parse_args()
-    args.name = f"{os.path.basename(args.data_path)}_{args.im_size}x{args.im_size}_G-{args.Generator_architecture}" \
-                f"_D-{args.Discriminator_architecture}_L-{args.loss_function}_Z-{args.z_dim}_B-{args.batch_size}_{args.tag}"
+    args.name = f"{os.path.basename(args.data_path)}_{args.im_size}x{args.im_size}_G-{args.gen_arch}" \
+                f"_D-{args.disc_arch}_L-{args.loss_function}_Z-{args.z_dim}_B-{args.batch_size}_{args.tag}"
 
     device = torch.device(args.device)
 
