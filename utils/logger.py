@@ -14,20 +14,6 @@ mpl.use('Agg')
 COLORS=['r','g','b','k','pink', 'yellow']
 
 
-class WandBLogger:
-    def __init__(self, save_dir, name):
-        wandb.init(project="Gan-training", dir=save_dir, name=name)
-
-    def aggregate_data(self, data_dict, group_name):
-        wandb.log(data_dict)
-
-    def add_data(self, data_dict, group_name):
-        wandb.log(data_dict)
-
-    def plot(self):
-        pass
-
-
 class PLTLogger:
     def __init__(self, save_dir, use_wandb=False):
         self.save_dir = save_dir
@@ -76,6 +62,8 @@ class PLTLogger:
                 plt.clf()
 
         pickle.dump(self.data, open(self.log_file, "wb"))
+
+
 def get_dir(args):
     task_name = os.path.join(args.outputs_root,  args.name)
     saved_model_folder = os.path.join(task_name, 'models')

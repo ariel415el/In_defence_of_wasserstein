@@ -66,6 +66,30 @@ class WGANLoss:
         return Gloss, {"Gloss": Gloss.item()}
 
 
+class BatchW2D:
+    """
+    """
+    def __init__(self, search_space='full'):
+        self.dist_clc = vgg_dist_calculator()
+        self.search_space = search_space
+
+    def trainG(self, netD, real_data, fake_data):
+        import ot
+        uniform_x = np.ones(len(real_data)) / len(real_data)
+        uniform_y = np.ones(len(fake_data)) / len(fake_data)
+        with torch.no_grad():
+            C = torch.mean((real_data[:, None] - fake_data[None, :]) ** 2, dim=(-3, -2,-1))
+            # C = self.dist_clc.get_dist_mat(real_data, fake_data, b=64)
+            C = C.cpu().numpy()
+            Tmap = ot.emd(uniform_x, uniform_y, C)
+            Nns = Tmap.argmax(0)
+            OT = np.sum(Tmap * C)
+
+        Gloss = ((fake_data - real_data[Nns])**2).mean()
+
+        return Gloss, {"Gloss": Gloss.item(), "OT": OT.item()}
+
+
 class CtransformLoss:
     """Following c-transform WGAN from:
      "(p,q)-WGAN defined at Mallasto, Anton, et al. "(q, p)-Wasserstein GANs: Comparing Ground Metrics for Wasserstein GANs."
@@ -129,10 +153,10 @@ class CtransformLoss:
     def trainD(self, netD, real_data, fake_data):
         OT, penalty1, penalty2 = CtransformLoss.compute_ot(netD, real_data, fake_data.detach(), compute_penalties=True)
         Dloss = -OT + self.c1 * penalty1 + self.c2 * penalty2  # Maximize OT with penalties
-        debug_dict = {"OT": OT.item()}
+        debug_dict = {"CT-OT": OT.item()}
 
         from benchmarking.emd import EMD
-        debug_dict['emd'] = EMD()(real_data, fake_data)
+        debug_dict['Primal-PT'] = EMD()(real_data, fake_data)
 
         return Dloss, debug_dict
 
@@ -140,7 +164,7 @@ class CtransformLoss:
         OT = CtransformLoss.compute_ot(netD, real_data, fake_data, compute_penalties=False)
         Gloss = OT  # Minimize OT
 
-        return Gloss, {"OT": OT.item()}
+        return Gloss, {"CT-OT": OT.item()}
 
 
 class AmortizedDualWasserstein:
@@ -199,7 +223,7 @@ class AmortizedDualWasserstein:
         sol = cvxopt.solvers.lp(self.ab, self.fi_gj, constraints, primalstart=self.pStart, solver='glpk')
 
         x = np.array(sol['x'])[:, 0]
-        x = x - x.mean()  # Since the solution is shift invariant we may as well take take the zero shirt one
+        # x = x - x.mean()  # Since the solution is shift invariant we may as well take take the zero shirt one ( This is true only in the +- formulation not in ++)
         fg = torch.from_numpy(x).to(reals.device).float()
         f = fg[:self.d]
         g = fg[self.d:]
@@ -216,10 +240,10 @@ class AmortizedDualWasserstein:
 
         L2LossD_fake = self.criterion(fake_score, g)
         L2LossD_real = self.criterion(real_score_mean, f.mean())
-        Dloss = 0.5 * L2LossD_real + 0.5 * L2LossD_fake
-        WD_D = real_score_mean - fake_score.mean()
+        Dloss = 0.5 * L2LossD_real  + 0.5 * L2LossD_fake
+        WD_D = real_score_mean + fake_score.mean()
 
-        debug_dict = {"WD-D": WD_D.item(), "Dual-OT": WD}
+        debug_dict = {"WD_D":WD_D.item(), "Dual-OT": WD, "f+g":(f.mean() - g.mean()).item()}
 
         from benchmarking.emd import EMD
         debug_dict['Primal-OT'] = EMD()(real_data, fake_data)
@@ -227,17 +251,17 @@ class AmortizedDualWasserstein:
         return Dloss, debug_dict
 
     def trainG(self, netD, real_data, fake_data):
-        Gloss = -1 * netD(fake_data).mean()
+        Gloss = -1*netD(fake_data).mean()
         return Gloss, {"Gloss": Gloss.item()}
 
+#########################
+# #### Utilities ###### #
+#########################
 
 def get_loss_function(loss_name):
     return getattr(sys.modules[__name__], loss_name)()
 
 
-#########################
-# #### Utilities ###### #
-#########################
 def calc_gradient_penalty(netD, real_data, fake_data, device):
     alpha = torch.rand(1, 1)
     alpha = alpha.expand(real_data.size())
@@ -256,3 +280,56 @@ def calc_gradient_penalty(netD, real_data, fake_data, device):
 
     gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
     return gradient_penalty
+
+
+def get_batche_slices(n, b):
+    n_batches = n // b
+    slices = []
+    for i in range(n_batches):
+        slices.append(slice(i * b, (i + 1) * b))
+
+    if n % b != 0:
+        slices.append(slice(n_batches, n))
+    return slices
+
+class vgg_dist_calculator:
+    def __init__(self,  layer=18):
+        self.layer = layer  # [4, 9, 18]
+        from torchvision import models, transforms
+        self.vgg_features = models.vgg19(pretrained=True).features
+        self.device = None
+        self.vgg_features.eval()
+        self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+
+    def extract_intermediate_feature_maps(self, x):
+        for i, layer in enumerate(self.vgg_features):
+            x = layer(x)
+            # if i in layer_indices:
+            if i == self.layer:
+                return x
+
+    def get_dist_mat(self, X, Y, b=64):
+        if self.device is None:
+            self.device = X.device
+            self.vgg_features.to(self.device)
+        x_slices = get_batche_slices(len(X), b)
+        y_slices = get_batche_slices(len(Y), b)
+        dists = -1 * torch.ones(len(X), len(Y))
+        for slice_x in x_slices:
+            features_x = self.extract_intermediate_feature_maps(X[slice_x])
+            for slice_y in y_slices:
+                features_y = self.extract_intermediate_feature_maps(Y[slice_x])
+                D = features_x[:, None] - features_y[None, ]
+                D = D.reshape(slice_x.stop - slice_x.start, slice_y.stop - slice_y.start, -1)
+                dists[slice_x, slice_y] = torch.norm(D, dim=-1)
+
+        return dists
+
+if __name__ == '__main__':
+    vgg_dist = vgg_dist_calculator(torch.device("cpu"))
+
+    x = torch.ones(16,3,128,128)
+    y = torch.zeros(16,3,128,128)
+
+    d = vgg_dist.get_dist_mat(x,y)
+    print(d.min())

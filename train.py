@@ -3,12 +3,11 @@ import glob
 import os.path
 from math import sqrt
 
-from tqdm import tqdm
-from time import time
+import wandb
+from time import time, strftime
 
 import torch
 import torch.optim as optim
-import torch.nn.functional as F
 from torchvision import utils as vutils
 
 from diffaug import DiffAugment
@@ -16,11 +15,10 @@ from models import get_models
 from utils.common import copy_G_params, load_params
 from utils.losses import get_loss_function
 from utils.data import get_dataloader
-from utils.logger import get_dir, PLTLogger, WandBLogger
+from utils.logger import get_dir
 
 from benchmarking.fid import FID_score
 from benchmarking.lap_swd import LapSWD
-from benchmarking.swd import PatchSWD
 from benchmarking.emd import patchEMD, EMD
 
 
@@ -47,7 +45,7 @@ def get_models_and_optimizers(args):
     return netG, netD, optimizerG, optimizerD, start_iteration
 
 def train_GAN(args):
-    logger = WandBLogger(plots_image_folder, args.name)
+    wandb.init(project=f"GANs-{args.outputs_root}", dir=plots_image_folder, name=args.name)
     debug_fixed_noise = torch.randn((args.batch_size, args.z_dim)).to(device)
     debug_fixed_reals = next(train_loader).to(device)
     debug_fixed_reals_test = next(test_loader).to(device)
@@ -55,13 +53,10 @@ def train_GAN(args):
 
     other_metrics = [
                 EMD(),
-                patchEMD(p=9, n=128),
-                patchEMD(p=17, n=128),
-                patchEMD(p=33, n=128),
+                patchEMD(p=9, n=256),
+                patchEMD(p=17, n=256),
+                patchEMD(p=33, n=256),
                 LapSWD(),
-                PatchSWD(p=9, n=128),
-                PatchSWD(p=17, n=128),
-                PatchSWD(p=33, n=128)
               ]
 
     loss_function = get_loss_function(args.loss_function)
@@ -87,6 +82,7 @@ def train_GAN(args):
             netD.zero_grad()
             Dloss.backward(retain_graph=args.n_D_steps > 1)
             optimizerD.step()
+            wandb.log(debug_Dlosses, step=iteration)
 
         # #####  2. train Generator #####
         if iteration % args.G_step_every == 0:
@@ -94,25 +90,22 @@ def train_GAN(args):
             netG.zero_grad()
             Gloss.backward()
             optimizerG.step()
+            wandb.log(debug_Glosses, step=iteration)
 
         # Update avg weights
         for p, avg_p in zip(netG.parameters(), avg_param_G):
             avg_p.mul_(1 - args.avg_update_factor).add_(args.avg_update_factor * p.data)
 
-        logger.aggregate_data(debug_Dlosses, group_name="D_train")
-        logger.aggregate_data(debug_Glosses, group_name="G_train")
         if iteration % 100 == 0:
             it_sec = max(1, iteration - start_iteration) / (time() - start)
-            print(f"Iteration: {iteration} " + str({k: f"{v:.6f}" for k, v in debug_Dlosses.items()}) + f" it/sec: {it_sec:.1f}")
+            print(f"Iteration: {iteration}: it/sec: {it_sec:.1f}")
 
         if iteration % args.save_interval == 0:
             backup_para = copy_G_params(netG)
             load_params(netG, avg_param_G)
 
-            evaluate(netG, netD,
-                     fid_metric, other_metrics,
-                     debug_fixed_noise, debug_fixed_reals, debug_fixed_reals_test,
-                     logger, saved_image_folder, iteration, args)
+            evaluate(netG, netD, fid_metric, other_metrics, debug_fixed_noise,
+                     debug_fixed_reals, debug_fixed_reals_test, saved_image_folder, iteration, args)
             torch.save({"iteration": iteration, 'netG': netG.state_dict(), 'netD': netD.state_dict(),
                         "optimizerG":optimizerG.state_dict(), "optimizerD": optimizerD.state_dict()},
                        saved_model_folder + '/%d.pth' % iteration)
@@ -120,17 +113,15 @@ def train_GAN(args):
             load_params(netG, backup_para)
 
 
-def evaluate(netG, netD,
-             fid_metric, other_metrics,
-             fixed_noise, debug_fixed_reals, debug_fixed_reals_test,
-             logger, saved_image_folder, iteration, args):
+def evaluate(netG, netD, fid_metric, other_metrics, fixed_noise, debug_fixed_reals, debug_fixed_reals_test,
+             saved_image_folder, iteration, args):
     netG.eval()
     netD.eval()
     start = time()
     with torch.no_grad():
         D_on_fixed_real_train = netD(debug_fixed_reals).mean().item()
         D_on_fixed_real_test = netD(debug_fixed_reals_test).mean().item()
-        logger.add_data({'D_on_fixed_real_train': D_on_fixed_real_train, 'D_on_fixed_real_test':D_on_fixed_real_test}, group_name="D_eval")
+        wandb.log({'D_on_fixed_real_train': D_on_fixed_real_train, 'D_on_fixed_real_test':D_on_fixed_real_test}, step=iteration)
 
         fixed_noise_fake_images = netG(fixed_noise)
         nrow = int(sqrt(len(fixed_noise_fake_images)))
@@ -138,20 +129,18 @@ def evaluate(netG, netD,
         if fid_metric is not None and iteration % args.fid_freq == 0:
             fixed_fid = fid_metric([fixed_noise_fake_images])
             fid = fid_metric([netG(torch.randn_like(fixed_noise).to(device)) for _ in range(args.fid_n_batches)])
-            logger.add_data({
-                'fixed_fid_train': fixed_fid['train'], 'fixed_fid_test': fixed_fid['test'], 'fid_train': fid['train'], 'fid_test': fid['test']
-            }, group_name="FID")
+            wandb.log({'fixed_fid_train': fixed_fid['train'], 'fixed_fid_test': fixed_fid['test'],
+                       'fid_train': fid['train'], 'fid_test': fid['test'] },
+                      step=iteration)
 
         # fake_images = netG(torch.randn_like(fixed_noise).to(device))
         for metric in other_metrics:
-            logger.add_data({
+            wandb.log({
                 f'{metric}_fixed_noise_gen_to_train': metric(fixed_noise_fake_images, debug_fixed_reals),
-                f'{metric}_fixed_noise_gen_to_test': metric(fixed_noise_fake_images, debug_fixed_reals_test),
+                # f'{metric}_fixed_noise_gen_to_test': metric(fixed_noise_fake_images, debug_fixed_reals_test),
                 # f'{metric}_gen_to_train': metric(fake_images, debug_fixed_reals),
                 # f'{metric}_gen_to_test': metric(fake_images, debug_fixed_reals_test),
-            }, group_name=f"{metric}")
-
-        logger.plot()
+            }, step=iteration)
 
     netG.train()
     netD.train()
