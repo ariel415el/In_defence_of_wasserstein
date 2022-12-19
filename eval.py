@@ -9,6 +9,7 @@ from torchvision import transforms
 from PIL import Image
 from tqdm import tqdm
 
+from models import get_generator
 from models.FastGAN import Generator
 from torchvision import utils as vutils
 import torch.nn.functional as F
@@ -146,8 +147,8 @@ def inverse_image(G, z_dim, real_images):
 
 if __name__ == '__main__':
     device = torch.device('cpu')
-    model_dir = 'train_results/FFHQ-1k+gp_2_FastGAN_Z-128_B-64'
-    ckpt_path = f'{model_dir}/models/10000.pth'  # path to the checkpoint
+    model_dir = 'Outputs/FFHQ_1000_64x64_G-DCGAN_D-DCGAN_L-AmortizedDualWasserstein_Z-64_B-64_test'
+    ckpt_path = f'{model_dir}/models/56000.pth'  # path to the checkpoint
     outputs_dir = f'{model_dir}/test_outputs'
 
     os.makedirs(outputs_dir, exist_ok=True)
@@ -155,8 +156,10 @@ if __name__ == '__main__':
     z_dim = args['z_dim']
     data_root = args['data_path']
 
-    G = Generator(z_dim)
-    weights = {k.replace('module.', ''): v for k, v in torch.load(ckpt_path)['g'].items()}
+    G = get_generator(args['gen_arch'], args['im_size'], args['z_dim'])
+    weights = torch.load(ckpt_path)['netG']
+    # weights = {k.replace('module.', ''): v for k, v in weights.items()}
+    # weights = {k.replace('network', 'init.init'): v for k, v in weights.items()}
     G.load_state_dict(weights)
     G.to(device)
     G.eval()
@@ -168,7 +171,7 @@ if __name__ == '__main__':
     with torch.no_grad():
         interpolate(G, n_zs=15)
         # find_nns(G, data)
-        find_patch_nns(G, data, 16, 4, 6)
-        find_patch_nns(G, data, 24, 4, 6)
+        # find_patch_nns(G, data, patch_size=16, stride=4, search_margin=6)
+        find_patch_nns(G, data, patch_size=24, stride=4, search_margin=6)
 
     # inverse_image(G, data[:10])

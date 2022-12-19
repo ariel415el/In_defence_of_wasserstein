@@ -62,7 +62,7 @@ class WGANLoss:
         return Dloss, debug_dict
 
     def trainG(self, netD, real_data, fake_data):
-        Gloss = -netD(fake_data).mean()
+        Gloss = -1* netD(fake_data).mean() #  Minimize WD
         return Gloss, {"Gloss": Gloss.item()}
 
 
@@ -231,6 +231,7 @@ class AmortizedDualWasserstein:
         return f, g, -1 * sol['primal objective']
 
     def trainD(self, netD, real_data, fake_data):
+        from time import time
         with torch.no_grad():
             f, g, WD = self.solve_dual(real_data, fake_data)
         # for i in range(self.n_iters):
@@ -240,10 +241,11 @@ class AmortizedDualWasserstein:
 
         L2LossD_fake = self.criterion(fake_score, g)
         L2LossD_real = self.criterion(real_score_mean, f.mean())
-        Dloss = 0.5 * L2LossD_real  + 0.5 * L2LossD_fake
-        WD_D = real_score_mean + fake_score.mean()
+        Dloss = 0.5 * L2LossD_real + 0.5 * L2LossD_fake
+        WD_D_plus = real_score_mean + fake_score.mean()
+        WD_D_minus = real_score_mean - fake_score.mean()
 
-        debug_dict = {"WD_D":WD_D.item(), "Dual-OT": WD, "f+g":(f.mean() - g.mean()).item()}
+        debug_dict = {"WD_D_plus":WD_D_plus.item(), "WD_D_minus":WD_D_minus.item(), "Dual-OT": WD, "f+g":(f.mean() + g.mean()).item()}
 
         from benchmarking.emd import EMD
         debug_dict['Primal-OT'] = EMD()(real_data, fake_data)
@@ -251,7 +253,7 @@ class AmortizedDualWasserstein:
         return Dloss, debug_dict
 
     def trainG(self, netD, real_data, fake_data):
-        Gloss = -1*netD(fake_data).mean()
+        Gloss = -1 * netD(fake_data).mean()
         return Gloss, {"Gloss": Gloss.item()}
 
 #########################
@@ -291,6 +293,7 @@ def get_batche_slices(n, b):
     if n % b != 0:
         slices.append(slice(n_batches, n))
     return slices
+
 
 class vgg_dist_calculator:
     def __init__(self,  layer=18):

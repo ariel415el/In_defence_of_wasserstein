@@ -82,9 +82,14 @@ def print_num_params(model):
 
 
 if __name__ == '__main__':
-    for arch_name, s in [('FC', 64), ("DCGAN", 64), ("FastGAN", 128), ('FC', 128), ('ResNet', 64), ('ResNet', 128)]:
-        netG = get_generator(arch_name, s, s)
-        netD = get_discriminator(arch_name, s)
+    for arch_name, s in [('FC', 64), ("DCGAN", 64), ("FastGAN", 128),
+                         ('FC', 128), ('ResNet', 64), ('ResNet', 128),
+                         ('BagNet-9', 64), ('BagNet-9', 128)]:
         print(arch_name)
-        print("\t-G params: ", print_num_params(netG))
+        try:
+            netG = get_generator(arch_name, s, s)
+            print("\t-G params: ", print_num_params(netG))
+        except Exception as e:
+            pass
+        netD = get_discriminator(arch_name, s)
         print("\t-D params: ", print_num_params(netD))

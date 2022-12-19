@@ -183,6 +183,7 @@ if __name__ == "__main__":
     parser.add_argument('--n_workers', default=4, type=int)
     parser.add_argument('--resume_last_ckpt', action='store_true', default=False,
                         help="Search for the latest ckpt in the same folder to resume training")
+    parser.add_argument('--load_data_to_memory', action='store_true', default=False)
     parser.add_argument('--device', default="cuda:0")
 
     args = parser.parse_args()
@@ -193,7 +194,8 @@ if __name__ == "__main__":
 
     saved_model_folder, saved_image_folder, plots_image_folder = get_dir(args)
 
-    train_loader, test_loader = get_dataloader(args.data_path, args.im_size, args.batch_size, args.n_workers)
+    train_loader, test_loader = get_dataloader(args.data_path, args.im_size, args.batch_size, args.n_workers,
+                                               load_to_memory=args.load_data_to_memory)
 
     train_GAN(args)
 
