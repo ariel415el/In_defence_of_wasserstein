@@ -22,8 +22,9 @@ def weights_init_G(m):
         nn.init.constant_(m.weight, 1)
         nn.init.constant_(m.bias, 0)
 
+
 class ResNet_G(nn.Module):
-    def __init__(self, z_dim, size, nfilter=64, nfilter_max=512, bn=True, res_ratio=0.1, **kwargs):
+    def __init__(self, z_dim, size, nfilter=64, nfilter_max=512, bn=True, res_ratio=0.1):
         super().__init__()
         s0 = self.s0 = 4
         nf = self.nf = nfilter
@@ -46,7 +47,6 @@ class ResNet_G(nn.Module):
             nf1 = min(nf * 2 ** i, nf_max)
             blocks += [
                 ResNetBlock(nf0, nf1, bn=self.bn, res_ratio=res_ratio),
-                # ResNetBlock(nf1, nf1, bn=self.bn, res_ratio=res_ratio),
                 nn.Upsample(scale_factor=2)
             ]
 
@@ -102,7 +102,6 @@ class ResNet_D(nn.Module):
             nf1 = min(nf * 2 ** (i + 1), nf_max)
             blocks += [
                 nn.AvgPool2d(3, stride=2, padding=1),
-                # ResNetBlock(nf0, nf0, bn=False, res_ratio=res_ratio),
                 ResNetBlock(nf0, nf1, bn=False, res_ratio=res_ratio),
             ]
 

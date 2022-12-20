@@ -4,6 +4,7 @@ import torch
 from torch.nn import functional as F
 import numpy as np
 import cvxopt
+import ot
 
 
 class NonSaturatingGANLoss:
@@ -42,7 +43,7 @@ class SoftHingeLoss:
 
 
 class WGANLoss:
-    def __init__(self, gp_factor=10):
+    def __init__(self, gp_factor=0):
         self.gp_factor = gp_factor
 
     def trainD(self, netD, real_data, fake_data):
@@ -55,9 +56,6 @@ class WGANLoss:
         if self.gp_factor > 0:
             gp = calc_gradient_penalty(netD, real_data, fake_data, real_data.device)
             Dloss += self.gp_factor * gp
-
-        from benchmarking.emd import EMD
-        debug_dict['Primal-OT'] = EMD()(real_data, fake_data)
 
         return Dloss, debug_dict
 
@@ -74,7 +72,6 @@ class BatchW2D:
         self.search_space = search_space
 
     def trainG(self, netD, real_data, fake_data):
-        import ot
         uniform_x = np.ones(len(real_data)) / len(real_data)
         uniform_y = np.ones(len(fake_data)) / len(fake_data)
         with torch.no_grad():
@@ -196,16 +193,17 @@ class AmortizedDualWasserstein:
         for i in range(d):
             for j in range(d):
                 fi_plus_gj_extraction_matrix[i * d + j, i] = 1
-                fi_plus_gj_extraction_matrix[i * d + j, d + j] = 1
+                fi_plus_gj_extraction_matrix[i * d + j, d + j] = -1
 
         self.d = d
         self.fi_gj = cvxopt.sparse(cvxopt.matrix(fi_plus_gj_extraction_matrix))
         self.ab = cvxopt.matrix(-1 * np.ones(2 * d) / d)
+        self.ab[d:] *= -1
         self.criterion = torch.nn.MSELoss()
 
         # this seem to make a faster computation
         self.pStart = {}
-        self.pStart['x'] = cvxopt.matrix([cvxopt.matrix([1.0] * d), cvxopt.matrix([1.0] * d)])
+        self.pStart['x'] = cvxopt.matrix([cvxopt.matrix([1.0] * d), cvxopt.matrix([-1.0] * d)])
         self.pStart['s'] = cvxopt.matrix([1.0] * (2 * d))
 
         cvxopt.solvers.options['show_progress'] = False
@@ -217,13 +215,13 @@ class AmortizedDualWasserstein:
             self.init = True
             self.set_foundations(len(reals))
 
-        dist = self.fast_dist_mat(reals.reshape(self.d, -1), fakes.reshape(self.d, -1)).cpu().numpy()
-        # dist = torch.mean((reals[:, None] - fakes[None, :]) ** 2, dim=(-3, -2,-1)).cpu().numpy()
+        # dist = self.fast_dist_mat(reals.reshape(self.d, -1), fakes.reshape(self.d, -1)).cpu().numpy()
+        dist = torch.mean((reals[:, None] - fakes[None, :]) ** 2, dim=(-3, -2,-1)).cpu().numpy()
         constraints = cvxopt.matrix(dist.reshape(-1).astype(np.float64))
         sol = cvxopt.solvers.lp(self.ab, self.fi_gj, constraints, primalstart=self.pStart, solver='glpk')
 
         x = np.array(sol['x'])[:, 0]
-        # x = x - x.mean()  # Since the solution is shift invariant we may as well take take the zero shirt one ( This is true only in the +- formulation not in ++)
+        x = x - x.mean()  # Since the solution is shift invariant we may as well take take the zero shirt one ( This is true only in the +- formulation not in ++)
         fg = torch.from_numpy(x).to(reals.device).float()
         f = fg[:self.d]
         g = fg[self.d:]
@@ -235,26 +233,52 @@ class AmortizedDualWasserstein:
         with torch.no_grad():
             f, g, WD = self.solve_dual(real_data, fake_data)
         # for i in range(self.n_iters):
-        real_score = netD(real_data)
-        real_score_mean = real_score.mean()
+        real_score_mean = netD(real_data).mean()
         fake_score = netD(fake_data.detach())
 
         L2LossD_fake = self.criterion(fake_score, g)
         L2LossD_real = self.criterion(real_score_mean, f.mean())
         Dloss = 0.5 * L2LossD_real + 0.5 * L2LossD_fake
-        WD_D_plus = real_score_mean + fake_score.mean()
-        WD_D_minus = real_score_mean - fake_score.mean()
+        WD_D = real_score_mean - fake_score.mean()
 
-        debug_dict = {"WD_D_plus":WD_D_plus.item(), "WD_D_minus":WD_D_minus.item(), "Dual-OT": WD, "f+g":(f.mean() + g.mean()).item()}
-
-        from benchmarking.emd import EMD
-        debug_dict['Primal-OT'] = EMD()(real_data, fake_data)
+        debug_dict = {"WD_D":WD_D.item(),  "Dual-OT": WD, "f": f.mean().item(), "g": g.mean().item()}
 
         return Dloss, debug_dict
 
     def trainG(self, netD, real_data, fake_data):
-        Gloss = -1 * netD(fake_data).mean()
+        Gloss = -1*netD(fake_data).mean()
         return Gloss, {"Gloss": Gloss.item()}
+
+
+class AdverserialOT:
+    def __init__(self):
+        self.dist_clc = vgg_dist_calculator()
+
+    def compute_OT(self, netD, real_data, fake_data):
+        real_features = netD(real_data)
+        fake_features = netD(fake_data)
+        uniform_x = np.ones(len(real_features)) / len(real_features)
+        uniform_y = np.ones(len(fake_features)) / len(fake_features)
+        with torch.no_grad():
+            C = torch.mean((real_features[:, None] - fake_features[None, :]) ** 2, dim=-1)
+            # C = self.dist_clc.get_dist_mat(real_data, fake_data, b=64)
+            C = C.cpu().numpy()
+            Tmap = ot.emd(uniform_x, uniform_y, C)
+            NNs = Tmap.argmax(0)
+            # OT = np.sum(Tmap * C)
+
+        OT = ((real_features[NNs] - fake_features) ** 2).mean()
+
+        return OT
+
+    def trainD(self, netD, real_data, fake_data):
+        Dloss = -1 * self.compute_OT(netD, real_data, fake_data.detach())
+        return Dloss, {"Dloss": -1 * Dloss.item()}
+
+    def trainG(self, netD, real_data, fake_data):
+        Gloss = self.compute_OT(netD, real_data, fake_data)
+        return Gloss, {"Gloss": Gloss.item()}
+
 
 #########################
 # #### Utilities ###### #

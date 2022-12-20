@@ -9,8 +9,8 @@ class Discriminator(nn.Module):
         super().__init__()
         n_conv = 2
         equal_lr = True
-        # n_feature_maps = [512, 512, 512, 512, 512, 256]
-        n_feature_maps = [512, 256, 128, 64, 32, 16]
+        n_feature_maps = [512, 512, 512, 512, 512, 256]
+        # n_feature_maps = [512, 256, 128, 64, 32, 16]
         self.conv_rgb = Conv(3, n_feature_maps[0], 1, equal_lr=equal_lr)
         self.blocks = nn.Sequential(
             *[DiscriminatorBlock(n_feature_maps[i], n, n_conv, equal_lr) for i, n in enumerate(n_feature_maps[1:])])
@@ -50,8 +50,8 @@ class Generator(nn.Module):
         super().__init__()
         n_conv_blocks = 2
         n_layers_mapper = 8
-        # n_feature_maps = [512, 512, 512, 512, 512, 256]
-        n_feature_maps = [512, 256, 128, 64, 32, 16]
+        n_feature_maps = [512, 512, 512, 512, 512, 256]
+        # n_feature_maps = [512, 256, 128, 64, 32, 16]
         n_dim_const = 4
         equal_lr = True
         self.mapper = Mapper(n_layers_mapper, z_dim, equal_lr)

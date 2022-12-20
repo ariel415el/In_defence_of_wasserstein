@@ -165,7 +165,7 @@ if __name__ == "__main__":
     parser.add_argument('--batch_size', default=64, type=int)
     parser.add_argument('--loss_function', default="SoftHingeLoss", type=str)
     parser.add_argument('--lr', default=0.0001, type=float)
-    parser.add_argument('--avg_update_factor', default=0.001, type=float,
+    parser.add_argument('--avg_update_factor', default=1, type=float,
                         help='moving average factor weight of updating generator (1 means none)')
     parser.add_argument('--n_D_steps', default=1, type=int, help="Number of repeated D updates with each batch")
     parser.add_argument('--G_step_every', default=1, type=int, help="Update G only evry 'G_step_every' iterations")

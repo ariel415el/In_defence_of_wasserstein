@@ -6,6 +6,10 @@ def get_generator(name, res, z_dim):
         netG = Generator(z_dim, skip_connections=False)
         netG.apply(weights_init)
 
+    if name == "StyleGAN":
+        from models.StyleGAN import Generator
+        netG = Generator(z_dim)
+
     elif name == 'DCGAN':
         if res != 64:
             raise ValueError("DCGAN only implemented for 64x64 images")
@@ -31,6 +35,10 @@ def get_discriminator(name, res):
         from models.FastGAN import Discriminator, weights_init
         netD = Discriminator()
         netD.apply(weights_init)
+
+    if name == "StyleGAN":
+        from models.StyleGAN import Discriminator
+        netD = Discriminator()
 
     elif name == 'DCGAN':
         if res != 64:
@@ -82,7 +90,7 @@ def print_num_params(model):
 
 
 if __name__ == '__main__':
-    for arch_name, s in [('FC', 64), ("DCGAN", 64), ("FastGAN", 128),
+    for arch_name, s in [('FC', 64), ("DCGAN", 64), ("FastGAN", 128), ('StyleGAN', 128),
                          ('FC', 128), ('ResNet', 64), ('ResNet', 128),
                          ('BagNet-9', 64), ('BagNet-9', 128)]:
         print(arch_name)

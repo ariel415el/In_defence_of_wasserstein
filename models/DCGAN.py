@@ -44,7 +44,7 @@ class Discriminator(nn.Module):
         super(Discriminator, self).__init__()
         channels=3
 
-        layer_depth = [channels, 64, 128, 256, 512]
+        layer_depth = [channels, 128, 256, 512, 512]
         layers = []
         for i in range(len(layer_depth) - 1):
             layers += [
