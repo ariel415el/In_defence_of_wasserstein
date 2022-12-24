@@ -15,7 +15,7 @@ COLORS=['r','g','b','k','pink', 'yellow']
 
 
 class PLTLogger:
-    def __init__(self, save_dir, use_wandb=False):
+    def __init__(self, save_dir):
         self.save_dir = save_dir
         os.makedirs(save_dir, exist_ok=True)
         self.aggregated_data = defaultdict(list)

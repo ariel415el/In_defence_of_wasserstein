@@ -13,7 +13,7 @@ from torchvision import utils as vutils
 from diffaug import DiffAugment
 from models import get_models
 from utils.common import copy_G_params, load_params
-from utils.losses import get_loss_function
+from losses import get_loss_function, calc_gradient_penalty
 from utils.data import get_dataloader
 from utils.logger import get_dir
 
@@ -49,8 +49,8 @@ def train_GAN(args):
     debug_fixed_noise = torch.randn((args.batch_size, args.z_dim)).to(device)
     debug_fixed_reals = next(train_loader).to(device)
     debug_fixed_reals_test = next(test_loader).to(device)
-    fid_metric = FID_score({"train": train_loader, "test":test_loader}, args.fid_n_batches, torch.device("cpu")) if args.fid_n_batches else None
 
+    fid_metric = FID_score({"train": train_loader, "test":test_loader}, args.fid_n_batches, torch.device("cpu")) if args.fid_n_batches else None
     other_metrics = [
                 EMD(),
                 patchEMD(p=9, n=256),
@@ -81,6 +81,8 @@ def train_GAN(args):
             Dloss, debug_Dlosses = loss_function.trainD(netD, real_images, fake_images)
             netD.zero_grad()
             Dloss.backward(retain_graph=args.n_D_steps > 1)
+            if args.gp_weight > 0:
+                Dloss += args.gp_weight * calc_gradient_penalty(netD, real_images, fake_images)
             optimizerD.step()
             wandb.log(debug_Dlosses, step=iteration)
 
@@ -164,6 +166,7 @@ if __name__ == "__main__":
     # Training
     parser.add_argument('--batch_size', default=64, type=int)
     parser.add_argument('--loss_function', default="SoftHingeLoss", type=str)
+    parser.add_argument('--gp_weight', default=0, type=float)
     parser.add_argument('--lr', default=0.0001, type=float)
     parser.add_argument('--avg_update_factor', default=1, type=float,
                         help='moving average factor weight of updating generator (1 means none)')
@@ -191,6 +194,7 @@ if __name__ == "__main__":
                 f"_D-{args.disc_arch}_L-{args.loss_function}_Z-{args.z_dim}_B-{args.batch_size}_{args.tag}"
 
     device = torch.device(args.device)
+    print(f"Working on device: {torch.cuda.get_device_name(device)}")
 
     saved_model_folder, saved_image_folder, plots_image_folder = get_dir(args)
 
