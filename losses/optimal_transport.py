@@ -12,6 +12,9 @@ class BatchW2D:
         self.dist_clc = vgg_dist_calculator()
         self.search_space = search_space
 
+    def trainD(self, netD, real_data, fake_data):
+        raise NotImplemented("BatchW2D should be run with --n_D_steps 0")
+
     def trainG(self, netD, real_data, fake_data):
         uniform_x = np.ones(len(real_data)) / len(real_data)
         uniform_y = np.ones(len(fake_data)) / len(fake_data)

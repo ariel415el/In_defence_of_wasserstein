@@ -44,8 +44,9 @@ def get_models_and_optimizers(args):
             print(f"Loaded ckpt of iteration: {start_iteration}")
     return netG, netD, optimizerG, optimizerD, start_iteration
 
+
 def train_GAN(args):
-    wandb.init(project=f"GANs-{args.outputs_root}", dir=plots_image_folder, name=args.name)
+    wandb.init(project=f"GANs", dir=plots_image_folder, name=args.name)
     debug_fixed_noise = torch.randn((args.batch_size, args.z_dim)).to(device)
     debug_fixed_reals = next(train_loader).to(device)
     debug_fixed_reals_test = next(test_loader).to(device)
@@ -127,7 +128,7 @@ def evaluate(netG, netD, fid_metric, other_metrics, fixed_noise, debug_fixed_rea
 
         fixed_noise_fake_images = netG(fixed_noise)
         nrow = int(sqrt(len(fixed_noise_fake_images)))
-        vutils.save_image(fixed_noise_fake_images, saved_image_folder + '/%d.jpg' % iteration, nrow=nrow, normalize=True)
+        vutils.save_image(fixed_noise_fake_images,  f'{saved_image_folder}/{iteration}.jpg', nrow=nrow, normalize=True)
         if fid_metric is not None and iteration % args.fid_freq == 0:
             fixed_fid = fid_metric([fixed_noise_fake_images])
             fid = fid_metric([netG(torch.randn_like(fixed_noise).to(device)) for _ in range(args.fid_n_batches)])
@@ -144,6 +145,9 @@ def evaluate(netG, netD, fid_metric, other_metrics, fixed_noise, debug_fixed_rea
                 # f'{metric}_gen_to_test': metric(fake_images, debug_fixed_reals_test),
             }, step=iteration)
 
+        if iteration == 0:
+            vutils.save_image(debug_fixed_reals, f'{saved_image_folder}/debug_fixed_reals.jpg', nrow=nrow, normalize=True)
+
     netG.train()
     netD.train()
     print(f"Evaluation finished in {time()-start} seconds")
@@ -155,6 +159,7 @@ if __name__ == "__main__":
     # Data
     parser.add_argument('--data_path', default="/mnt/storage_ssd/datasets/FFHQ_1000/FFHQ_1000",
                         help="Path to train images")
+    parser.add_argument('--center_crop', default=None, help='center_crop_data', type=int)
     parser.add_argument('--augmentation', default='color,translation', help="comma separated data augmentation")
 
     # Model
@@ -180,9 +185,9 @@ if __name__ == "__main__":
     parser.add_argument('--fid_freq', default=10000, type=int)
     parser.add_argument('--fid_n_batches', default=0, type=int, help="How many batches of train/test to compute "
                                                                      "reference FID statistics (0 turns off FID)")
-    parser.add_argument('--tag', default='test')
 
     # Other
+    parser.add_argument('--tag', default='test')
     parser.add_argument('--n_workers', default=4, type=int)
     parser.add_argument('--resume_last_ckpt', action='store_true', default=False,
                         help="Search for the latest ckpt in the same folder to resume training")

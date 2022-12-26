@@ -31,18 +31,18 @@ class Generator(nn.Module):
 class Discriminator(nn.Module):
     def __init__(self, in_dim=64):
         super(Discriminator, self).__init__()
-        nf = 256 if in_dim == 64 else 128
+        nf = 256 if in_dim == 64 else 512
         self.model = nn.Sequential(
             nn.Linear(3*in_dim**2, 2*nf),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(2*nf, nf),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(nf, 1),
-            nn.Sigmoid(),
+            # nn.Sigmoid(),
         )
 
     def forward(self, img):
         img_flat = img.view(img.size(0), -1)
-        validity = self.model(img_flat)
+        validity = self.model(img_flat).view(img.size(0))
 
         return validity

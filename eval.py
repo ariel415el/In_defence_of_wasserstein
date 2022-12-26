@@ -14,14 +14,12 @@ from models.FastGAN import Generator
 from torchvision import utils as vutils
 import torch.nn.functional as F
 
+from utils.data import get_transforms
 
-def get_data(data_root, limit_data=None):
+
+def get_data(data_root, im_size, center_crop, limit_data=None):
     """Load entire dataset to memory as a single batch"""
-    T = transforms.Compose([
-        transforms.Resize((128, 128)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
-    ])
+    T = get_transforms(im_size, center_crop)
 
     images = []
     print("Loading data to memory to find NNs")
@@ -147,8 +145,8 @@ def inverse_image(G, z_dim, real_images):
 
 if __name__ == '__main__':
     device = torch.device('cpu')
-    model_dir = 'Outputs/FFHQ_1000_64x64_G-DCGAN_D-DCGAN_L-AmortizedDualWasserstein_Z-64_B-64_test'
-    ckpt_path = f'{model_dir}/models/56000.pth'  # path to the checkpoint
+    model_dir = 'Outputs/square_data_64x64_G-DCGAN_D-DCGAN_L-SoftHingeLoss_Z-64_B-16_test'
+    ckpt_path = f'{model_dir}/models/100000.pth'  # path to the checkpoint
     outputs_dir = f'{model_dir}/test_outputs'
 
     os.makedirs(outputs_dir, exist_ok=True)
@@ -164,14 +162,14 @@ if __name__ == '__main__':
     G.to(device)
     G.eval()
 
-    data = get_data(args['data_path'], limit_data=None)
+    data = get_data(args['data_path'], args['im_size'], args['center_crop'], limit_data=None)
     data = data.to(device)
 
 
     with torch.no_grad():
         interpolate(G, n_zs=15)
-        # find_nns(G, data)
-        # find_patch_nns(G, data, patch_size=16, stride=4, search_margin=6)
+        find_nns(G, z_dim, data)
+        find_patch_nns(G, data, patch_size=16, stride=4, search_margin=6)
         find_patch_nns(G, data, patch_size=24, stride=4, search_margin=6)
 
     # inverse_image(G, data[:10])

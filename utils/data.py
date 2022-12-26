@@ -7,15 +7,22 @@ from PIL import Image
 from torchvision import transforms as T
 from tqdm import tqdm
 
-
-class MemoryDataset(Dataset):
-    def __init__(self, paths, im_size):
-        super(MemoryDataset, self).__init__()
-        transforms = T.Compose([
+def get_transforms(im_size, center_crop):
+    transforms = [
              T.ToTensor(),
              T.Resize(im_size, antialias=True),
              T.Normalize((0.5,), (0.5,))
-        ])
+        ]
+
+    if center_crop is not None:
+        transforms = [T.CenterCrop(size=center_crop)] + transforms
+
+    return T.Compose(transforms)
+
+class MemoryDataset(Dataset):
+    def __init__(self, paths, im_size, center_crop=None):
+        super(MemoryDataset, self).__init__()
+        transforms = get_transforms(im_size, center_crop)
 
         self.images = []
         for path in tqdm(paths, desc="Loading images into memory"):
@@ -32,14 +39,10 @@ class MemoryDataset(Dataset):
 
 
 class DiskDataset(Dataset):
-    def __init__(self, paths, im_size):
+    def __init__(self, paths, im_size, center_crop=True):
         super(DiskDataset, self).__init__()
         self.paths = paths
-        self.transforms = T.Compose([
-             T.ToTensor(),
-             T.Resize(im_size, antialias=True),
-             T.Normalize((0.5,), (0.5,))
-        ])
+        self.transforms = get_transforms(im_size, center_crop)
 
     def __len__(self):
         return len(self.paths)
