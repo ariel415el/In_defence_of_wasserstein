@@ -160,7 +160,7 @@ if __name__ == "__main__":
     parser.add_argument('--data_path', default="/mnt/storage_ssd/datasets/FFHQ_1000/FFHQ_1000",
                         help="Path to train images")
     parser.add_argument('--center_crop', default=None, help='center_crop_data', type=int)
-    parser.add_argument('--augmentation', default='color,translation', help="comma separated data augmentation")
+    parser.add_argument('--augmentation', default='', help="comma separated data augmentation ('color,translation')")
 
     # Model
     parser.add_argument('--gen_arch', default='DCGAN')
@@ -204,6 +204,7 @@ if __name__ == "__main__":
     saved_model_folder, saved_image_folder, plots_image_folder = get_dir(args)
 
     train_loader, test_loader = get_dataloader(args.data_path, args.im_size, args.batch_size, args.n_workers,
+                                               val_percentage=0.01,
                                                load_to_memory=args.load_data_to_memory)
 
     train_GAN(args)

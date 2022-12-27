@@ -33,6 +33,20 @@ def get_batche_slices(n, b):
     return slices
 
 
+
+class L1_metric:
+    def __call__(self, X, Y):
+        X = X.view(len(X), -1)
+        Y = Y.view(len(Y), -1)
+        return torch.mean(torch.abs(X[:, None] - Y[None, :]), dim=-1)
+
+class L2_metric:
+    def __call__(self, X, Y):
+        X = X.view(len(X), -1)
+        Y = Y.view(len(Y), -1)
+        return torch.mean((X[:, None] - Y[None, :])**2, dim=-1)
+
+
 class vgg_dist_calculator:
     def __init__(self,  layer=18):
         self.layer = layer  # [4, 9, 18]
@@ -49,7 +63,7 @@ class vgg_dist_calculator:
             if i == self.layer:
                 return x
 
-    def get_dist_mat(self, X, Y, b=64):
+    def __call__(self, X, Y, b=64):
         if self.device is None:
             self.device = X.device
             self.vgg_features.to(self.device)

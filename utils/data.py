@@ -39,7 +39,7 @@ class MemoryDataset(Dataset):
 
 
 class DiskDataset(Dataset):
-    def __init__(self, paths, im_size, center_crop=True):
+    def __init__(self, paths, im_size, center_crop=None):
         super(DiskDataset, self).__init__()
         self.paths = paths
         self.transforms = get_transforms(im_size, center_crop)
