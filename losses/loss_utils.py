@@ -33,7 +33,6 @@ def get_batche_slices(n, b):
     return slices
 
 
-
 class L1_metric:
     def __call__(self, X, Y):
         X = X.view(len(X), -1)

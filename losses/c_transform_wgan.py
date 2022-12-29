@@ -8,8 +8,8 @@ class CtransformLoss:
     """
     def __init__(self, search_space='full', c1=0.1, c2=0.1):
         self.search_space = search_space
-        self.c1 = c1
-        self.c2 = c2
+        self.c1 = float(c1)
+        self.c2 = float(c2)
 
     @staticmethod
     def compute_ot(critic, batch, gen_batch, compute_penalties=False):

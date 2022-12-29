@@ -128,7 +128,7 @@ def evaluate(netG, netD, fid_metric, other_metrics, fixed_noise, debug_fixed_rea
 
         fixed_noise_fake_images = netG(fixed_noise)
         nrow = int(sqrt(len(fixed_noise_fake_images)))
-        vutils.save_image(fixed_noise_fake_images,  f'{saved_image_folder}/{iteration}.jpg', nrow=nrow, normalize=True)
+        vutils.save_image(fixed_noise_fake_images,  f'{saved_image_folder}/{iteration}.png', nrow=nrow, value_range=(-1,1))#, normalize=True)
         if fid_metric is not None and iteration % args.fid_freq == 0:
             fixed_fid = fid_metric([fixed_noise_fake_images])
             fid = fid_metric([netG(torch.randn_like(fixed_noise).to(device)) for _ in range(args.fid_n_batches)])
@@ -146,7 +146,7 @@ def evaluate(netG, netD, fid_metric, other_metrics, fixed_noise, debug_fixed_rea
             }, step=iteration)
 
         if iteration == 0:
-            vutils.save_image(debug_fixed_reals, f'{saved_image_folder}/debug_fixed_reals.jpg', nrow=nrow, normalize=True)
+            vutils.save_image(debug_fixed_reals, f'{saved_image_folder}/debug_fixed_reals.png', nrow=nrow, value_range=(-1,1))#, normalize=True)
 
     netG.train()
     netD.train()
@@ -159,7 +159,7 @@ if __name__ == "__main__":
     # Data
     parser.add_argument('--data_path', default="/mnt/storage_ssd/datasets/FFHQ_1000/FFHQ_1000",
                         help="Path to train images")
-    parser.add_argument('--center_crop', default=None, help='center_crop_data', type=int)
+    parser.add_argument('--center_crop', default=None, help='center_crop_data to specified size', type=int)
     parser.add_argument('--augmentation', default='', help="comma separated data augmentation ('color,translation')")
 
     # Model

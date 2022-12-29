@@ -2,7 +2,7 @@ import numpy as np
 import ot
 import torch
 import torch.nn.functional as F
-from losses.loss_utils import vgg_dist_calculator, L1_metric
+from losses.loss_utils import vgg_dist_calculator, L1_metric, L2_metric
 
 
 def get_ot_plan(C):
@@ -17,9 +17,20 @@ def to_patches(x, p=8, s=4):
     patches = patches.reshape(-1, patches.shape[-1])
     return patches
 
+def get_dist_metric(name):
+    if name == 'L1':
+        metric = L1_metric()
+    elif name == 'L2':
+        metric = L2_metric()
+    elif name == 'vgg':
+         metric = vgg_dist_calculator()
+    else:
+        raise ValueError(f"No such metric name {name}")
+    return metric
+
 class BatchW2D:
     def __init__(self, dist='L1'):
-        self.metric = vgg_dist_calculator()
+        self.metric = get_dist_metric(dist)
 
     def trainD(self, netD, real_data, fake_data):
         raise NotImplemented("BatchW2D should be run with --n_D_steps 0")
@@ -34,18 +45,17 @@ class BatchW2D:
 
         # perm = OTPlan.argmax(0)
 
-        # Gloss = ((fake_data - real_data[Nns])**2).mean()
-
         return OT, {"OT": OT.item()}
 
 
 class BatchPatchW2D:
-    def __init__(self, dist='L1'):
-        self.metric = L1_metric()
-        self.n_batches = 1
-        self.n_samples = 128
-        self.p = 8
-        self.s = 4
+    def __init__(self, dist='L1', n_batches=1, n_samples=128, p=8, s=1):
+        self.metric = get_dist_metric(dist)
+        self.n_batches = int(n_batches)
+        self.n_samples = int(n_samples)
+        self.p = int(p)
+        self.s = int(s)
+
     def trainD(self, netD, real_data, fake_data):
         raise NotImplemented("BatchW2D should be run with --n_D_steps 0")
 
@@ -68,8 +78,6 @@ class BatchPatchW2D:
         OT /= self.n_batches
 
         return OT, {"OT": OT.item()}
-
-
 
 
 class BatchSWD:
@@ -101,9 +109,9 @@ class BatchSWD:
 
 
 class BatchPatchSWD:
-    def __init__(self, dist='L1'):
-        self.num_proj = 64
-        self.patch_size = 8
+    def __init__(self, n_proj=64, patch_size=8):
+        self.num_proj = int(n_proj)
+        self.patch_size = int(patch_size)
 
     def trainD(self, netD, real_data, fake_data):
         raise NotImplemented("BatchW2D should be run with --n_D_steps 0")

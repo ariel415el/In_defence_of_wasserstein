@@ -2,9 +2,7 @@ from losses.loss_utils import calc_gradient_penalty
 
 
 class WGANLoss:
-    def __init__(self, gp_factor=10):
-        self.gp_factor = gp_factor
-
+    """Should be used with GP"""
     def trainD(self, netD, real_data, fake_data):
         real_score = netD(real_data).mean()
         fake_score = netD(fake_data.detach()).mean()
