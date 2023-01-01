@@ -4,7 +4,7 @@ import os.path
 from math import sqrt
 
 import wandb
-from time import time, strftime
+from time import time
 
 import torch
 import torch.optim as optim
@@ -109,9 +109,10 @@ def train_GAN(args):
 
             evaluate(netG, netD, fid_metric, other_metrics, debug_fixed_noise,
                      debug_fixed_reals, debug_fixed_reals_test, saved_image_folder, iteration, args)
+            fname = f"{saved_model_folder}/{'last' if args.save_last_only else iteration}.pth"
             torch.save({"iteration": iteration, 'netG': netG.state_dict(), 'netD': netD.state_dict(),
                         "optimizerG":optimizerG.state_dict(), "optimizerD": optimizerD.state_dict()},
-                       saved_model_folder + '/%d.pth' % iteration)
+                       fname)
 
             load_params(netG, backup_para)
 
@@ -128,7 +129,7 @@ def evaluate(netG, netD, fid_metric, other_metrics, fixed_noise, debug_fixed_rea
 
         fixed_noise_fake_images = netG(fixed_noise)
         nrow = int(sqrt(len(fixed_noise_fake_images)))
-        vutils.save_image(fixed_noise_fake_images,  f'{saved_image_folder}/{iteration}.png', nrow=nrow, value_range=(-1,1))#, normalize=True)
+        vutils.save_image(fixed_noise_fake_images,  f'{saved_image_folder}/{iteration}.png', nrow=nrow, normalize=True)
         if fid_metric is not None and iteration % args.fid_freq == 0:
             fixed_fid = fid_metric([fixed_noise_fake_images])
             fid = fid_metric([netG(torch.randn_like(fixed_noise).to(device)) for _ in range(args.fid_n_batches)])
@@ -140,13 +141,13 @@ def evaluate(netG, netD, fid_metric, other_metrics, fixed_noise, debug_fixed_rea
         for metric in other_metrics:
             wandb.log({
                 f'{metric}_fixed_noise_gen_to_train': metric(fixed_noise_fake_images, debug_fixed_reals),
-                # f'{metric}_fixed_noise_gen_to_test': metric(fixed_noise_fake_images, debug_fixed_reals_test),
+                f'{metric}_fixed_noise_gen_to_test': metric(fixed_noise_fake_images, debug_fixed_reals_test),
                 # f'{metric}_gen_to_train': metric(fake_images, debug_fixed_reals),
                 # f'{metric}_gen_to_test': metric(fake_images, debug_fixed_reals_test),
             }, step=iteration)
 
         if iteration == 0:
-            vutils.save_image(debug_fixed_reals, f'{saved_image_folder}/debug_fixed_reals.png', nrow=nrow, value_range=(-1,1))#, normalize=True)
+            vutils.save_image(debug_fixed_reals, f'{saved_image_folder}/debug_fixed_reals.png', nrow=nrow, normalize=True)
 
     netG.train()
     netD.train()
@@ -182,6 +183,7 @@ if __name__ == "__main__":
     # Evaluation
     parser.add_argument('--outputs_root', default='Outputs')
     parser.add_argument('--save_interval', default=1000, type=int)
+    parser.add_argument('--save_last_only',action='store_true', default=False)
     parser.add_argument('--fid_freq', default=10000, type=int)
     parser.add_argument('--fid_n_batches', default=0, type=int, help="How many batches of train/test to compute "
                                                                      "reference FID statistics (0 turns off FID)")

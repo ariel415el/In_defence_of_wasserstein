@@ -12,6 +12,6 @@ class NonSaturatingGANLoss:
     def trainG(self, netD, real_data, fake_data):
         # A saturating loss is -1*BCE(fake_preds, 0) the non saturating is BCE(fake_preds, 1)
         preds = netD(fake_data).unsqueeze(1)
-        labels = torch.ones(len(real_data), 1).to(real_data.device)
+        labels = torch.ones(len(fake_data), 1).to(fake_data.device)
         GLoss = F.binary_cross_entropy_with_logits(preds, labels)
         return GLoss, {"GLoss": GLoss.item()}
