@@ -52,7 +52,7 @@ class BatchPatchW2D:
     def __init__(self, dist='L1', n_batches=1, n_samples=128, p=8, s=1):
         self.metric = get_dist_metric(dist)
         self.n_batches = int(n_batches)
-        self.n_samples = int(n_samples)
+        self.n_samples = int(n_samples if n_samples != "all" else -1)
         self.p = int(p)
         self.s = int(s)
 

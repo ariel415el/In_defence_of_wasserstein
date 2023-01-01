@@ -52,10 +52,13 @@ class Discriminator(nn.Module):
                 nn.BatchNorm2d(layer_depth[i + 1]),
                 nn.ReLU(True)
             ]
-        layers.append(nn.Conv2d(layer_depth[-1], 1, 4, 1, 0, bias=False))
         self.convs = nn.Sequential(*layers)
+        self.classifier = nn.Conv2d(layer_depth[-1], 1, 4, 1, 0, bias=False)
 
-    def forward(self, input):
-        input = input
-        output = self.convs(input).view(input.size(0))
+    def features(self, img):
+        return self.convs(img)
+
+    def forward(self, img):
+        features = self.convs(img)
+        output = self.classifier(features).view(img.size(0))
         return output

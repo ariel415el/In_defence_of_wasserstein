@@ -6,6 +6,7 @@ from losses.optimal_transport import *
 from losses.soft_hinge_loss import *
 from losses.two_steps_loss import *
 from losses.wgan import *
+from losses.adverserial_feature_matching import *
 
 def get_loss_function(loss_name):
     loss_name_and_args = loss_name.split('-')
