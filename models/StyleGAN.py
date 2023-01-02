@@ -26,7 +26,7 @@ class Discriminator(nn.Module):
         x = torch.cat((x, mean_std_batch), 1)
         x = self.lrelu(self.conv_3(x))
         x = self.lrelu(self.conv_4(x))
-        return self.fc(x.view(x.size()[:2]))
+        return self.fc(x.view(x.size()[:2])).reshape(len(x))
 
 
 class DiscriminatorBlock(nn.Module):
@@ -43,7 +43,6 @@ class DiscriminatorBlock(nn.Module):
 
     def forward(self, x):
         return self.conv_res(self.downsample(x)) + self.downsample(self.layers(x))
-
 
 class Generator(nn.Module):
     def __init__(self, z_dim):

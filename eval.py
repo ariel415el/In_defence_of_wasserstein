@@ -9,7 +9,7 @@ from torchvision import transforms
 from PIL import Image
 from tqdm import tqdm
 
-from models import get_generator
+from models import get_generator, get_discriminator
 from models.FastGAN import Generator
 from torchvision import utils as vutils
 import torch.nn.functional as F
@@ -142,11 +142,48 @@ def inverse_image(G, z_dim, real_images):
             vutils.save_image(torch.cat([real_images, g_images]).add(1).mul(0.5), f'{outputs_dir}/inverse_z/rec_{iteration}.jpg',
                               nrow=len(real_images))
 
+def find_mode_collapses(G, z_dim):
+    os.makedirs(f"{outputs_dir}/mode_collapses", exist_ok=True)
+    b = 256
+    fixed_noise = torch.randn((b, z_dim), device=device)
+    g_images = G(fixed_noise)
+
+    from losses import vgg_dist_calculator
+    calc = vgg_dist_calculator(layer=9)
+    dists_mat = calc(g_images, g_images)
+
+    second_NN_indices = torch.argsort(dists_mat, dim=1)[:, 1]
+
+    vutils.save_image(torch.cat([g_images, g_images[second_NN_indices]]),
+                      f'{outputs_dir}/mode_collapses/NNs.jpg',
+                      nrow=b, normalize=True)
+
+    second_NN_dists = dists_mat[torch.arange(b), second_NN_indices]
+    perm = torch.argsort(second_NN_dists)
+
+    vutils.save_image(g_images[perm],
+                      f'{outputs_dir}/mode_collapses/sorted_by_NN_distance.jpg',
+                      nrow=int(np.sqrt(b)), normalize=True)
+
+
+    D = get_discriminator(args['disc_arch'], args['im_size'])
+    weights = torch.load(ckpt_path, map_location=device)['netD']
+    D.load_state_dict(weights)
+    D.to(device)
+    D.eval()
+
+    scores = D(g_images)
+
+    perm = torch.argsort(scores)
+
+    vutils.save_image(g_images[perm],
+                      f'{outputs_dir}/mode_collapses/sorted_by_D_Score.jpg',
+                      nrow=int(np.sqrt(b)), normalize=True)
 
 if __name__ == '__main__':
     device = torch.device('cpu')
-    model_dir = 'Outputs/square_data_64x64_G-DCGAN_D-DCGAN_L-SoftHingeLoss_Z-64_B-16_test'
-    ckpt_path = f'{model_dir}/models/100000.pth'  # path to the checkpoint
+    model_dir = 'Outputs/FFHQ_128_64x64_G-DCGAN_D-DCGAN_L-NonSaturatingGANLoss_Z-64_B-64_01-01_T-22:34:16'
+    ckpt_path = f'{model_dir}/models/821000.pth'  # path to the checkpoint
     outputs_dir = f'{model_dir}/test_outputs'
 
     os.makedirs(outputs_dir, exist_ok=True)
@@ -155,16 +192,18 @@ if __name__ == '__main__':
     data_root = args['data_path']
 
     G = get_generator(args['gen_arch'], args['im_size'], args['z_dim'])
-    weights = torch.load(ckpt_path)['netG']
+    weights = torch.load(ckpt_path, map_location=device)['netG']
     # weights = {k.replace('module.', ''): v for k, v in weights.items()}
     # weights = {k.replace('network', 'init.init'): v for k, v in weights.items()}
     G.load_state_dict(weights)
     G.to(device)
     G.eval()
 
+    with torch.no_grad():
+        find_mode_collapses(G, z_dim)
+    exit()
     data = get_data(args['data_path'], args['im_size'], args['center_crop'], limit_data=None)
     data = data.to(device)
-
 
     with torch.no_grad():
         interpolate(G, n_zs=15)
