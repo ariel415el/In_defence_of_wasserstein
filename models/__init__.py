@@ -11,10 +11,8 @@ def get_generator(name, res, z_dim):
         netG = Generator(z_dim)
 
     elif name == 'DCGAN':
-        if res != 64:
-            raise ValueError("DCGAN only implemented for 64x64 images")
         from models.DCGAN import Generator, weights_init
-        netG = Generator(z_dim)
+        netG = Generator(z_dim, res)
         # netG.apply(weights_init)
 
     elif name == 'FC':
@@ -41,10 +39,8 @@ def get_discriminator(name, res):
         netD = Discriminator()
 
     elif name == 'DCGAN':
-        if res != 64:
-            raise ValueError("DCGAN only implemented for 64x64 images")
         from models.DCGAN import Discriminator, weights_init
-        netD = Discriminator()
+        netD = Discriminator(im_dim=res)
         # netD.apply(weights_init)
 
     elif 'BagNet' in name:
@@ -90,10 +86,10 @@ def print_num_params(model):
 
 
 if __name__ == '__main__':
-    for arch_name, s in [('FC', 64), ("DCGAN", 64), ("FastGAN", 128), ('StyleGAN', 128),
-                         ('FC', 128), ('ResNet', 64), ('ResNet', 128),
+    for arch_name, s in [('FC', 64), ("DCGAN", 64), ('ResNet', 64),
+                         ('FC', 128), ("DCGAN", 128),('ResNet', 128) , ("FastGAN", 128), ('StyleGAN', 128),
                          ('BagNet-9', 64), ('BagNet-9', 128)]:
-        print(arch_name)
+        print(f"{arch_name}: {s}x{s}")
         try:
             netG = get_generator(arch_name, s, s)
             print("\t-G params: ", print_num_params(netG))

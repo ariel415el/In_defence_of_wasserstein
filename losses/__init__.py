@@ -15,4 +15,6 @@ def get_loss_function(loss_name):
     for arg in loss_name_and_args[1:]:
         name, value = arg.split("=")
         kwargs[name] = value
-    return getattr(sys.modules[__name__], loss_name)(**kwargs)
+    loss =  getattr(sys.modules[__name__], loss_name)(**kwargs)
+    loss.name =  loss_name
+    return loss

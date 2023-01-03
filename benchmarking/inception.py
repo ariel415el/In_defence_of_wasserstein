@@ -308,3 +308,66 @@ class FIDInceptionE_2(models.inception.InceptionE):
 
         outputs = [branch1x1, branch3x3, branch3x3dbl, branch_pool]
         return torch.cat(outputs, 1)
+
+
+class myInceptionV3(nn.Module):
+    def __init__(self):
+        super(myInceptionV3, self).__init__()
+        # self.model = models.inception_v3(pretrained=True)
+        self.model = fid_inception_v3()
+
+    def forward(self, x):
+        # x = self.model._transform_input(x)
+        # N x 3 x 299 x 299
+        x = self.model.Conv2d_1a_3x3(x)
+        # N x 32 x 149 x 149
+        x = self.model.Conv2d_2a_3x3(x)
+        # N x 32 x 147 x 147
+        x = self.model.Conv2d_2b_3x3(x)
+        # N x 64 x 147 x 147
+        x = self.model.maxpool1(x)
+        # N x 64 x 73 x 73
+        x = self.model.Conv2d_3b_1x1(x)
+        # N x 80 x 73 x 73
+        x = self.model.Conv2d_4a_3x3(x)
+        # N x 192 x 71 x 71
+        x = self.model.maxpool2(x)
+        # N x 192 x 35 x 35
+        x = self.model.Mixed_5b(x)
+        # N x 256 x 35 x 35
+        x = self.model.Mixed_5c(x)
+        # N x 288 x 35 x 35
+        x = self.model.Mixed_5d(x)
+        # N x 288 x 35 x 35
+        x = self.model.Mixed_6a(x)
+        # N x 768 x 17 x 17
+        x = self.model.Mixed_6b(x)
+        # N x 768 x 17 x 17
+        x = self.model.Mixed_6c(x)
+        # N x 768 x 17 x 17
+        x = self.model.Mixed_6d(x)
+        # N x 768 x 17 x 17
+        x = self.model.Mixed_6e(x)
+        # N x 768 x 17 x 17
+        x = self.model.Mixed_7a(x)
+        # N x 1280 x 8 x 8
+        x = self.model.Mixed_7b(x)
+        # N x 2048 x 8 x 8
+        x = self.model.Mixed_7c(x)
+        # N x 2048 x 8 x 8
+        # Adaptive average pooling
+        x = self.model.avgpool(x)
+        # N x 2048 x 1 x 1
+        x = torch.flatten(x, 1)
+        return x
+
+if __name__ == '__main__':
+    x = torch.ones(5,3,128,128)
+    v1 = InceptionV3(use_fid_inception=True, normalize_input=False, resize_input=False).eval()
+    print(v1(x)[0].shape)
+    v2 = myInceptionV3().eval()
+    print(v2(x).shape)
+
+
+    print(v1(x)[0].squeeze(-1).squeeze(-1))
+    print(v2(x))

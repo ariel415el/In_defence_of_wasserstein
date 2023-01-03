@@ -12,13 +12,20 @@ def weights_init(m):
         init.xavier_normal_(m.weight, gain=np.sqrt(2.0))
 
 class Generator(nn.Module):
-    def __init__(self, z_dim):
+    def __init__(self, z_dim, im_dim=64):
         channels = 3
         super(Generator, self).__init__()
         layer_depths = [z_dim, 512, 512, 256, 128]
         kernel_dim = [4, 4, 4, 4, 4]
         strides = [1, 2, 2, 2, 2]
         padding = [0, 1, 1, 1, 1]
+
+        if im_dim == 128:
+            layer_depths += [64]
+            kernel_dim += [4]
+            strides += [2]
+            padding += [1]
+
         layers = []
         for i in range(len(layer_depths) - 1):
             layers += [
@@ -40,11 +47,13 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self):
+    def __init__(self, im_dim=64):
         super(Discriminator, self).__init__()
         channels=3
 
         layer_depth = [channels, 128, 256, 512, 512]
+        if im_dim == 128:
+            layer_depth += [512]
         layers = []
         for i in range(len(layer_depth) - 1):
             layers += [
@@ -62,3 +71,13 @@ class Discriminator(nn.Module):
         features = self.convs(img)
         output = self.classifier(features).view(img.size(0))
         return output
+
+
+if __name__ == '__main__':
+    z = torch.ones(5,128)
+    x = torch.ones(5,3,64,64)
+    G = Generator(128, 128)
+    D = Discriminator(128)
+
+    print(G(z).shape)
+    print(D(G(z)).shape)

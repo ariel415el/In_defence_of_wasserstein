@@ -159,8 +159,8 @@ def lap_swd(image1, image2,
 
 
 class LapSWD:
-    def __str__(self):
-        return "LapSWD"
+    def __init__(self):
+        self.name =  "LapSWD"
 
     def __call__(self, x,y):
         return lap_swd(x,y).item()

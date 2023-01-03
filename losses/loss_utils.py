@@ -2,6 +2,7 @@ import torch
 
 
 def calc_gradient_penalty(netD, real_data, fake_data):
+    """Ensure the netD is smooth by forcing the gradient between real and fake data to ahve norm of 1"""
     device = real_data.device
     alpha = torch.rand(1, 1)
     alpha = alpha.expand(real_data.size())
@@ -22,15 +23,19 @@ def calc_gradient_penalty(netD, real_data, fake_data):
     return gradient_penalty
 
 
-def get_batche_slices(n, b):
-    n_batches = n // b
-    slices = []
-    for i in range(n_batches):
-        slices.append(slice(i * b, (i + 1) * b))
-
-    if n % b != 0:
-        slices.append(slice(n_batches * b, n))
-    return slices
+def get_dist_metric(name):
+    """Choose how to calulate pairwise distances for EMD"""
+    if name == 'L1':
+        metric = L1_metric()
+    elif name == 'L2':
+        metric = L2_metric()
+    elif name == 'vgg':
+         metric = vgg_dist_calculator()
+    elif name == 'inception':
+        metric = inception_dist_calculator()
+    else:
+        raise ValueError(f"No such metric name {name}")
+    return metric
 
 
 class L1_metric:
@@ -45,6 +50,45 @@ class L2_metric:
         Y = Y.view(len(Y), -1)
         return torch.mean((X[:, None] - Y[None, :])**2, dim=-1)
 
+def get_batche_slices(n, b):
+    n_batches = n // b
+    slices = []
+    for i in range(n_batches):
+        slices.append(slice(i * b, (i + 1) * b))
+
+    if n % b != 0:
+        slices.append(slice(n_batches * b, n))
+    return slices
+
+
+def compute_features_dist_mat_in_batches(X, Y, f, b=64):
+    """Compute distance matrix in features of a function f(X) but restrict maximum inference batch to 'b'"""
+    dists = -1 * torch.ones(len(X), len(Y))
+    x_slices = get_batche_slices(len(X), b)
+    y_slices = get_batche_slices(len(Y), b)
+    for slice_x in x_slices:
+        features_x = f(X[slice_x])
+        for slice_y in y_slices:
+            features_y = f(Y[slice_y])
+            D = features_x[:, None] - features_y[None,]
+            D = D.reshape(D.shape[0], D.shape[1], -1) # In case featueres are still spatial
+            dists[slice_x, slice_y] = torch.norm(D, dim=-1)
+
+class inception_dist_calculator:
+    def __init__(self):
+        from benchmarking.inception import myInceptionV3
+        self.device = None
+        self.inception = myInceptionV3()
+        self.inception.eval()
+
+    def extract(self, X):
+        if self.device is None:
+            self.device = X.device
+            self.inception.to(self.device)
+        return self.inception(X)
+    def __call__(self, X, Y, b=64):
+        return compute_features_dist_mat_in_batches(X, Y, self.extract, b=b)
+
 
 class vgg_dist_calculator:
     def __init__(self,  layer=18):
@@ -55,35 +99,25 @@ class vgg_dist_calculator:
         self.vgg_features.eval()
         self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
-    def extract_intermediate_feature_maps(self, x):
-        for i, layer in enumerate(self.vgg_features):
-            x = layer(x)
-            # if i in layer_indices:
-            if i == self.layer:
-                return x
-
-    def __call__(self, X, Y, b=64):
+    def extract(self, X):
         if self.device is None:
             self.device = X.device
             self.vgg_features.to(self.device)
-        x_slices = get_batche_slices(len(X), b)
-        y_slices = get_batche_slices(len(Y), b)
-        dists = -1 * torch.ones(len(X), len(Y))
-        for slice_x in x_slices:
-            features_x = self.extract_intermediate_feature_maps(X[slice_x])
-            for slice_y in y_slices:
-                features_y = self.extract_intermediate_feature_maps(Y[slice_y])
-                D = features_x[:, None] - features_y[None, ]
-                D = D.reshape(slice_x.stop - slice_x.start, slice_y.stop - slice_y.start, -1)
-                dists[slice_x, slice_y] = torch.norm(D, dim=-1)
+        for i, layer in enumerate(self.vgg_features):
+            X = layer(X)
+            # if i in layer_indices:
+            if i == self.layer:
+                return X
 
-        return dists
+    def __call__(self, X, Y, b=64):
+        return compute_features_dist_mat_in_batches(X, Y, self.extract, b=b)
+
 
 if __name__ == '__main__':
-    vgg_dist = vgg_dist_calculator(torch.device("cpu"))
+    vgg_dist = inception_dist_calculator()
 
     x = torch.ones(16,3,128,128)
     y = torch.zeros(16,3,128,128)
 
-    d = vgg_dist.get_dist_mat(x,y)
+    d = vgg_dist.__call__(x,y)
     print(d.min())
