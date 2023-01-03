@@ -73,7 +73,7 @@ def compute_features_dist_mat_in_batches(X, Y, f, b=64):
             D = features_x[:, None] - features_y[None,]
             D = D.reshape(D.shape[0], D.shape[1], -1) # In case featueres are still spatial
             dists[slice_x, slice_y] = torch.norm(D, dim=-1)
-
+    return dists
 class inception_dist_calculator:
     def __init__(self):
         from benchmarking.inception import myInceptionV3
@@ -120,4 +120,4 @@ if __name__ == '__main__':
     y = torch.zeros(16,3,128,128)
 
     d = vgg_dist.__call__(x,y)
-    print(d.min())
+    print(d)

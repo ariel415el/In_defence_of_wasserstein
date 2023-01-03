@@ -10,6 +10,7 @@ import torch
 import torch.optim as optim
 from torchvision import utils as vutils
 
+from benchmarking.lap_swd import LapSWD
 from diffaug import DiffAugment
 from models import get_models
 from utils.common import copy_G_params, load_params
@@ -18,8 +19,6 @@ from utils.data import get_dataloader
 from utils.logger import get_dir
 
 from benchmarking.fid import FID_score
-from benchmarking.lap_swd import LapSWD
-from benchmarking.emd import patchEMD, EMD
 
 
 def get_models_and_optimizers(args):
@@ -53,11 +52,15 @@ def train_GAN(args):
 
     fid_metric = FID_score({"train": train_loader, "test":test_loader}, args.fid_n_batches, torch.device("cpu")) if args.fid_n_batches else None
     other_metrics = [
-                EMD(),
-                patchEMD(p=9, n=256),
-                patchEMD(p=17, n=256),
-                patchEMD(p=33, n=256),
-                LapSWD(),
+                get_loss_function("BatchEMD-dist=L1"),
+                get_loss_function("BatchEMD-dist=vgg"),
+                get_loss_function("BatchPatchEMD-p=9"),
+                get_loss_function("BatchPatchEMD-p=17"),
+                get_loss_function("BatchPatchEMD-p=33"),
+                get_loss_function("BatchPatchSWD-p=9"),
+                get_loss_function("BatchPatchSWD-p=17"),
+                get_loss_function("BatchPatchSWD-p=33"),
+                LapSWD()
               ]
 
     loss_function = get_loss_function(args.loss_function)
@@ -98,6 +101,12 @@ def train_GAN(args):
         # Update avg weights
         for p, avg_p in zip(netG.parameters(), avg_param_G):
             avg_p.mul_(1 - args.avg_update_factor).add_(args.avg_update_factor * p.data)
+
+        if iteration % 10000 == 0:
+            for g in optimizerG.param_groups:
+                g['lr'] *= 0.95
+            for d in optimizerD.param_groups:
+                d['lr'] *= 0.95
 
         if iteration % 100 == 0:
             it_sec = max(1, iteration - start_iteration) / (time() - start)
@@ -140,8 +149,8 @@ def evaluate(netG, netD, fid_metric, other_metrics, fixed_noise, debug_fixed_rea
         # fake_images = netG(torch.randn_like(fixed_noise).to(device))
         for metric in other_metrics:
             wandb.log({
-                f'{metric}_fixed_noise_gen_to_train': metric(fixed_noise_fake_images, debug_fixed_reals),
-                f'{metric}_fixed_noise_gen_to_test': metric(fixed_noise_fake_images, debug_fixed_reals_test),
+                f'{metric.name}_fixed_noise_gen_to_train': metric(fixed_noise_fake_images, debug_fixed_reals),
+                f'{metric.name}_fixed_noise_gen_to_test': metric(fixed_noise_fake_images, debug_fixed_reals_test),
                 # f'{metric}_gen_to_train': metric(fake_images, debug_fixed_reals),
                 # f'{metric}_gen_to_test': metric(fake_images, debug_fixed_reals_test),
             }, step=iteration)
