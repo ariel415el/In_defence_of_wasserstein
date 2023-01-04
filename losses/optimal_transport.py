@@ -42,7 +42,7 @@ class BatchEMD:
         raise NotImplemented("BatchEMD should be run with --n_D_steps 0")
 
     def trainG(self, netD, real_data, fake_data):
-        OT = self.__call__(real_data, fake_data)
+        OT = self.compute(real_data, fake_data)
         return OT, {"OT": OT.item()}
 
 
@@ -78,7 +78,7 @@ class BatchPatchEMD:
         raise NotImplemented("BatchPatchEMD should be run with --n_D_steps 0")
 
     def trainG(self, netD, real_data, fake_data):
-        OT = self.__call__(real_data, fake_data)
+        OT = self.compute(real_data, fake_data)
         return OT, {"OT": OT.item()}
 
 
@@ -112,7 +112,7 @@ class BatchSWD:
         raise NotImplemented("BatchSWD should be run with --n_D_steps 0")
 
     def trainG(self, netD, real_data, fake_data):
-        SWD = self.__call__(real_data, fake_data)
+        SWD = self.compute(real_data, fake_data)
         return SWD, {"SWD": SWD.item()}
 
 
@@ -149,5 +149,5 @@ class BatchPatchSWD:
         raise NotImplemented("BatchPatchSWD should be run with --n_D_steps 0")
 
     def trainG(self, netD, real_data, fake_data):
-        PatchSWD = self.__call__(real_data, fake_data)
+        PatchSWD = self.compute(real_data, fake_data)
         return PatchSWD, {"PatchSWD": PatchSWD.item()}
