@@ -60,10 +60,13 @@ def get_discriminator(name, res):
 
 
 def get_models(args, device):
-    netG = get_generator(args.gen_arch, args.im_size, args.z_dim).to(device)
-    netD = get_discriminator(args.disc_arch, args.im_size).to(device)
+    netG = get_generator(args.gen_arch, args.im_size, args.z_dim)
+    netD = get_discriminator(args.disc_arch, args.im_size)
+    if args.spectral_normalization:
+        from models.model_utils import make_model_spectral_normalized
+        netD = make_model_spectral_normalized(netD)
 
-    return netG, netD
+    return netG.to(device), netD.to(device)
 
 
 def human_format(num):

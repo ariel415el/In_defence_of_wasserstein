@@ -174,7 +174,7 @@ def fid_inception_v3():
     """
     inception = models.inception_v3(num_classes=1008,
                                     aux_logits=False,
-                                    weights=None)
+                                    weights=None, init_weights=True)
     inception.Mixed_5b = FIDInceptionA(192, pool_features=32)
     inception.Mixed_5c = FIDInceptionA(256, pool_features=64)
     inception.Mixed_5d = FIDInceptionA(288, pool_features=64)
