@@ -1,3 +1,4 @@
+import argparse
 import itertools
 import json
 import os
@@ -5,49 +6,16 @@ import os
 import numpy as np
 import torch
 from torch import optim
-from torchvision import transforms
 from PIL import Image
 from tqdm import tqdm
 
 from models import get_generator, get_discriminator
-from models.FastGAN import Generator
 from torchvision import utils as vutils
 import torch.nn.functional as F
 
-from utils.data import get_transforms
+from main.data import get_transforms
+from losses.loss_utils import vgg_dist_calculator
 
-
-def get_data(data_root, im_size, center_crop, limit_data=None):
-    """Load entire dataset to memory as a single batch"""
-    T = get_transforms(im_size, center_crop)
-
-    images = []
-    print("Loading data to memory to find NNs")
-    img_names = os.listdir(data_root)
-    if limit_data is not None:
-        img_names = img_names[:limit_data]
-    for fname in tqdm(img_names):
-        im = Image.open(os.path.join(data_root, fname))
-        im = T(im)
-        images += [im]
-
-    return torch.stack(images)
-
-
-def interpolate(G, n_zs=10, steps=10):
-    """Sample n_zs images and linearly interpolate between them in the latent space """
-    os.makedirs(f'{outputs_dir}/interpolations', exist_ok=True)
-    cur_z = torch.randn((1, z_dim)).to(device)
-    frame = 0
-    f = 1 / (steps - 1)
-    for i in range(n_zs):
-        next_z = torch.randn((1, z_dim)).to(device)
-        for a in range(steps):
-            noise = next_z * a * f + cur_z * (1 - a * f)
-            fake_imgs = G(noise).add(1).mul(0.5)
-            vutils.save_image(fake_imgs, f'{outputs_dir}/interpolations/fakes-{frame}.png', normalize=False)
-            frame += 1
-        cur_z = next_z
 
 
 def _batch_nns(img, data, center, p, s):
@@ -70,6 +38,7 @@ def _batch_nns(img, data, center, p, s):
     edge_nn_index = torch.sort(torch.norm(dists, dim=1, p=1))[1][0]
 
     return refs[rgb_nn_index].clone(), refs[gs_nn_index].clone(), refs[edge_nn_index].clone()
+
 
 def find_patch_nns(G, data, patch_size=24, stride=4, search_margin=6):
     """
@@ -104,13 +73,15 @@ def find_patch_nns(G, data, patch_size=24, stride=4, search_margin=6):
 
 
 def find_nns(G, z_dim, data):
-    import lpips
+    vgg_fe = vgg_dist_calculator(layer_idx=9, device=device)
+    # percept = lpips.LPIPS(net='vgg', lpips=False).to(device)
+
     os.makedirs(f'{outputs_dir}/nns', exist_ok=True)
-    percept = lpips.LPIPS(net='vgg', lpips=False).to(device)
     results = []
     for i in range(8):
         fake_image = G(torch.randn((1, z_dim), device=device))
-        dists = [percept(fake_image, data[i].unsqueeze(0)).sum().item() for i in range(len(data))]
+        # dists = [percept(fake_image, data[i].unsqueeze(0)).sum().item() for i in range(len(data))]
+        dists = [vgg_fe.extract(fake_image) - vgg_fe.extract(data[i].unsqueeze(0)).pow(2).sum().item() for i in range(len(data))]
         nn_indices = np.argsort(dists)
         nns = data[nn_indices[:4]]
 
@@ -142,73 +113,6 @@ def inverse_image(G, z_dim, real_images):
             vutils.save_image(torch.cat([real_images, g_images]).add(1).mul(0.5), f'{outputs_dir}/inverse_z/rec_{iteration}.jpg',
                               nrow=len(real_images))
 
-def find_mode_collapses(G, z_dim):
-    os.makedirs(f"{outputs_dir}/mode_collapses", exist_ok=True)
-    b = 256
-    fixed_noise = torch.randn((b, z_dim), device=device)
-    g_images = G(fixed_noise)
-
-    from losses import vgg_dist_calculator
-    calc = vgg_dist_calculator(layer=9)
-    dists_mat = calc(g_images, g_images)
-
-    second_NN_indices = torch.argsort(dists_mat, dim=1)[:, 1]
-
-    vutils.save_image(torch.cat([g_images, g_images[second_NN_indices]]),
-                      f'{outputs_dir}/mode_collapses/NNs.jpg',
-                      nrow=b, normalize=True)
-
-    second_NN_dists = dists_mat[torch.arange(b), second_NN_indices]
-    perm = torch.argsort(second_NN_dists)
-
-    vutils.save_image(g_images[perm],
-                      f'{outputs_dir}/mode_collapses/sorted_by_NN_distance.jpg',
-                      nrow=int(np.sqrt(b)), normalize=True)
 
 
-    D = get_discriminator(args['disc_arch'], args['im_size'])
-    weights = torch.load(ckpt_path, map_location=device)['netD']
-    D.load_state_dict(weights)
-    D.to(device)
-    D.eval()
 
-    scores = D(g_images)
-
-    perm = torch.argsort(scores)
-
-    vutils.save_image(g_images[perm],
-                      f'{outputs_dir}/mode_collapses/sorted_by_D_Score.jpg',
-                      nrow=int(np.sqrt(b)), normalize=True)
-
-if __name__ == '__main__':
-    device = torch.device('cpu')
-    model_dir = 'Outputs/FFHQ_128_64x64_G-DCGAN_D-DCGAN_L-NonSaturatingGANLoss_Z-64_B-64_01-01_T-22:34:16'
-    ckpt_path = f'{model_dir}/models/821000.pth'  # path to the checkpoint
-    outputs_dir = f'{model_dir}/test_outputs'
-
-    os.makedirs(outputs_dir, exist_ok=True)
-    args = json.load(open(os.path.join(model_dir, "args.txt")))
-    z_dim = args['z_dim']
-    data_root = args['data_path']
-
-    G = get_generator(args['gen_arch'], args['im_size'], args['z_dim'])
-    weights = torch.load(ckpt_path, map_location=device)['netG']
-    # weights = {k.replace('module.', ''): v for k, v in weights.items()}
-    # weights = {k.replace('network', 'init.init'): v for k, v in weights.items()}
-    G.load_state_dict(weights)
-    G.to(device)
-    G.eval()
-
-    with torch.no_grad():
-        find_mode_collapses(G, z_dim)
-    exit()
-    data = get_data(args['data_path'], args['im_size'], args['center_crop'], limit_data=None)
-    data = data.to(device)
-
-    with torch.no_grad():
-        interpolate(G, n_zs=15)
-        find_nns(G, z_dim, data)
-        find_patch_nns(G, data, patch_size=16, stride=4, search_margin=6)
-        find_patch_nns(G, data, patch_size=24, stride=4, search_margin=6)
-
-    # inverse_image(G, data[:10])

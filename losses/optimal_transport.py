@@ -72,7 +72,7 @@ class BatchPatchEMD:
 
     def __call__(self, images_X, images_Y):
         with torch.no_grad():
-            return self.compute(images_X, images_Y)
+            return self.compute(images_X.cpu(), images_Y.cpu())
 
     def trainD(self, netD, real_data, fake_data):
         raise NotImplemented("BatchPatchEMD should be run with --n_D_steps 0")
@@ -114,7 +114,6 @@ class BatchSWD:
     def trainG(self, netD, real_data, fake_data):
         SWD = self.__call__(real_data, fake_data)
         return SWD, {"SWD": SWD.item()}
-
 
 
 class BatchPatchSWD:

@@ -174,7 +174,7 @@ def fid_inception_v3():
     """
     inception = models.inception_v3(num_classes=1008,
                                     aux_logits=False,
-                                    pretrained=False)
+                                    weights=None)
     inception.Mixed_5b = FIDInceptionA(192, pool_features=32)
     inception.Mixed_5c = FIDInceptionA(256, pool_features=64)
     inception.Mixed_5d = FIDInceptionA(288, pool_features=64)
@@ -362,7 +362,8 @@ class myInceptionV3(nn.Module):
         return x
 
 if __name__ == '__main__':
-    x = torch.ones(5,3,128,128)
+    b = 64
+    x = torch.ones(5, 3, b, b)
     v1 = InceptionV3(use_fid_inception=True, normalize_input=False, resize_input=False).eval()
     print(v1(x)[0].shape)
     v2 = myInceptionV3().eval()

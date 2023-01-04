@@ -52,7 +52,6 @@ class FID_score:
         stats = self.get_multi_batch_statistics(batches)
         return {k: calc_fid(ref_stats, stats) for k, ref_stats in self.ref_stats_dict.items()}
 
-
     def get_multi_batch_statistics(self, batches):
         global inception
         with torch.no_grad():
