@@ -54,6 +54,7 @@ def train_GAN(args):
     other_metrics = [
                 get_loss_function("BatchEMD-dist=L1"),
                 get_loss_function("BatchEMD-dist=vgg"),
+                # get_loss_function("BatchEMD-dist=inception"),
                 get_loss_function("BatchPatchEMD-p=9"),
                 get_loss_function("BatchPatchEMD-p=17"),
                 get_loss_function("BatchPatchEMD-p=33"),

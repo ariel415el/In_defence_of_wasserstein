@@ -361,6 +361,7 @@ class myInceptionV3(nn.Module):
         x = torch.flatten(x, 1)
         return x
 
+
 if __name__ == '__main__':
     b = 64
     x = torch.ones(5, 3, b, b)
