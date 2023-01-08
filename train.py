@@ -103,12 +103,6 @@ def train_GAN(args):
         for p, avg_p in zip(netG.parameters(), avg_param_G):
             avg_p.mul_(1 - args.avg_update_factor).add_(args.avg_update_factor * p.data)
 
-        if iteration % 10000 == 0:
-            for g in optimizerG.param_groups:
-                g['lr'] *= 0.95
-            for d in optimizerD.param_groups:
-                d['lr'] *= 0.95
-
         if iteration % 100 == 0:
             it_sec = max(1, iteration - start_iteration) / (time() - start)
             print(f"Iteration: {iteration}: it/sec: {it_sec:.1f}")
@@ -144,7 +138,7 @@ def evaluate(netG, netD, fid_metric, other_metrics, fixed_noise, debug_fixed_rea
             fixed_fid = fid_metric([fixed_noise_fake_images])
             fid = fid_metric([netG(torch.randn_like(fixed_noise).to(device)) for _ in range(args.fid_n_batches)])
             wandb.log({'fixed_fid_train': fixed_fid['train'], 'fixed_fid_test': fixed_fid['test'],
-                       'fid_train': fid['train'], 'fid_test': fid['test'] },
+                       'fid_train': fid['train'], 'fid_test': fid['test']},
                       step=iteration)
 
         # fake_images = netG(torch.randn_like(fixed_noise).to(device))

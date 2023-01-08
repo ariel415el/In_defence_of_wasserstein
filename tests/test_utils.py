@@ -1,4 +1,5 @@
 import os
+from random import shuffle
 
 import torch
 from tqdm import tqdm
@@ -15,6 +16,7 @@ def get_data(data_root, im_size, center_crop, limit_data=None):
     images = []
     print("Loading data to memory to find NNs")
     img_names = os.listdir(data_root)
+    # shuffle(img_names)
     if limit_data is not None:
         img_names = img_names[:limit_data]
     for fname in tqdm(img_names):
@@ -39,8 +41,15 @@ def load_pretrained_generator(args, ckpt_path, device):
 
 def load_pretrained_discriminator(args, ckpt_path, device):
     D = get_discriminator(args['disc_arch'], args['im_size'])
+
+
+    if args['spectral_normalization']:
+        from models.model_utils import make_model_spectral_normalized
+        D = make_model_spectral_normalized(D)
+
     weights = torch.load(ckpt_path, map_location=device)['netD']
     D.load_state_dict(weights)
     D.to(device)
     D.eval()
+
     return D

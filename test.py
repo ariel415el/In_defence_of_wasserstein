@@ -8,9 +8,7 @@ from tests.interpolate import interpolate
 from tests.test_data_NNs import find_nns, find_patch_nns, inverse_image
 from tests.test_mode_collapse import find_mode_collapses
 from tests.test_utils import load_pretrained_generator, load_pretrained_discriminator, get_data
-
-
-
+from tests.visualize_discriminator import visualize_discriminator
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -29,18 +27,25 @@ if __name__ == '__main__':
     z_dim = args['z_dim']
     data_root = args['data_path']
 
-    G = load_pretrained_generator(args, ckpt_path, device)
-    D = load_pretrained_discriminator(args, ckpt_path, device)
+    print("Loading models", end='...')
+    netG = load_pretrained_generator(args, ckpt_path, device)
+    netD = load_pretrained_discriminator(args, ckpt_path, device)
+    print("Done")
 
-    find_mode_collapses(G,D, z_dim, outputs_dir, device)
+    # No data tests
+    # find_mode_collapses(netG, netD, z_dim, outputs_dir, device)
+    # interpolate(netG, z_dim, n_zs=15, steps=25, outputs_dir=outputs_dir, device=device)
 
-    interpolate(G, z_dim, n_zs=15, steps=25, outputs_dir=outputs_dir, device=device)
+    # partial data tests
+    data = get_data(args['data_path'], args['im_size'], args['center_crop'], limit_data=9)
+    visualize_discriminator(netG, netD, z_dim, data, outputs_dir, device)
+    inverse_image(netG, z_dim, data, outputs_dir=outputs_dir, device=device)
 
+    # Full data tests
     data = get_data(args['data_path'], args['im_size'], args['center_crop'], limit_data=None)
     data = data.to(device)
 
-    find_nns(G, z_dim, data, outputs_dir=outputs_dir, device=device)
-    find_patch_nns(G, z_dim, data, patch_size=16, stride=4, search_margin=6, outputs_dir=outputs_dir, device=device)
-    find_patch_nns(G, z_dim, data, patch_size=24, stride=4, search_margin=6, outputs_dir=outputs_dir, device=device)
+    find_nns(netG, z_dim, data, outputs_dir=outputs_dir, device=device)
+    find_patch_nns(netG, z_dim, data, patch_size=16, stride=4, search_margin=6, outputs_dir=outputs_dir, device=device)
+    find_patch_nns(netG, z_dim, data, patch_size=24, stride=4, search_margin=6, outputs_dir=outputs_dir, device=device)
 
-    inverse_image(G, data[:10], outputs_dir=outputs_dir, device=device)

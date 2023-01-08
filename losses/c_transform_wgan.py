@@ -66,9 +66,6 @@ class CtransformLoss:
         Dloss = -OT + self.c1 * penalty1 + self.c2 * penalty2  # Maximize OT with penalties
         debug_dict = {"CT-OT": OT.item()}
 
-        from benchmarking.emd import EMD
-        debug_dict['Primal-PT'] = EMD()(real_data, fake_data)
-
         return Dloss, debug_dict
 
     def trainG(self, netD, real_data, fake_data):
