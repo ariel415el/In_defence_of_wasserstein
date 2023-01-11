@@ -7,6 +7,7 @@ from PIL import Image
 from torchvision import transforms as T
 from tqdm import tqdm
 
+
 def get_transforms(im_size, center_crop):
     transforms = [
              T.ToTensor(),
@@ -18,6 +19,7 @@ def get_transforms(im_size, center_crop):
         transforms = [T.CenterCrop(size=center_crop)] + transforms
 
     return T.Compose(transforms)
+
 
 class MemoryDataset(Dataset):
     def __init__(self, paths, im_size, center_crop=None):

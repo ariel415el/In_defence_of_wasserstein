@@ -183,7 +183,7 @@ if __name__ == "__main__":
                         help='moving average factor weight of updating generator (1 means none)')
     parser.add_argument('--n_D_steps', default=1, type=int, help="Number of repeated D updates with each batch")
     parser.add_argument('--G_step_every', default=1, type=int, help="Update G only evry 'G_step_every' iterations")
-    parser.add_argument('--n_iterations', default=100000, type=int)
+    parser.add_argument('--n_iterations', default=1000000, type=int)
 
     # Evaluation
     parser.add_argument('--outputs_root', default='Outputs')
@@ -206,7 +206,8 @@ if __name__ == "__main__":
                 f"_D-{args.disc_arch}_L-{args.loss_function}_Z-{args.z_dim}_B-{args.batch_size}_{args.tag}"
 
     device = torch.device(args.device)
-    print(f"Working on device: {torch.cuda.get_device_name(device)}")
+    if args.device != 'cpu':
+        print(f"Working on device: {torch.cuda.get_device_name(device)}")
 
     saved_model_folder, saved_image_folder, plots_image_folder = get_dir(args)
 

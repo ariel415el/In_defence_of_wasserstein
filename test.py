@@ -8,7 +8,7 @@ from tests.interpolate import interpolate
 from tests.test_data_NNs import find_nns, find_patch_nns, inverse_image
 from tests.test_mode_collapse import find_mode_collapses
 from tests.test_utils import load_pretrained_generator, load_pretrained_discriminator, get_data
-from tests.visualize_discriminator import visualize_discriminator
+from tests.test_discriminator import saliency_maps
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -38,7 +38,7 @@ if __name__ == '__main__':
 
     # partial data tests
     data = get_data(args['data_path'], args['im_size'], args['center_crop'], limit_data=9)
-    visualize_discriminator(netG, netD, z_dim, data, outputs_dir, device)
+    saliency_maps(netG, netD, z_dim, data, outputs_dir, device)
     inverse_image(netG, z_dim, data, outputs_dir=outputs_dir, device=device)
 
     # Full data tests
