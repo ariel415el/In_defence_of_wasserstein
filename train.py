@@ -26,8 +26,8 @@ def get_models_and_optimizers(args):
     netG.train()
     netD.train()
 
-    optimizerG = optim.Adam(netG.parameters(), lr=args.lr, betas=(0.5, 0.999))
-    optimizerD = optim.Adam(netD.parameters(), lr=args.lr, betas=(0.5, 0.999))
+    optimizerG = optim.Adam(netG.parameters(), lr=args.lrG, betas=(0.5, 0.999))
+    optimizerD = optim.Adam(netD.parameters(), lr=args.lrD, betas=(0.5, 0.999))
 
     start_iteration = 0
     if args.resume_last_ckpt:
@@ -175,10 +175,11 @@ if __name__ == "__main__":
 
     # Training
     parser.add_argument('--batch_size', default=64, type=int)
-    parser.add_argument('--loss_function', default="SoftHingeLoss", type=str)
+    parser.add_argument('--loss_function', default="NonSaturatingGANLoss", type=str)
     parser.add_argument('--gp_weight', default=0, type=float)
     parser.add_argument('--spectral_normalization', action='store_true', default=False)
-    parser.add_argument('--lr', default=0.0001, type=float)
+    parser.add_argument('--lrG', default=0.0001, type=float)
+    parser.add_argument('--lrD', default=0.0001, type=float)
     parser.add_argument('--avg_update_factor', default=1, type=float,
                         help='moving average factor weight of updating generator (1 means none)')
     parser.add_argument('--n_D_steps', default=1, type=int, help="Number of repeated D updates with each batch")
@@ -188,7 +189,7 @@ if __name__ == "__main__":
     # Evaluation
     parser.add_argument('--outputs_root', default='Outputs')
     parser.add_argument('--save_interval', default=1000, type=int)
-    parser.add_argument('--save_last_only',action='store_true', default=False)
+    parser.add_argument('--save_last_only', action='store_true', default=False)
     parser.add_argument('--fid_freq', default=10000, type=int)
     parser.add_argument('--fid_n_batches', default=0, type=int, help="How many batches of train/test to compute "
                                                                      "reference FID statistics (0 turns off FID)")

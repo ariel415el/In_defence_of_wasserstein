@@ -12,6 +12,7 @@ def get_ot_plan(C):
     OTplan = ot.emd(uniform_x, uniform_y, C)
     return OTplan
 
+
 def to_patches(x, p=8, s=4):
     """extract flattened patches from a pytorch image"""
     patches = F.unfold(x, kernel_size=p, stride=s)  # shape (b, c*p*p, N_patches)

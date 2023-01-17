@@ -11,6 +11,7 @@ def weights_init(m):
     elif classname.find('Conv') != -1:
         init.xavier_normal_(m.weight, gain=np.sqrt(2.0))
 
+
 class Generator(nn.Module):
     def __init__(self, z_dim, im_dim=64):
         channels = 3
@@ -47,8 +48,9 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, im_dim=64):
+    def __init__(self, im_dim=64, GAP=False):
         super(Discriminator, self).__init__()
+        self.GAP = GAP
         channels=3
 
         layer_depth = [channels, 128, 256, 512, 512]
@@ -62,14 +64,24 @@ class Discriminator(nn.Module):
                 nn.ReLU(True)
             ]
         self.convs = nn.Sequential(*layers)
-        self.classifier = nn.Conv2d(layer_depth[-1], 1, 4, 1, 0, bias=False)
+        # self.classifier = nn.Conv2d(layer_depth[-1], 1, 4, 1, 0, bias=False)
+        if GAP:
+            self.classifier = nn.Linear(layer_depth[-1], 1, bias=False)
+        else:
+            self.classifier = nn.Linear(layer_depth[-1]*4**2, 1, bias=False)
 
     def features(self, img):
         return self.convs(img)
 
     def forward(self, img):
+        b = img.size(0)
         features = self.convs(img)
-        output = self.classifier(features).view(img.size(0))
+        # output = self.classifier(features).view(img.size(0))
+        if self.GAP:
+            features = torch.mean(features, dim=(2, 3)) # GAP
+        else:
+            features = features.reshape(b, -1)
+        output = self.classifier(features).view(b)
         return output
 
 
