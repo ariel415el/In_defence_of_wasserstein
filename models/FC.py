@@ -2,7 +2,7 @@ from torch import nn
 
 
 class Generator(nn.Module):
-    def __init__(self, z_dim, output_dim=64):
+    def __init__(self, z_dim, output_dim=64, **kwargs):
         super(Generator, self).__init__()
         self.output_dim = output_dim
         nf = 128 if output_dim == 64 else 64
@@ -29,7 +29,7 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, in_dim=64):
+    def __init__(self, in_dim=64, **kwargs):
         super(Discriminator, self).__init__()
         nf = 256 if in_dim == 64 else 512
         self.model = nn.Sequential(

@@ -10,10 +10,26 @@ def weights_init(m):
         init.xavier_normal_(m.weight, gain=np.sqrt(2.0))
     elif classname.find('Conv') != -1:
         init.xavier_normal_(m.weight, gain=np.sqrt(2.0))
+    elif isinstance(m, nn.BatchNorm2d):
+        nn.init.normal_(m.weight.data, 1.0, 0.02)
+        nn.init.constant_(m.bias.data, 0)
+
+
+def conv_block(c_in, c_out, k_size, stride, pad, use_bn=True, transpose=False):
+    module = []
+
+    conv_type = nn.ConvTranspose2d if transpose else nn.Conv2d
+    module.append(conv_type(c_in, c_out, k_size, stride, pad, bias=not use_bn))
+
+    if use_bn:
+        module.append(nn.BatchNorm2d(c_out))
+
+    module.append(nn.ReLU(True))
+    return nn.Sequential(*module)
 
 
 class Generator(nn.Module):
-    def __init__(self, z_dim, im_dim=64):
+    def __init__(self, z_dim, output_dim=64, bn=True, **kwargs):
         channels = 3
         super(Generator, self).__init__()
         layer_depths = [z_dim, 512, 512, 256, 128]
@@ -21,7 +37,7 @@ class Generator(nn.Module):
         strides = [1, 2, 2, 2, 2]
         padding = [0, 1, 1, 1, 1]
 
-        if im_dim == 128:
+        if output_dim == 128:
             layer_depths += [64]
             kernel_dim += [4]
             strides += [2]
@@ -29,12 +45,9 @@ class Generator(nn.Module):
 
         layers = []
         for i in range(len(layer_depths) - 1):
-            layers += [
-                nn.ConvTranspose2d(layer_depths[i], layer_depths[i + 1], kernel_dim[i], strides[i], padding[i],
-                                   bias=False),
-                nn.BatchNorm2d(layer_depths[i + 1]),
-                nn.ReLU(True),
-            ]
+            layers.append(
+                conv_block(layer_depths[i], layer_depths[i + 1], kernel_dim[i], strides[i], padding[i], use_bn=bn, transpose=True)
+            )
         layers += [
             nn.ConvTranspose2d(layer_depths[-1], channels, kernel_dim[-1], strides[-1], padding[-1], bias=False),
             nn.Tanh()
@@ -48,23 +61,21 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, im_dim=64, GAP=False):
+    def __init__(self, input_dim=64, bn=True, GAP=False, **kwargs):
         super(Discriminator, self).__init__()
         self.GAP = GAP
         channels=3
 
         layer_depth = [channels, 128, 256, 512, 512]
-        if im_dim == 128:
+        if input_dim == 128:
             layer_depth += [512]
+
         layers = []
         for i in range(len(layer_depth) - 1):
-            layers += [
-                nn.Conv2d(layer_depth[i], layer_depth[i + 1], 4, 2, 1, bias=False),
-                nn.BatchNorm2d(layer_depth[i + 1]),
-                nn.ReLU(True)
-            ]
+            layers.append(
+                conv_block(layer_depth[i], layer_depth[i + 1], 4, 2, 1, use_bn=bn, transpose=False)
+            )
         self.convs = nn.Sequential(*layers)
-        # self.classifier = nn.Conv2d(layer_depth[-1], 1, 4, 1, 0, bias=False)
         if GAP:
             self.classifier = nn.Linear(layer_depth[-1], 1, bias=False)
         else:
@@ -76,7 +87,6 @@ class Discriminator(nn.Module):
     def forward(self, img):
         b = img.size(0)
         features = self.convs(img)
-        # output = self.classifier(features).view(img.size(0))
         if self.GAP:
             features = torch.mean(features, dim=(2, 3)) # GAP
         else:

@@ -95,7 +95,7 @@ class SEBlock(nn.Module):
 
 
 class Generator(nn.Module):
-    def __init__(self, z_dim=100, skip_connections=False):
+    def __init__(self, z_dim=100, skip_connections=False, **kwargs):
         super(Generator, self).__init__()
         self.skip_connections = skip_connections
         ngf = 64
@@ -168,9 +168,8 @@ class DownBlockComp(nn.Module):
         return (self.main(feat) + self.direct(feat)) / 2
 
 
-
 class Discriminator(nn.Module):
-    def __init__(self):
+    def __init__(self, **kwargs):
         super(Discriminator, self).__init__()
         self.ndf = 48
         nc = 3

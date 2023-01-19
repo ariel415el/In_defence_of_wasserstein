@@ -45,7 +45,8 @@ class Bottleneck(nn.Module):
 
 
 class BagNet(nn.Module):
-    def __init__(self, block, layers=[3, 4, 6, 3], strides=[2, 2, 2, 1], kernel3=[0, 0, 0, 0], avg_pool=True):
+    def __init__(self, receptive_field=33, strides=[2, 2, 2, 1], kernel3=[0, 0, 0, 0], avg_pool=True):
+        layers = {9:[1, 1, 0, 0], 17: [1, 1, 1, 0], 33: [1, 1, 1, 1]}[receptive_field]
         num_classes = 1
         self.inplanes = 64
         super(BagNet, self).__init__()
@@ -55,14 +56,14 @@ class BagNet(nn.Module):
                                bias=False)
         self.bn1 = nn.BatchNorm2d(64, momentum=0.001)
         self.relu = nn.ReLU(inplace=True)
-        self.layer1 = self._make_layer(block, 64, layers[0], stride=strides[0], kernel3=kernel3[0], prefix='layer1')
-        self.layer2 = self._make_layer(block, 128, layers[1], stride=strides[1], kernel3=kernel3[1], prefix='layer2')
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=strides[2], kernel3=kernel3[2], prefix='layer3')
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=strides[3], kernel3=kernel3[3], prefix='layer4')
+        self.layer1 = self._make_layer(Bottleneck, 64, layers[0], stride=strides[0], kernel3=kernel3[0], prefix='layer1')
+        self.layer2 = self._make_layer(Bottleneck, 128, layers[1], stride=strides[1], kernel3=kernel3[1], prefix='layer2')
+        self.layer3 = self._make_layer(Bottleneck, 256, layers[2], stride=strides[2], kernel3=kernel3[2], prefix='layer3')
+        self.layer4 = self._make_layer(Bottleneck, 512, layers[3], stride=strides[3], kernel3=kernel3[3], prefix='layer4')
         self.avgpool = nn.AvgPool2d(1, stride=1)
-        self.fc = nn.Linear(512 * block.expansion, num_classes)
+        self.fc = nn.Linear(512 * Bottleneck.expansion, num_classes)
         self.avg_pool = avg_pool
-        self.block = block
+        self.block = Bottleneck
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -112,14 +113,3 @@ class BagNet(nn.Module):
 
         return x.reshape(-1)
 
-
-
-if __name__ == '__main__':
-    import torchvision
-
-    bagnet9 = BagNet(Bottleneck,  kernel3=[1, 1, 0, 0])
-    bagnet17 = BagNet(Bottleneck, kernel3=[1, 1, 1, 0])
-    bagnet33 = BagNet(Bottleneck, kernel3=[1, 1, 1, 1])
-    resnet50 = torchvision.models.resnet50()
-
-    x =1

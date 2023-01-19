@@ -1,70 +1,20 @@
-def get_generator(name, res, z_dim):
-    if name == "FastGAN":
-        if res != 128:
-            raise ValueError("FastGan only implemented for 128x128 images")
-        from models.FastGAN import Generator, weights_init
-        netG = Generator(z_dim, skip_connections=False)
-        netG.apply(weights_init)
+import importlib
 
-    if name == "StyleGAN":
-        from models.StyleGAN import Generator
-        netG = Generator(z_dim)
-
-    elif name == 'DCGAN':
-        from models.DCGAN import Generator, weights_init
-        netG = Generator(z_dim, res)
-        # netG.apply(weights_init)
-
-    elif name == 'FC':
-        from models.FC import Generator
-        netG = Generator(z_dim, output_dim=res)
-
-    elif name == 'ResNet':
-        from models.Resnet import ResNet_G
-        netG = ResNet_G(z_dim, size=res)
-
-    return netG
-
-
-def get_discriminator(name, res):
-    if name == "FastGAN":
-        if res != 128:
-            raise ValueError("FastGan only implemented for 128x128 images")
-        from models.FastGAN import Discriminator, weights_init
-        netD = Discriminator()
-        netD.apply(weights_init)
-
-    if name == "StyleGAN":
-        from models.StyleGAN import Discriminator
-        netD = Discriminator()
-
-    elif name == 'DCGAN':
-        from models.DCGAN import Discriminator, weights_init
-        netD = Discriminator(im_dim=res)
-        # netD.apply(weights_init)
-
-    elif 'BagNet' in name:
-        from models.BagNet import BagNet, Bottleneck
-        kernel_dict = {"BagNet-9": [1, 1, 0, 0], "BagNet-17": [1, 1, 1, 0], "BagNet-33": [1, 1, 1, 1]}
-        netD = BagNet(Bottleneck, kernel3=kernel_dict[name])
-
-    elif name == 'FC':
-        from models.FC import Discriminator
-        netD = Discriminator(in_dim=res)
-
-    elif name == 'ResNet':
-        from models.Resnet import ResNet_D
-        netD = ResNet_D(size=res)
-
-    return netD
+from utils.common import parse_classnames_and_kwargs
 
 
 def get_models(args, device):
-    netG = get_generator(args.gen_arch, args.im_size, args.z_dim)
-    netD = get_discriminator(args.disc_arch, args.im_size)
+    model_name, kwargs = parse_classnames_and_kwargs(args.gen_arch, kwargs={"output_dim": args.im_size, "z_dim": args.z_dim})
+    netG = importlib.import_module("models." + model_name).Generator(**kwargs)
+
+    model_name, kwargs = parse_classnames_and_kwargs(args.disc_arch, kwargs={"input_dim": args.im_size})
+    netD = importlib.import_module("models." + model_name).Discriminator(**kwargs)
+
     if args.spectral_normalization:
         from models.model_utils import make_model_spectral_normalized
         netD = make_model_spectral_normalized(netD)
+
+    print(f"G params: {print_num_params(netG)}, D params: {print_num_params(netD)}", )
 
     return netG.to(device), netD.to(device)
 
