@@ -5,7 +5,7 @@ def weights_init(m):
     pass
 
 class Discriminator(nn.Module):
-    def __init__(self):
+    def __init__(self, input_dim=128):
         super().__init__()
         n_conv = 2
         equal_lr = True
@@ -45,7 +45,7 @@ class DiscriminatorBlock(nn.Module):
         return self.conv_res(self.downsample(x)) + self.downsample(self.layers(x))
 
 class Generator(nn.Module):
-    def __init__(self, z_dim):
+    def __init__(self, z_dim, output_dim=128):
         super().__init__()
         n_conv_blocks = 2
         n_layers_mapper = 8

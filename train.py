@@ -82,14 +82,18 @@ def train_GAN(args):
         fake_images = DiffAugment(fake_images, policy=args.augmentation)
 
         # #####  1. train Discriminator #####
-        for i in range(args.n_D_steps):
+        if iteration % args.D_step_every == 0:
             Dloss, debug_Dlosses = loss_function.trainD(netD, real_images, fake_images)
             netD.zero_grad()
-            Dloss.backward(retain_graph=args.n_D_steps > 1)
+            Dloss.backward()
             if args.gp_weight > 0:
                 Dloss += args.gp_weight * calc_gradient_penalty(netD, real_images, fake_images)
             optimizerD.step()
             wandb.log(debug_Dlosses, step=iteration)
+
+        noise = torch.randn((b, args.z_dim)).to(device)
+        fake_images = netG(noise)
+        fake_images = DiffAugment(fake_images, policy=args.augmentation)
 
         # #####  2. train Generator #####
         if iteration % args.G_step_every == 0:
@@ -127,11 +131,20 @@ def evaluate(netG, netD, fid_metric, other_metrics, fixed_noise, debug_fixed_rea
     netD.eval()
     start = time()
     with torch.no_grad():
-        D_on_fixed_real_train = netD(debug_fixed_reals).mean().item()
-        D_on_fixed_real_test = netD(debug_fixed_reals_test).mean().item()
-        wandb.log({'D_on_fixed_real_train': D_on_fixed_real_train, 'D_on_fixed_real_test':D_on_fixed_real_test}, step=iteration)
-
         fixed_noise_fake_images = netG(fixed_noise)
+
+        D_on_fixed_real_train = netD(debug_fixed_reals)
+        D_on_fixed_real_test = netD(debug_fixed_reals_test)
+        D_on_fixed_noise = netD(fixed_noise_fake_images)
+        wandb.log({'D_on_fixed_real_train': D_on_fixed_real_train.mean().item(),
+                   'D_on_fixed_real_test':D_on_fixed_real_test.mean().item(),
+                   'D_on_fixed_noise': D_on_fixed_noise.mean().item(),
+                   'rv': (D_on_fixed_real_train.mean().item() - D_on_fixed_real_test.mean().item()) / (D_on_fixed_real_train.mean().item() - D_on_fixed_noise.mean().item()),
+                   'rt': (D_on_fixed_real_train.sign().mean().item()),
+                   'train/test': (D_on_fixed_real_train.mean().item() / D_on_fixed_real_test.mean().item()),
+                   'train/fake': (D_on_fixed_real_train.mean().item() / D_on_fixed_noise.mean().item())
+                   }, step=iteration)
+
         nrow = int(sqrt(len(fixed_noise_fake_images)))
         vutils.save_image(fixed_noise_fake_images,  f'{saved_image_folder}/{iteration}.png', nrow=nrow, normalize=True)
         if fid_metric is not None and iteration % args.fid_freq == 0:
@@ -141,7 +154,6 @@ def evaluate(netG, netD, fid_metric, other_metrics, fixed_noise, debug_fixed_rea
                        'fid_train': fid['train'], 'fid_test': fid['test']},
                       step=iteration)
 
-        # fake_images = netG(torch.randn_like(fixed_noise).to(device))
         for metric in other_metrics:
             wandb.log({
                 f'{metric.name}_fixed_noise_gen_to_train': metric(fixed_noise_fake_images, debug_fixed_reals),
@@ -182,7 +194,7 @@ if __name__ == "__main__":
     parser.add_argument('--lrD', default=0.0001, type=float)
     parser.add_argument('--avg_update_factor', default=1, type=float,
                         help='moving average factor weight of updating generator (1 means none)')
-    parser.add_argument('--n_D_steps', default=1, type=int, help="Number of repeated D updates with each batch")
+    parser.add_argument('--D_step_every', default=1, type=int, help="D G only evry 'D_step_every' iterations")
     parser.add_argument('--G_step_every', default=1, type=int, help="Update G only evry 'G_step_every' iterations")
     parser.add_argument('--n_iterations', default=1000000, type=int)
 

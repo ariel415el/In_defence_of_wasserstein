@@ -1,3 +1,4 @@
+import argparse
 import importlib
 
 from utils.common import parse_classnames_and_kwargs
@@ -41,12 +42,17 @@ def print_num_params(model):
 if __name__ == '__main__':
     for arch_name, s in [('FC', 64), ("DCGAN", 64), ('ResNet', 64),
                          ('FC', 128), ("DCGAN", 128),('ResNet', 128) , ("FastGAN", 128), ('StyleGAN', 128),
-                         ('BagNet-9', 64), ('BagNet-9', 128)]:
+                         ('BagNet-rf=9', 64), ('BagNet-rf=9', 128)]:
         print(f"{arch_name}: {s}x{s}")
+
         try:
-            netG = get_generator(arch_name, s, s)
+            model_name, kwargs = parse_classnames_and_kwargs(arch_name, kwargs={"output_dim": s, "z_dim": s})
+            netG = importlib.import_module("models." + model_name).Generator(**kwargs)
+
+
             print("\t-G params: ", print_num_params(netG))
         except Exception as e:
             pass
-        netD = get_discriminator(arch_name, s)
+        model_name, kwargs = parse_classnames_and_kwargs(arch_name, kwargs={"input_dim": s})
+        netD = importlib.import_module("models." + model_name).Discriminator(**kwargs)
         print("\t-D params: ", print_num_params(netD))
