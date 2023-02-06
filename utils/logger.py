@@ -65,7 +65,7 @@ class PLTLogger:
 
 
 def get_dir(args):
-    task_name = os.path.join(args.outputs_root,  args.name)
+    task_name = os.path.join(f"outputs/{args.wandb_project}",  args.name)
     saved_model_folder = os.path.join(task_name, 'models')
     saved_image_folder = os.path.join(task_name, 'images')
     plots_image_folder = os.path.join(task_name, 'plots')

@@ -11,7 +11,7 @@ import torch.optim as optim
 from torchvision import utils as vutils
 
 from benchmarking.lap_swd import LapSWD
-from diffaug import DiffAugment
+from utils.diffaug import DiffAugment
 from models import get_models
 from utils.common import copy_G_params, load_params
 from losses import get_loss_function, calc_gradient_penalty
@@ -45,7 +45,7 @@ def get_models_and_optimizers(args):
 
 
 def train_GAN(args):
-    wandb.init(project=f"GANs", dir=plots_image_folder, name=args.name)
+    wandb.init(project=args.wandb_project, dir=plots_image_folder, name=args.name)
     debug_fixed_noise = torch.randn((args.batch_size, args.z_dim)).to(device)
     debug_fixed_reals = next(train_loader).to(device)
     debug_fixed_reals_test = next(test_loader).to(device)
@@ -91,9 +91,10 @@ def train_GAN(args):
             optimizerD.step()
             wandb.log(debug_Dlosses, step=iteration)
 
-        noise = torch.randn((b, args.z_dim)).to(device)
-        fake_images = netG(noise)
-        fake_images = DiffAugment(fake_images, policy=args.augmentation)
+        if not args.no_fake_resample:
+            noise = torch.randn((b, args.z_dim)).to(device)
+            fake_images = netG(noise)
+            fake_images = DiffAugment(fake_images, policy=args.augmentation)
 
         # #####  2. train Generator #####
         if iteration % args.G_step_every == 0:
@@ -184,12 +185,12 @@ if __name__ == "__main__":
     parser.add_argument('--disc_arch', default='DCGAN')
     parser.add_argument('--im_size', default=64, type=int)
     parser.add_argument('--z_dim', default=64, type=int)
+    parser.add_argument('--spectral_normalization', action='store_true', default=False)
 
     # Training
     parser.add_argument('--batch_size', default=64, type=int)
     parser.add_argument('--loss_function', default="NonSaturatingGANLoss", type=str)
     parser.add_argument('--gp_weight', default=0, type=float)
-    parser.add_argument('--spectral_normalization', action='store_true', default=False)
     parser.add_argument('--lrG', default=0.0001, type=float)
     parser.add_argument('--lrD', default=0.0001, type=float)
     parser.add_argument('--avg_update_factor', default=1, type=float,
@@ -197,9 +198,9 @@ if __name__ == "__main__":
     parser.add_argument('--D_step_every', default=1, type=int, help="D G only evry 'D_step_every' iterations")
     parser.add_argument('--G_step_every', default=1, type=int, help="Update G only evry 'G_step_every' iterations")
     parser.add_argument('--n_iterations', default=1000000, type=int)
+    parser.add_argument('--no_fake_resample', default=False, action='store_true')
 
     # Evaluation
-    parser.add_argument('--outputs_root', default='Outputs')
     parser.add_argument('--save_interval', default=1000, type=int)
     parser.add_argument('--save_last_only', action='store_true', default=False)
     parser.add_argument('--fid_freq', default=10000, type=int)
@@ -208,6 +209,7 @@ if __name__ == "__main__":
 
     # Other
     parser.add_argument('--tag', default='test')
+    parser.add_argument('--wandb_project', default='GANs')
     parser.add_argument('--n_workers', default=4, type=int)
     parser.add_argument('--resume_last_ckpt', action='store_true', default=False,
                         help="Search for the latest ckpt in the same folder to resume training")
