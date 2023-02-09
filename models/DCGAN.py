@@ -66,7 +66,7 @@ class Discriminator(nn.Module):
         self.GAP = GAP
         channels=3
 
-        layer_depth = [channels, 128, 256, 512, 512]
+        layer_depth = [channels, 32, 64, 128, 256]
         if input_dim == 128:
             layer_depth += [512]
 

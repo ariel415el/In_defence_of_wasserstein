@@ -96,7 +96,7 @@ def make_model_spectral_normalized(model):
                                   padding=module.padding,
                                   dilation=module.dilation,
                                   groups=module.groups,
-                                  bias=module.bias)
+                                  bias=not (module.bias is None))
         else:
             continue
         set_layer(model, name, new_conv)

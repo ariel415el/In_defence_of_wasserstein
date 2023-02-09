@@ -7,7 +7,6 @@ from losses.soft_hinge_loss import *
 from losses.two_steps_loss import *
 from losses.wgan import *
 from losses.adverserial_feature_matching import *
-from losses.swd_gan import *
 from utils.common import parse_classnames_and_kwargs
 
 

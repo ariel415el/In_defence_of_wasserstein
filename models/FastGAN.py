@@ -95,7 +95,7 @@ class SEBlock(nn.Module):
 
 
 class Generator(nn.Module):
-    def __init__(self, z_dim=100, skip_connections=False, **kwargs):
+    def __init__(self, z_dim=100, skip_connections=True, **kwargs):
         super(Generator, self).__init__()
         self.skip_connections = skip_connections
         ngf = 64

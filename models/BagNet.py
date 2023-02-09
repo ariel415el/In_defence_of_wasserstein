@@ -45,8 +45,11 @@ class Bottleneck(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, input_dim=64, rf='33', strides=[2, 2, 2, 1], kernel3=[0, 0, 0, 0], avg_pool=True, **kwargs):
-        layers = {'9':[1, 1, 0, 0], '17': [1, 1, 1, 0], '33': [1, 1, 1, 1]}[rf]
+    def __init__(self, input_dim=64, rf='33', layers=(3, 4, 6, 3), avg_pool=True, **kwargs):
+        if type(layers)== str:
+            layers = eval(layers)
+        strides = [2, 2, 2, 1]
+        kernel3 = {'9':[1, 1, 0, 0], '17': [1, 1, 1, 0], '33': [1, 1, 1, 1]}[rf]
         num_classes = 1
         self.inplanes = 64
         super(Discriminator, self).__init__()
