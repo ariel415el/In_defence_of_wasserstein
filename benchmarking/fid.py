@@ -1,12 +1,8 @@
 import numpy as np
-import torch
 from scipy import linalg
-from tqdm import tqdm
-
-from benchmarking.inception import InceptionV3
 
 
-def calc_fid(stats1, stats2, eps=1e-6):
+def frechet_distance(stats1, stats2, eps=1e-6):
     mean1, cov1 = stats1
     mean2, cov2 = stats2
     cov_sqrt, _ = linalg.sqrtm(cov1 @ cov2, disp=False)
@@ -33,29 +29,4 @@ def calc_fid(stats1, stats2, eps=1e-6):
 
     return fid
 
-
-inception = None
-
-
-class FID_score:
-    def __init__(self, loaders, num_batches, device):
-        self.device = device
-        print("Computing reference Inception features", end='...', flush=True)
-        with torch.no_grad():
-            global inception
-            if inception is None:
-                inception = InceptionV3([3], normalize_input=False).to(device)
-            self.ref_stats_dict = {k: self.get_multi_batch_statistics([next(loader).to(device) for _ in range(num_batches)]) for k,loader in loaders.items()}
-            print("Done")
-
-    def __call__(self, batches):
-        stats = self.get_multi_batch_statistics(batches)
-        return {k: calc_fid(ref_stats, stats) for k, ref_stats in self.ref_stats_dict.items()}
-
-    def get_multi_batch_statistics(self, batches):
-        global inception
-        with torch.no_grad():
-            features = [inception(batch.to(self.device))[0].view(batch.shape[0], -1).cpu().numpy() for batch in batches]
-        features = np.concatenate(features, axis=0)
-        return np.mean(features, 0), np.cov(features, rowvar=False)
 

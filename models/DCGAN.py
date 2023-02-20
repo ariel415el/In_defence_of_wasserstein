@@ -66,7 +66,8 @@ class Discriminator(nn.Module):
         self.GAP = GAP
         channels=3
 
-        layer_depth = [channels, 32, 64, 128, 256]
+        # layer_depth = [channels, 32, 64, 128, 256]
+        layer_depth = [channels, 64, 128, 256, 512]
         if input_dim == 128:
             layer_depth += [512]
 
@@ -100,6 +101,8 @@ if __name__ == '__main__':
     x = torch.ones(5,3,64,64)
     G = Generator(128, 128)
     D = Discriminator(128)
+    from model_utils.discriminator_ensamble import Ensemble
+    D = Ensemble(D, 4)
 
     print(G(z).shape)
     print(D(G(z)).shape)

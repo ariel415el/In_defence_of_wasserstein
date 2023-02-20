@@ -2,6 +2,7 @@ import argparse
 import importlib
 
 from utils.common import parse_classnames_and_kwargs
+from models.model_utils.discriminator_ensamble import Ensemble, StochasticEnsemble
 
 
 def get_models(args, device):
@@ -12,8 +13,14 @@ def get_models(args, device):
     netD = importlib.import_module("models." + model_name).Discriminator(**kwargs)
 
     if args.spectral_normalization:
-        from models.model_utils import make_model_spectral_normalized
+        from models.model_utils.spectral_normalization import make_model_spectral_normalized
         netD = make_model_spectral_normalized(netD)
+
+    if args.ensemble_models != 1:
+        if args.stochastic_ensemble:
+            netD = StochasticEnsemble(netD, args.ensemble_models)
+        else:
+            netD = Ensemble(netD, args.ensemble_models)
 
     print(f"G params: {print_num_params(netG)}, D params: {print_num_params(netD)}", )
 
@@ -35,7 +42,10 @@ def human_format(num):
 
 
 def print_num_params(model):
-    n = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    # n = sum(p.nelement() * p.element_size() for p in model.parameters() if p.requires_grad)
+    # n += sum(p.nelement() * p.element_size() for p in model.buffers() if p.requires_grad)
+    n = sum(p.nelement() for p in model.parameters() if p.requires_grad)
+    n += sum(p.nelement() for p in model.buffers() if p.requires_grad)
     return human_format(n)
 
 
@@ -50,9 +60,9 @@ if __name__ == '__main__':
             netG = importlib.import_module("models." + model_name).Generator(**kwargs)
 
 
-            print("\t-G params: ", print_num_params(netG))
+            print("\t-G params (MB): ", print_num_params(netG))
         except Exception as e:
             pass
         model_name, kwargs = parse_classnames_and_kwargs(arch_name, kwargs={"input_dim": s})
         netD = importlib.import_module("models." + model_name).Discriminator(**kwargs)
-        print("\t-D params: ", print_num_params(netD))
+        print("\t-D params (MB): ", print_num_params(netD))

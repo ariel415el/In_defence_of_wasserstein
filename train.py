@@ -11,15 +11,13 @@ import torch.optim as optim
 from torchvision import utils as vutils
 
 from benchmarking.lap_swd import LapSWD
+from benchmarking.neural_metrics import InceptionMetrics
 from utils.diffaug import DiffAugment
 from models import get_models
 from utils.common import copy_G_params, load_params
 from losses import get_loss_function, calc_gradient_penalty
 from utils.data import get_dataloader
 from utils.logger import get_dir
-
-from benchmarking.fid import FID_score
-
 
 def get_models_and_optimizers(args):
     netG, netD = get_models(args, device)
@@ -50,17 +48,17 @@ def train_GAN(args):
     debug_fixed_reals = next(train_loader).to(device)
     debug_fixed_reals_test = next(test_loader).to(device)
 
-    fid_metric = FID_score({"train": train_loader, "test":test_loader}, args.fid_n_batches, torch.device("cpu")) if args.fid_n_batches else None
+    inception_metrics = InceptionMetrics([next(train_loader) for _ in range(args.fid_n_batches)], torch.device("cpu"))
     other_metrics = [
                 get_loss_function("BatchEMD-dist=L1"),
-                get_loss_function("BatchEMD-dist=vgg"),
+                # get_loss_function("BatchEMD-dist=vgg"),
                 # get_loss_function("BatchEMD-dist=inception"),
-                get_loss_function("BatchPatchEMD-p=9"),
-                get_loss_function("BatchPatchEMD-p=17"),
-                get_loss_function("BatchPatchEMD-p=33"),
-                get_loss_function("BatchPatchSWD-p=9"),
-                get_loss_function("BatchPatchSWD-p=17"),
-                get_loss_function("BatchPatchSWD-p=33"),
+                # get_loss_function("BatchPatchEMD-p=9"),
+                # get_loss_function("BatchPatchEMD-p=17"),
+                # get_loss_function("BatchPatchEMD-p=33"),
+                # get_loss_function("BatchPatchSWD-p=9"),
+                # get_loss_function("BatchPatchSWD-p=17"),
+                # get_loss_function("BatchPatchSWD-p=33"),
                 LapSWD()
               ]
 
@@ -112,13 +110,13 @@ def train_GAN(args):
             it_sec = max(1, iteration - start_iteration) / (time() - start)
             print(f"Iteration: {iteration}: it/sec: {it_sec:.1f}")
 
-        if iteration % args.save_interval == 0:
+        if iteration % args.log_freq == 0:
             backup_para = copy_G_params(netG)
             load_params(netG, avg_param_G)
 
-            evaluate(netG, netD, fid_metric, other_metrics, debug_fixed_noise,
+            evaluate(netG, netD, inception_metrics, other_metrics, debug_fixed_noise,
                      debug_fixed_reals, debug_fixed_reals_test, saved_image_folder, iteration, args)
-            fname = f"{saved_model_folder}/{'last' if args.save_last_only else iteration}.pth"
+            fname = f"{saved_model_folder}/{'last' if not args.save_every else iteration}.pth"
             torch.save({"iteration": iteration, 'netG': netG.state_dict(), 'netD': netD.state_dict(),
                         "optimizerG":optimizerG.state_dict(), "optimizerD": optimizerD.state_dict()},
                        fname)
@@ -126,43 +124,42 @@ def train_GAN(args):
             load_params(netG, backup_para)
 
 
-def evaluate(netG, netD, fid_metric, other_metrics, fixed_noise, debug_fixed_reals, debug_fixed_reals_test,
+def evaluate(netG, netD, inception_metrics, other_metrics, fixed_noise, debug_fixed_reals, debug_fixed_reals_test,
              saved_image_folder, iteration, args):
     netG.eval()
     netD.eval()
     start = time()
     with torch.no_grad():
         fixed_noise_fake_images = netG(fixed_noise)
-
-        D_on_fixed_real_train = netD(debug_fixed_reals)
-        D_on_fixed_real_test = netD(debug_fixed_reals_test)
-        D_on_fixed_noise = netD(fixed_noise_fake_images)
-        wandb.log({'D_on_fixed_real_train': D_on_fixed_real_train.mean().item(),
-                   'D_on_fixed_real_test':D_on_fixed_real_test.mean().item(),
-                   'D_on_fixed_noise': D_on_fixed_noise.mean().item(),
-                   'rv': (D_on_fixed_real_train.mean().item() - D_on_fixed_real_test.mean().item()) / (D_on_fixed_real_train.mean().item() - D_on_fixed_noise.mean().item()),
-                   'rt': (D_on_fixed_real_train.sign().mean().item()),
-                   'train/test': (D_on_fixed_real_train.mean().item() / D_on_fixed_real_test.mean().item()),
-                   'train/fake': (D_on_fixed_real_train.mean().item() / D_on_fixed_noise.mean().item())
+        D_noise = netD(fixed_noise_fake_images)
+        D_train = netD(debug_fixed_reals)
+        D_test = netD(debug_fixed_reals_test)
+        wandb.log({'D_train': D_train.mean().item(),
+                   'D_test':D_test.mean().item(),
+                   'D_noise': D_noise.mean().item(),
+                   'rv': (D_train.mean().item() - D_test.mean().item()) / (D_train.mean().item() - D_noise.mean().item()),
+                   'rt': (D_train.sign().mean().item()),
+                   'train/test': (D_train.mean().item() / D_test.mean().item()),
+                   'train/fake': (D_train.mean().item() / D_noise.mean().item())
                    }, step=iteration)
 
-        nrow = int(sqrt(len(fixed_noise_fake_images)))
-        vutils.save_image(fixed_noise_fake_images,  f'{saved_image_folder}/{iteration}.png', nrow=nrow, normalize=True)
-        if fid_metric is not None and iteration % args.fid_freq == 0:
-            fixed_fid = fid_metric([fixed_noise_fake_images])
-            fid = fid_metric([netG(torch.randn_like(fixed_noise).to(device)) for _ in range(args.fid_n_batches)])
-            wandb.log({'fixed_fid_train': fixed_fid['train'], 'fixed_fid_test': fixed_fid['test'],
-                       'fid_train': fid['train'], 'fid_test': fid['test']},
-                      step=iteration)
+        if args.ensemble_models != 1:
+            wandb.log({'Ensemble_STD_real_train': netD(debug_fixed_reals, return_std=True)[1],
+                       'Ensemble_STD_fixed_noise': netD(fixed_noise_fake_images, return_std=True)[1],
+                       }, step=iteration)
+        
+        if args.fid_n_batches > 0 and iteration % args.fid_freq == 0:
+            fake_batches = [netG(torch.randn_like(fixed_noise).to(device)) for _ in range(args.fid_n_batches)]
+            wandb.log(inception_metrics(fake_batches), step=iteration)
 
         for metric in other_metrics:
             wandb.log({
                 f'{metric.name}_fixed_noise_gen_to_train': metric(fixed_noise_fake_images, debug_fixed_reals),
                 f'{metric.name}_fixed_noise_gen_to_test': metric(fixed_noise_fake_images, debug_fixed_reals_test),
-                # f'{metric}_gen_to_train': metric(fake_images, debug_fixed_reals),
-                # f'{metric}_gen_to_test': metric(fake_images, debug_fixed_reals_test),
             }, step=iteration)
 
+        nrow = int(sqrt(args.batch_size))
+        vutils.save_image(fixed_noise_fake_images,  f'{saved_image_folder}/{iteration}.png', nrow=nrow, normalize=True)
         if iteration == 0:
             vutils.save_image(debug_fixed_reals, f'{saved_image_folder}/debug_fixed_reals.png', nrow=nrow, normalize=True)
 
@@ -186,6 +183,8 @@ if __name__ == "__main__":
     parser.add_argument('--im_size', default=64, type=int)
     parser.add_argument('--z_dim', default=64, type=int)
     parser.add_argument('--spectral_normalization', action='store_true', default=False)
+    parser.add_argument('--ensemble_models', default=1, type=int)
+    parser.add_argument('--stochastic_ensemble', action='store_true', default=False)
 
     # Training
     parser.add_argument('--batch_size', default=64, type=int)
@@ -201,8 +200,8 @@ if __name__ == "__main__":
     parser.add_argument('--no_fake_resample', default=False, action='store_true')
 
     # Evaluation
-    parser.add_argument('--save_interval', default=1000, type=int)
-    parser.add_argument('--save_last_only', action='store_true', default=False)
+    parser.add_argument('--log_freq', default=1000, type=int)
+    parser.add_argument('--save_every', action='store_true', default=False)
     parser.add_argument('--fid_freq', default=10000, type=int)
     parser.add_argument('--fid_n_batches', default=0, type=int, help="How many batches of train/test to compute "
                                                                      "reference FID statistics (0 turns off FID)")

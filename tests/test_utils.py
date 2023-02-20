@@ -43,7 +43,7 @@ def load_pretrained_discriminator(args, ckpt_path, device):
     D = get_discriminator(args['disc_arch'], args['im_size'])
 
     if args['spectral_normalization']:
-        from models.model_utils import make_model_spectral_normalized
+        from models.model_utils.spectral_normalization import make_model_spectral_normalized
         D = make_model_spectral_normalized(D)
 
     weights = torch.load(ckpt_path, map_location=device)['netD']

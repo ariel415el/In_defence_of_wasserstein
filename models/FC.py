@@ -29,11 +29,11 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, in_dim=64, **kwargs):
+    def __init__(self, input_dim=64, **kwargs):
         super(Discriminator, self).__init__()
-        nf = 256 if in_dim == 64 else 512
+        nf = 256 if input_dim == 64 else 512
         self.model = nn.Sequential(
-            nn.Linear(3*in_dim**2, 2*nf),
+            nn.Linear(3*input_dim**2, 2*nf),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(2*nf, nf),
             nn.LeakyReLU(0.2, inplace=True),
