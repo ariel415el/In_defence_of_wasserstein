@@ -15,7 +15,7 @@ def get_transforms(im_size, center_crop):
              T.Normalize((0.5,), (0.5,))
         ]
 
-    if center_crop is not None:
+    if center_crop:
         transforms = [T.CenterCrop(size=center_crop)] + transforms
 
     return T.Compose(transforms)

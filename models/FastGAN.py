@@ -95,7 +95,7 @@ class SEBlock(nn.Module):
 
 
 class Generator(nn.Module):
-    def __init__(self, z_dim=100, skip_connections=True, **kwargs):
+    def __init__(self, z_dim=100, skip_connections=True, c=3, **kwargs):
         super(Generator, self).__init__()
         self.skip_connections = skip_connections
         ngf = 64
@@ -116,7 +116,7 @@ class Generator(nn.Module):
             self.se_64  = SEBlock(nfc[4], nfc[64])
             self.se_128 = SEBlock(nfc[8], nfc[128])
 
-        self.to_full = conv2d(nfc[128], 3, 1, 1, 0, bias=False)
+        self.to_full = conv2d(nfc[128], c, 1, 1, 0, bias=False)
 
     def forward(self, input):
         feat_4   = self.init(input)

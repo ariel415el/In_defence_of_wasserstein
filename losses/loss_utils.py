@@ -125,8 +125,7 @@ class vgg_dist_calculator:
             layer_idx = self.layer_idx
         if self.device is None:
             self.device = X.device
-            self.device = torch.device("cpu")
-            self.vgg_features.to(self.device)
+            self.vgg_features = self.vgg_features.to(self.device)
         X = X.to(self.device)
         for i, layer in enumerate(self.vgg_features):
             X = layer(X)

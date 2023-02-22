@@ -1,11 +1,9 @@
 import os
-from random import shuffle
 
 import torch
 from tqdm import tqdm
 from PIL import Image
 
-from models import get_discriminator
 from utils.data import get_transforms
 
 
@@ -25,30 +23,3 @@ def get_data(data_root, im_size, center_crop, limit_data=None):
         images += [im]
 
     return torch.stack(images)
-
-
-def load_pretrained_generator(args, ckpt_path, device):
-    from models import get_generator
-    G = get_generator(args['gen_arch'], args['im_size'], args['z_dim'])
-    weights = torch.load(ckpt_path, map_location=device)['netG']
-    # weights = {k.replace('module.', ''): v for k, v in weights.items()}
-    # weights = {k.replace('network', 'init.init'): v for k, v in weights.items()}
-    G.load_state_dict(weights)
-    G.to(device)
-    G.eval()
-    return G
-
-
-def load_pretrained_discriminator(args, ckpt_path, device):
-    D = get_discriminator(args['disc_arch'], args['im_size'])
-
-    if args['spectral_normalization']:
-        from models.model_utils.spectral_normalization import make_model_spectral_normalized
-        D = make_model_spectral_normalized(D)
-
-    weights = torch.load(ckpt_path, map_location=device)['netD']
-    D.load_state_dict(weights)
-    D.to(device)
-    D.eval()
-
-    return D

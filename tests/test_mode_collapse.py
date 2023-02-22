@@ -8,8 +8,11 @@ from losses.loss_utils import vgg_dist_calculator
 
 
 def find_mode_collapses(G, D, z_dim, outputs_dir, device):
+    """Generate some images and sort them by the Discriminator score and their distance to their nearest neighbor.
+    crappy images tend to go together and sorting by distance to NN will reveal this. The sorting by D score shows
+    different order meaning it didn't catch the problem.
+    """
     with torch.no_grad():
-
         os.makedirs(f"{outputs_dir}/mode_collapses", exist_ok=True)
         b = 256
         fixed_noise = torch.randn((b, z_dim), device=device)
@@ -30,9 +33,6 @@ def find_mode_collapses(G, D, z_dim, outputs_dir, device):
         vutils.save_image(g_images[perm],
                           f'{outputs_dir}/mode_collapses/sorted_by_NN_distance.jpg',
                           nrow=int(np.sqrt(b)), normalize=True)
-
-
-
 
         scores = D(g_images)
 

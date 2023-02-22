@@ -3,7 +3,6 @@ import os
 
 import numpy as np
 import torch
-from torch import optim
 from tqdm import tqdm
 
 from torchvision import utils as vutils
@@ -89,30 +88,6 @@ def find_nns(G, z_dim, data, outputs_dir, device):
             results.append(torch.cat([fake_image, nns]))
 
         vutils.save_image(torch.cat(results, dim=0).add(1).mul(0.5), f'{outputs_dir}/nns/im.png', normalize=False, nrow=5)
-
-
-def inverse_image(G, z_dim, real_images, outputs_dir, device):
-    import torch.nn.functional as F
-    os.makedirs(f"{outputs_dir}/inverse_z", exist_ok=True)
-
-    fixed_noise = torch.randn((len(real_images), z_dim), requires_grad=True, device=device)
-    optimizerG = optim.Adam([fixed_noise], lr=0.001)
-
-    for iteration in tqdm(range(10000)):
-        optimizerG.zero_grad()
-
-        g_images = G(fixed_noise)
-
-        # rec_loss = percept(F.avg_pool2d(g_images, 2, 2), F.avg_pool2d(real_images, 2, 2)).sum() + 0.2 * F.mse_loss(g_images, real_images)
-        rec_loss = F.mse_loss(g_images, real_images)
-
-        rec_loss.backward()
-
-        optimizerG.step()
-
-        if iteration % 100 == 0:
-            vutils.save_image(torch.cat([real_images, g_images]).add(1).mul(0.5), f'{outputs_dir}/inverse_z/rec_{iteration}.jpg',
-                              nrow=len(real_images))
 
 
 
