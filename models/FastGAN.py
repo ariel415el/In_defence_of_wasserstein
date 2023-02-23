@@ -169,7 +169,7 @@ class DownBlockComp(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, **kwargs):
+    def __init__(self, num_outputs=1, **kwargs):
         super(Discriminator, self).__init__()
         self.ndf = 48
         nc = 3
@@ -192,7 +192,8 @@ class Discriminator(nn.Module):
             conv2d(nfc[8], nfc[4], 4, 2, 0, bias=False),
             batchNorm2d(nfc[4]),
             nn.LeakyReLU(0.2, inplace=True),
-            conv2d(nfc[4], 1, 3, 1, 0, bias=False))
+            conv2d(nfc[4], num_outputs, 3, 1, 0, bias=False))
+        self.num_outputs = num_outputs
 
     def features(self, img):
         feat_128 = self.down_from_full(img)
@@ -204,7 +205,11 @@ class Discriminator(nn.Module):
 
     def forward(self, img):
         feat_8 = self.features(img)
-        output = self.spatial_logits(feat_8).view(len(img))
+        output = self.spatial_logits(feat_8)
+        if self.num_outputs == 1:
+            output = output.view(len(img))
+        else:
+            output = output.view(len(img), self.num_outputs)
 
         return output
 

@@ -61,7 +61,7 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, input_dim=64, bn=True, GAP=False, **kwargs):
+    def __init__(self, input_dim=64, bn=True, GAP=False, num_outputs=1, **kwargs):
         super(Discriminator, self).__init__()
         self.GAP = GAP
         channels=3
@@ -78,9 +78,10 @@ class Discriminator(nn.Module):
             )
         self.convs = nn.Sequential(*layers)
         if GAP:
-            self.classifier = nn.Linear(layer_depth[-1], 1, bias=False)
+            self.classifier = nn.Linear(layer_depth[-1], num_outputs, bias=False)
         else:
-            self.classifier = nn.Linear(layer_depth[-1]*4**2, 1, bias=False)
+            self.classifier = nn.Linear(layer_depth[-1]*4**2, num_outputs, bias=False)
+        self.num_outputs = num_outputs
 
     def features(self, img):
         return self.convs(img)
@@ -92,7 +93,13 @@ class Discriminator(nn.Module):
             features = torch.mean(features, dim=(2, 3)) # GAP
         else:
             features = features.reshape(b, -1)
-        output = self.classifier(features).view(b)
+
+        output = self.classifier(features)
+        if self.num_outputs == 1:
+            output = output.view(len(img))
+        else:
+            output = output.view(len(img), self.num_outputs)
+
         return output
 
 
