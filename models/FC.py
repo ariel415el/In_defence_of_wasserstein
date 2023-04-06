@@ -2,10 +2,10 @@ from torch import nn
 
 
 class Generator(nn.Module):
-    def __init__(self, z_dim, output_dim=64, **kwargs):
+    def __init__(self, z_dim, output_dim=64, nf=64, **kwargs):
         super(Generator, self).__init__()
         self.output_dim = output_dim
-        nf = 128 if output_dim == 64 else 64
+        nf = int(nf)
         def block(in_feat, out_feat, normalize=True):
             layers = [nn.Linear(in_feat, out_feat)]
             if normalize:
@@ -29,9 +29,9 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, input_dim=64, **kwargs):
+    def __init__(self, input_dim=64,  nf=128, **kwargs):
+        nf = int(nf)
         super(Discriminator, self).__init__()
-        nf = 256 if input_dim == 64 else 512
         self.model = nn.Sequential(
             nn.Linear(3*input_dim**2, 2*nf),
             nn.LeakyReLU(0.2, inplace=True),

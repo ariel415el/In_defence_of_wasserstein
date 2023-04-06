@@ -50,7 +50,7 @@ def print_num_params(model):
 
 
 if __name__ == '__main__':
-    for arch_name, s in [('FC', 64), ("DCGAN", 64), ('ResNet', 64),
+    for arch_name, s in [('FC', 64), ("DCGAN-nf=32", 64), ('ResNet', 64),
                          ('FC', 128), ("DCGAN", 128),('ResNet', 128) , ("FastGAN", 128), ('StyleGAN', 128),
                          ('BagNet-rf=9', 64), ('BagNet-rf=9', 128)]:
         print(f"{arch_name}: {s}x{s}")
