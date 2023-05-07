@@ -37,7 +37,7 @@ class PLTLogger:
 
 class WandbLogger:
     def __init__(self, args, save_dir):
-        self.wandb = wandb.init(project=args.projec_name, dir=save_dir, name=args.name)
+        self.wandb = wandb.init(project=args.project_name, dir=save_dir, name=args.name)
 
     def log(self, val_dict, step):
         self.wandb.log(val_dict, step=step)
