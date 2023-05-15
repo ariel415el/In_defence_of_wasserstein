@@ -7,7 +7,7 @@ import torch
 from models import get_models
 from tests.interpolate import interpolate
 from tests.test_data_NNs import find_nns, find_patch_nns
-from tests.latent_inversion import inverse_image
+# from tests.latent_inversion import inverse_image
 from tests.test_mode_collapse import find_mode_collapses
 from tests.test_utils import get_data
 from tests.test_discriminator import saliency_maps
@@ -17,9 +17,9 @@ def load_pretrained_models(args, ckpt_path, device):
     netG, netD = get_models(args, device)
 
     weights = torch.load(ckpt_path, map_location=device)
-    # netG.load_state_dict(weights['netG'])
-    # netG.to(device)
-    # netG.eval()
+    netG.load_state_dict(weights['netG'])
+    netG.to(device)
+    netG.eval()
 
     netD.load_state_dict(weights['netD'])
     netD.to(device)
@@ -47,14 +47,15 @@ if __name__ == '__main__':
     netG, netD = load_pretrained_models(argparse.Namespace(**args), ckpt_path, device)
     print("Done")
 
-    # # No data tests
-    # find_mode_collapses(netG, netD, z_dim, outputs_dir, device)
-    # interpolate(netG, z_dim, n_zs=15, steps=25, outputs_dir=outputs_dir, device=device)
+    # No data tests
+    find_mode_collapses(netG, netD, z_dim, outputs_dir, device)
+    interpolate(netG, z_dim, n_zs=15, steps=25, outputs_dir=outputs_dir, device=device)
+    exit()
     #
     # # partial data tests
     data = get_data(args['data_path'], args['im_size'], args['center_crop'], limit_data=9).to(device)
     # saliency_maps(netG, netD, z_dim, data, outputs_dir, device)
-    inverse_image(netG, z_dim, data, outputs_dir=outputs_dir, device=device)
+    # inverse_image(netG, z_dim, data, outputs_dir=outputs_dir, device=device)
 
     # Full data tests
     data = get_data(args['data_path'], args['im_size'], args['center_crop'], limit_data=None)
