@@ -50,11 +50,10 @@ class Generator(nn.Module):
         output = self.network(input)
         return output
 
-
+""" DC-discriminator receptive field by layer (4, 10, 22, 46, 94)"""
 class Discriminator(nn.Module):
-    def __init__(self, input_dim=64, nf='64', bn=True, GAP=False, num_outputs=1, **kwargs):
+    def __init__(self, input_dim=64, nf='64', bn=True, num_outputs=1, **kwargs):
         super(Discriminator, self).__init__()
-        self.GAP = GAP
         channels=3
         nf = int(nf)
         layer_depth = [channels, nf, nf*2, nf*4, nf*8]
@@ -67,10 +66,7 @@ class Discriminator(nn.Module):
                 conv_block(layer_depth[i], layer_depth[i + 1], 4, 2, 1, use_bn=bn, transpose=False)
             )
         self.convs = nn.Sequential(*layers)
-        if GAP:
-            self.classifier = nn.Linear(layer_depth[-1], num_outputs, bias=False)
-        else:
-            self.classifier = nn.Linear(layer_depth[-1]*4**2, num_outputs)
+        self.classifier = nn.Linear(layer_depth[-1]*4**2, num_outputs)
         self.num_outputs = num_outputs
 
     def features(self, img):
@@ -79,10 +75,8 @@ class Discriminator(nn.Module):
     def forward(self, img):
         b = img.size(0)
         features = self.convs(img)
-        if self.GAP:
-            features = torch.mean(features, dim=(2, 3)) # GAP
-        else:
-            features = features.reshape(b, -1)
+
+        features = features.reshape(b, -1)
 
         output = self.classifier(features)
         if self.num_outputs == 1:

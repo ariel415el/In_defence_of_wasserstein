@@ -10,6 +10,8 @@ class Generator(nn.Module):
             images = torch.randn(n, 3 ,output_dim, output_dim) * 0.5
         elif init_mode == "ones":
             images = torch.ones(n, 3 ,output_dim, output_dim)
+        elif init_mode == "zeros":
+            images = torch.ones(n, 3, output_dim, output_dim)
         else:
             raise ValueError("Bad init mode")
         self.images = nn.Parameter(images, requires_grad=True)

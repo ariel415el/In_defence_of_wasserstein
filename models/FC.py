@@ -1,26 +1,28 @@
 from torch import nn
 
 
+def block(in_feat, out_feat, bn=False):
+    layers = [nn.Linear(in_feat, out_feat)]
+    if bn:
+        layers.append(nn.BatchNorm1d(out_feat, 0.8))
+    layers.append(nn.LeakyReLU(0.2, inplace=True))
+    return layers
+
+
 class Generator(nn.Module):
-    def __init__(self, z_dim, output_dim=64, nf=64, **kwargs):
+    def __init__(self, z_dim, output_dim=64, nf=256, depth=2, bn=True, **kwargs):
         super(Generator, self).__init__()
         self.output_dim = output_dim
         nf = int(nf)
-        def block(in_feat, out_feat, normalize=True):
-            layers = [nn.Linear(in_feat, out_feat)]
-            if normalize:
-                layers.append(nn.BatchNorm1d(out_feat, 0.8))
-            layers.append(nn.LeakyReLU(0.2, inplace=True))
-            return layers
 
-        self.model = nn.Sequential(
-            *block(z_dim, nf, normalize=False),
-            *block(nf, 2*nf),
-            *block(2*nf, 4*nf),
-            *block(4*nf, 8*nf),
-            nn.Linear(8*nf, 3*output_dim**2),
-            nn.Tanh()
-        )
+        layers =  block(z_dim, nf, bn=bn)
+
+        for i in range(depth - 1):
+            layers += block(nf, nf, bn=bn)
+
+
+        layers += [nn.Linear(nf, 3*output_dim**2), nn.Tanh()]
+        self.model = nn.Sequential(*layers)
 
     def forward(self, z):
         img = self.model(z)
@@ -29,17 +31,17 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, input_dim=64,  nf=128, **kwargs):
-        nf = int(nf)
+    def __init__(self, input_dim=64,  nf=256 , depth=2, bn=False, **kwargs):
         super(Discriminator, self).__init__()
-        self.model = nn.Sequential(
-            nn.Linear(3*input_dim**2, 2*nf),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(2*nf, nf),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(nf, 1),
-            # nn.Sigmoid(),
-        )
+        nf = int(nf)
+
+        layers =  block(3*input_dim**2, nf, bn=bn)
+
+        for i in range(depth - 1):
+            layers += block(nf, nf, bn=bn)
+
+        layers += [nn.Linear(nf, 1)]
+        self.model = nn.Sequential(*layers)
 
     def forward(self, img):
         img_flat = img.view(img.size(0), -1)
