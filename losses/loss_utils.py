@@ -55,7 +55,7 @@ class L2_metric:
     def __call__(self, X, Y):
         X = X.view(len(X), -1)
         Y = Y.view(len(Y), -1)
-        return torch.mean((X[:, None] - Y[None, :])**2, dim=-1)
+        return torch.sqrt(torch.mean((X[:, None] - Y[None, :])**2, dim=-1))
 
 
 def get_batche_slices(n, b):
