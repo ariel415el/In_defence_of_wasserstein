@@ -11,11 +11,12 @@ def compute_receptive_field(depth, k):
 
 class Discriminator(nn.Module):
     def __init__(self, input_dim, depth=4, nf=64, bn=True, k=4, pad=1, **kwargs):
-        print(f"Discriminator receptive field is {compute_receptive_field(depth, k)}")
         super(Discriminator, self).__init__()
         channels=3
         depth = int(depth)
         nf = int(nf)
+        k = int(k)
+        print(f"Discriminator receptive field is {compute_receptive_field(depth, k)}")
 
         layers = [conv_block(channels, nf, k, 2, pad, use_bn=bn, transpose=False)]
         for i in range(depth - 1):
@@ -35,6 +36,7 @@ class Discriminator(nn.Module):
         features = torch.mean(features, dim=(2, 3)) # GAP
         output = self.classifier(features).view(b)
         return output
+
 
 
 if __name__ == '__main__':
