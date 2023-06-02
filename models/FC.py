@@ -16,7 +16,7 @@ class Generator(nn.Module):
         nf = int(nf)
         depth = int(depth)
 
-        layers =  block(z_dim, nf, bn=False)
+        layers =  block(z_dim, nf, bn=bn)
 
         for i in range(depth - 1):
             layers += block(nf, nf, bn=bn)
@@ -32,7 +32,7 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, input_dim=64,  nf=128 , depth=4, bn=False, **kwargs):
+    def __init__(self, input_dim=64,  nf=128 , depth=2, bn=True, **kwargs):
         super(Discriminator, self).__init__()
         nf = int(nf)
         depth = int(depth)
