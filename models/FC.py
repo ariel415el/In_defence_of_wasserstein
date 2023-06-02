@@ -4,13 +4,13 @@ from torch import nn
 def block(in_feat, out_feat, bn=False):
     layers = [nn.Linear(in_feat, out_feat)]
     if bn:
-        layers.append(nn.BatchNorm1d(out_feat, 0.8))
+        layers.append(nn.BatchNorm1d(out_feat))
     layers.append(nn.LeakyReLU(0.2, inplace=True))
     return layers
 
 
 class Generator(nn.Module):
-    def __init__(self, z_dim, output_dim=64, nf=128, depth=4, bn=True, **kwargs):
+    def __init__(self, z_dim, output_dim=64, nf=128, depth=4, bn=False, **kwargs):
         super(Generator, self).__init__()
         self.output_dim = output_dim
         nf = int(nf)
@@ -37,7 +37,7 @@ class Discriminator(nn.Module):
         nf = int(nf)
         depth = int(depth)
 
-        layers =  block(3*input_dim**2, nf, bn=bn)
+        layers =  block(3*input_dim**2, nf, bn=False) # bn is not good for RGB values
 
         for i in range(depth - 1):
             layers += block(nf, nf, bn=bn)
