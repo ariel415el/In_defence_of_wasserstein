@@ -29,6 +29,8 @@ def get_models_and_optimizers(args):
     optimizerD = optim.Adam(netD.parameters(), lr=args.lrD, betas=(0.5, 0.9))
 
     start_iteration = 0
+    ckpt = torch.load(f'/cs/labs/yweiss/ariel1/repos/DataEfficientGANs/outputs/GANs/FFHQ_128_64x64_G-pixels_D-DCGAN_L-BatchEMD_Z-64_B-64_test/models/last.pth')
+    netG.load_state_dict(ckpt['netG'])
     if args.resume_last_ckpt:
         ckpts = glob.glob(f'{saved_model_folder}/*.pth')
         if ckpts:
@@ -81,7 +83,7 @@ def train_GAN(args):
         fake_images = DiffAugment(fake_images, policy=args.augmentation)
 
         # #####  1. train Discriminator #####
-        if iteration % args.D_step_every == 0:
+        if iteration % args.D_step_every == 0 and args.D_step_every > 0:
             Dloss, debug_Dlosses = loss_function.trainD(netD, real_images, fake_images)
             if args.gp_weight > 0:
                 gp = args.gp_weight * calc_gradient_penalty(netD, real_images, fake_images)
