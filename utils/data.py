@@ -12,6 +12,7 @@ def get_transforms(im_size, center_crop):
     transforms = [
              T.ToTensor(),
              T.Resize(im_size, antialias=True),
+             T.CenterCrop(size=im_size),
              T.Normalize((0.5,), (0.5,))
         ]
 
@@ -53,6 +54,7 @@ class DiskDataset(Dataset):
         img = Image.open(self.paths[idx]).convert('RGB')
         if self.transforms is not None:
             img = self.transforms(img)
+        # return img, idx
         return img
 
 
