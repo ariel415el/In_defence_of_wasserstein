@@ -6,12 +6,13 @@ class Discriminator(nn.Module):
                  ksize=7,
                  hdim=128,
                  n_local_layers=4,
-                 strides=1,
+                 stride=1,
                  bn=False):
         super().__init__()
         ksize = int(ksize)
-        # layers = [nn.Conv2d(3, hdim, ksize, stride=strides, padding=ksize // 2)]
-        layers = [nn.Conv2d(3, hdim, ksize, stride=strides, padding=0), nn.LeakyReLU(0.2)]
+        stride = int(stride)
+        # layers = [nn.Conv2d(3, hdim, ksize, stride=stride, padding=ksize // 2)]
+        layers = [nn.Conv2d(3, hdim, ksize, stride=stride, padding=0), nn.LeakyReLU(0.2)]
         for i in range(n_local_layers):
             layers.append(nn.Conv2d(hdim, hdim, 1))
             if bn:

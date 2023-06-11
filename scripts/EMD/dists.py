@@ -100,7 +100,7 @@ class W1:
         return torch.abs(x - y).sum(-1).mean(0)
 
 
-def discrete_dual(x, y, n_steps=500, batch_size=None, lr=0.001, verbose=False):
+def discrete_dual(x, y, n_steps=500, batch_size=None, lr=0.001, verbose=False, nnb=256):
     pbar = range(n_steps)
     if verbose:
         print(f"Optimizing duals: {x.shape}, {y.shape}")
@@ -109,7 +109,7 @@ def discrete_dual(x, y, n_steps=500, batch_size=None, lr=0.001, verbose=False):
     if batch_size is None:
         batch_size = len(x)
 
-    loss_func = W1(b=1024)
+    loss_func = W1(b=nnb)
     psi = torch.zeros(len(x), requires_grad=True, device=x.device)
     opt_psi = torch.optim.Adam([psi], lr=lr)
     # scheduler = ReduceLROnPlateau(opt_psi, 'min', threshold=0.0001, patience=200)

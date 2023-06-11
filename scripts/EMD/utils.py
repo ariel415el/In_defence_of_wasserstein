@@ -8,16 +8,17 @@ from torchvision import transforms
 from torchvision.utils import save_image, make_grid
 import torch.nn.functional as F
 
-def get_data(data_path, im_size=None, c=3, limit_data=10000):
-    print("Loading data...", end='')
+def get_data(data_path, im_size=None, c=3, flatten=True, limit_data=10000):
     if os.path.isdir(data_path):
         image_paths = sorted([os.path.join(data_path, x) for x in os.listdir(data_path)])[:limit_data]
     else:
         image_paths = [data_path]
 
+
+
     transform = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Resize(im_size),
+        transforms.Resize(im_size) if im_size is not None else transforms.Lambda(lambda x: x),
         transforms.Normalize((0.5,), (0.5,))
     ])
 
@@ -31,9 +32,8 @@ def get_data(data_path, im_size=None, c=3, limit_data=10000):
     if c == 1:
         data = torch.mean(data, dim=1, keepdim=True)
 
-    data = data.reshape(len(data), -1)
-
-    print("done")
+    if flatten:
+        data = data.reshape(len(data), -1)
 
     return data
 
@@ -56,8 +56,8 @@ def get_centroids(data, n_centroids, use_faiss=False):
 
 
 def read_grid_batch(path, d, c):
-    img = get_data(path, d, c)[0].unsqueeze(0)
-    batch = F.unfold(img[..., 2:,2:], kernel_size=d, stride=66)  # shape (b, c*p*p, N_patches)
+    img = get_data(path, None, c, flatten=False)[0].unsqueeze(0)
+    batch = F.unfold(img[..., 2:,2:], kernel_size=d, stride=d+2)  # shape (b, c*p*p, N_patches)
     batch = batch[0].permute(1,0).reshape(-1, c, d, d).reshape(-1, c*d*d)
     return batch
 
