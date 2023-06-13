@@ -14,7 +14,7 @@ from benchmarking.lap_swd import LapSWD
 from benchmarking.neural_metrics import InceptionMetrics
 from utils.diffaug import DiffAugment
 from models import get_models
-from utils.common import copy_G_params, load_params
+from utils.common import copy_G_params, load_params, dump_images
 from losses import get_loss_function, calc_gradient_penalty
 from utils.data import get_dataloader
 from utils.logger import get_dir, PLTLogger, WandbLogger
@@ -29,6 +29,7 @@ def get_models_and_optimizers(args):
     optimizerD = optim.Adam(netD.parameters(), lr=args.lrD, betas=(0.5, 0.9))
 
     start_iteration = 0
+    # netG.load_state_dict(torch.load('/home/ariel/university/repos/DataEfficientGANs/outputs/GANs/FFHQ_128_64x64_G-pixels_D-DCGAN_L-BatchEMD-dist=L2_Z-64_B-64_test/models/last.pth')['netG'])
     if args.resume_last_ckpt:
         ckpts = glob.glob(f'{saved_model_folder}/*.pth')
         if ckpts:
@@ -51,7 +52,8 @@ def train_GAN(args):
 
     inception_metrics = InceptionMetrics([next(train_loader) for _ in range(args.fid_n_batches)], torch.device("cpu"))
     other_metrics = [
-                get_loss_function("BatchEMD-dist=L1"),
+                # get_loss_function("BatchEMD-dist=L1"),
+                get_loss_function("BatchEMD-dist=L2"),
                 # get_loss_function("BatchEMD-dist=vgg"),
                 # get_loss_function("BatchEMD-dist=inception"),
                 # get_loss_function("BatchPatchEMD-p=9"),
@@ -142,10 +144,10 @@ def evaluate(netG, netD, inception_metrics, other_metrics, fixed_noise, debug_fi
         logger.log({'D_train': D_train.mean().item(),
                    'D_test':D_test.mean().item(),
                    'D_noise': D_noise.mean().item(),
-                   'rv': (D_train.mean().item() - D_test.mean().item()) / (D_train.mean().item() - D_noise.mean().item()),
-                   'rt': (D_train.sign().mean().item()),
-                   'train\\test': (D_train.mean().item() / D_test.mean().item()),
-                   'train\\fake': (D_train.mean().item() / D_noise.mean().item())
+                   # 'rv': (D_train.mean().item() - D_test.mean().item()) / (D_train.mean().item() - D_noise.mean().item()),
+                   # 'rt': (D_train.sign().mean().item()),
+                   # 'train\\test': (D_train.mean().item() / D_test.mean().item()),
+                   # 'train\\fake': (D_train.mean().item() / D_noise.mean().item())
                    }, step=iteration)
 
         if args.ensemble_models != 1:
@@ -164,9 +166,10 @@ def evaluate(netG, netD, inception_metrics, other_metrics, fixed_noise, debug_fi
             }, step=iteration)
 
         nrow = int(sqrt(args.batch_size))
-        vutils.save_image(fixed_noise_fake_images,  f'{saved_image_folder}/{iteration}.png', nrow=nrow, normalize=True)
+        dump_images(fixed_noise_fake_images,  f'{saved_image_folder}/{iteration}.png', nrow=nrow)
         if iteration == 0:
-            vutils.save_image(debug_fixed_reals, f'{saved_image_folder}/debug_fixed_reals.png', nrow=nrow, normalize=True)
+            dump_images(debug_fixed_reals, f'{saved_image_folder}/debug_fixed_reals.png', nrow=nrow)
+            dump_images(debug_fixed_reals_test, f'{saved_image_folder}/debug_fixed_reals_test.png', nrow=nrow)
 
     netG.train()
     netD.train()

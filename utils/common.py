@@ -1,6 +1,9 @@
 import sys
 from copy import deepcopy
 
+import torch
+from torchvision.utils import save_image
+
 
 def copy_G_params(model):
     flatten = deepcopy(list(p.data for p in model.parameters()))
@@ -23,3 +26,10 @@ def parse_classnames_and_kwargs(string, kwargs=None):
         name, value = arg.split("=")
         kwargs[name] = value
     return class_name, kwargs
+
+def dump_images(batch, fname, nrow):
+    batch += 1
+    batch = batch / 2
+    # batch *= 255
+    # batch = torch.clip(batch, 0, 255)
+    save_image(batch, fname, nrow=nrow, normalize=False)

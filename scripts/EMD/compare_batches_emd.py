@@ -1,12 +1,12 @@
-from collections import defaultdict
-
-
 import os
+import sys
+
 import torch
 from matplotlib import pyplot as plt
 
-from scripts.EMD.dists import discrete_dual, swd
-from scripts.EMD.dists import emd
+
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
+from scripts.EMD.dists import discrete_dual, swd, emd
 
 from utils import get_data, dump_images, batch_to_image, to_patches, read_grid_batch
 
@@ -14,18 +14,18 @@ if __name__ == '__main__':
     device = torch.device('cpu')
     c = 3
     b = 64
-    p, s = 15, 1
-    # metric_name, metric = "EMD", emd
-    metric_name, metric = "SWD", swd
+    p, s = 16, 8
+    metric_name, metric = "EMD", emd
+    # metric_name, metric = "SWD", swd
     # metric_name, metric = "Dual", lambda x,y: discrete_dual(x,y, verbose=False, nnb=16)
     for data_path, batches_dir, d in [
         ('/mnt/storage_ssd/datasets/FFHQ/FFHQ_128/FFHQ_128', '/home/ariel/Downloads/outputs/FFHQ_64',64),
-        ('/mnt/storage_ssd/datasets/FFHQ/FFHQ_128/FFHQ_128', '/home/ariel/Downloads/outputs/FFHQ_128', 128),
-        ('/mnt/storage_ssd/datasets/square_data/7x7', '/home/ariel/Downloads/outputs/squares', 64),
-        ('/mnt/storage_ssd/datasets/MNIST/floating_MNIST/train-128-0', '/home/ariel/Downloads/outputs/floating_mnist_128', 128),
-        ('/mnt/storage_ssd/datasets/MNIST/MNIST/jpgs/training', '/home/ariel/Downloads/outputs/mnist',64),
+        # ('/mnt/storage_ssd/datasets/FFHQ/FFHQ_128/FFHQ_128', '/home/ariel/Downloads/outputs/FFHQ_128', 128),
+        # ('/mnt/storage_ssd/datasets/square_data/7x7', '/home/ariel/Downloads/outputs/squares', 64),
+        # ('/mnt/storage_ssd/datasets/MNIST/floating_MNIST/train-128-0', '/home/ariel/Downloads/outputs/floating_mnist_128', 128),
+        # ('/mnt/storage_ssd/datasets/MNIST/MNIST/jpgs/training', '/home/ariel/Downloads/outputs/mnist',64),
     ]:
-        data = get_data(data_path, d, c, limit_data=10000 + 2 * b).to(device)
+        data = get_data(data_path, d, c, limit_data=1000 + 2 * b).to(device)
 
         r1 = data[:b]
         r2 = data[b:2*b]
@@ -34,11 +34,14 @@ if __name__ == '__main__':
         batches = {'r2': r2}
 
         for name in [
-            "FC",
-            "DC",
-            "GAP",
-            "EMD-L2"
-            # "EMD-L2-15-1"
+            # "FC",
+            # "DC",
+            # "GAP",
+            "EMD-L2",
+            "EMD-L2-16-8-n=1024_from_faces",
+            "EMD-L2-16-8-n=1024",
+            "Dual-L2",
+            # "Dual-L2-16-16_from_faces",
         ]:
             batches[name] = read_grid_batch(os.path.join(batches_dir, f"{name}.png"), d, c).to(device)
 

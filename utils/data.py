@@ -1,4 +1,5 @@
 import os
+from random import shuffle
 
 import numpy as np
 import torch.utils.data as data
@@ -84,7 +85,9 @@ class InfiniteSamplerWrapper(data.sampler.Sampler):
 
 
 def get_dataloader(data_root, im_size, batch_size, n_workers, val_percentage=0.1, load_to_memory=False):
-    paths = sorted([os.path.join(data_root, im_name) for im_name in os.listdir(data_root)])
+    # paths = sorted([os.path.join(data_root, im_name) for im_name in os.listdir(data_root)])
+    paths = [os.path.join(data_root, im_name) for im_name in os.listdir(data_root)]
+    shuffle(paths)
 
     n_val_images = int(val_percentage * len(paths))
     train_paths, test_paths = paths[n_val_images:], paths[:n_val_images]
