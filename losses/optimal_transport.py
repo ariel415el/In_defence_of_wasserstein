@@ -26,7 +26,7 @@ class BatchEMD:
         self.metric = get_dist_metric(dist)
 
     def compute(self, images_X, images_Y):
-        C = self.metric(images_X, images_Y)
+        C = self.metric(images_X.reshape(len(images_X), -1), images_Y.reshape(len(images_Y), -1))
 
         OTPlan = get_ot_plan(C.detach().cpu().numpy())
         OTPlan = torch.from_numpy(OTPlan).to(C.device)
@@ -49,7 +49,7 @@ class BatchEMD:
 
 class BatchPatchEMD:
     """Split images to patches and sample n_samples from each to compute on."""
-    def __init__(self, dist='L1', n_samples=128, p=8, s=1):
+    def __init__(self, dist='L1', n_samples='all', p=5, s=1):
         self.metric = get_dist_metric(dist)
         self.n_samples = int(n_samples if n_samples != "all" else -1)
         self.p = int(p)
@@ -119,7 +119,7 @@ class BatchSWD:
 
 class BatchPatchSWD:
     """Project patches into 1D with random convolutions and compute 1D OT"""
-    def __init__(self, n_proj=128, p=8, s=1):
+    def __init__(self, n_proj=128, p=5, s=1):
         self.num_proj = int(n_proj)
         self.p = int(p)
         self.s = int(s)

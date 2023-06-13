@@ -32,9 +32,9 @@ def calc_gradient_penalty(netD, real_data, fake_data, one_sided=False):
 def get_dist_metric(name):
     """Choose how to calulate pairwise distances for EMD"""
     if name == 'L1':
-        metric = L1_metric()
+        metric = L1()
     elif name == 'L2':
-        metric = L2_metric()
+        metric = L2()
     elif name == 'vgg':
          metric = vgg_dist_calculator()
     elif name == 'inception':
@@ -44,18 +44,21 @@ def get_dist_metric(name):
     return metric
 
 
-class L1_metric:
+class L1:
     def __call__(self, X, Y):
-        X = X.view(len(X), -1)
-        Y = Y.view(len(Y), -1)
-        return torch.mean(torch.abs(X[:, None] - Y[None, :]), dim=-1)
+        assert len(X.shape) == len(Y.shape) == 2
+        return torch.abs(X[:, None] - Y[None, :]).sum(-1)
 
 
-class L2_metric:
+class L2:
+    """
+    Pytorch efficient way of computing distances between all vectors in X and Y, i.e sqrt((X[:, None] - Y[None, :])**2)
+    """
     def __call__(self, X, Y):
-        X = X.view(len(X), -1)
-        Y = Y.view(len(Y), -1)
-        return torch.sqrt(torch.mean((X[:, None] - Y[None, :])**2, dim=-1))
+        assert len(X.shape) == len(Y.shape) == 2
+        dist = (X * X).sum(1)[:, None] + (Y * Y).sum(1)[None, :] - 2.0 * torch.mm(X, torch.transpose(Y, 0, 1))
+        dist = torch.sqrt(dist)
+        return dist
 
 
 def get_batche_slices(n, b):
