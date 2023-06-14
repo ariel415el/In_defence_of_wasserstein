@@ -41,23 +41,24 @@ def train_bagnet_discriminators():
 
 
 
-def run_WGAN(dataset, gen):
-    hours = 4
-    name = os.path.basename(dataset)
-    base = f"python3 train.py --data_path {dataset}  --loss_function WGANLoss --batch_size 64 --gp_weight 10 --project_name WGAN_yweiss_IN --wandb --n_iterations 100000"
-    
-
-    run_sbatch(base + f" --gen_arch {gen}  --disc_arch FC-normalize='in'", f"{gen}-FC_{name}", hours)
-    run_sbatch(base + f" --gen_arch {gen}  --disc_arch DCGAN-normalize='in'", f"{gen}-DC_{name}", hours)
-    run_sbatch(base + f" --gen_arch {gen}  --disc_arch PatchGAN-normalize='in'", f"{gen}-PatchDisc_{name}", hours)
-    # run_sbatch(base + f" --gen_arch {gen}  --disc_arch SCNN-ksize=9", f"{gen}-SCNN22_{name}", hours)
-    # run_sbatch(base + f" --gen_arch {gen}  --disc_arch SCNN-ksize=22", f"{gen}-SCNN9_{name}", hours)
-
-if __name__ == '__main__':
+def run_WGAN():
+    hours = 8
     for dataset in [
-        '/cs/labs/yweiss/ariel1/data/square_data/7x7',
-        '/cs/labs/yweiss/ariel1/data/MNIST/floating_MNIST/train-128-0',
-        '/cs/labs/yweiss/ariel1/data/FFHQ/FFHQ_128'
+        # '/cs/labs/yweiss/ariel1/data/square_data/7x7',
+         '/cs/labs/yweiss/ariel1/data/MNIST/floating_MNIST/train-128-0',
+        #'/cs/labs/yweiss/ariel1/data/FFHQ/FFHQ_128'
     ]:
         for gen in ["pixels"]:
-            run_WGAN(dataset, gen)
+            name = os.path.basename(dataset)
+
+            base = f"python3 train.py --im_size 128 --data_path {dataset}  --loss_function WGANLoss --batch_size 64 --gp_weight 10 --project_name WGAN_yweiss_128 --wandb --n_iterations 100000"
+
+
+            run_sbatch(base + f" --gen_arch {gen}  --disc_arch FC-normalize='in'", f"{gen}-FC_{name}", hours)
+            run_sbatch(base + f" --gen_arch {gen}  --disc_arch DCGAN-normalize='in'", f"{gen}-DC_{name}", hours)
+            run_sbatch(base + f" --gen_arch {gen}  --disc_arch PatchGAN-normalize='in'", f"{gen}-PatchDisc_{name}", hours)
+            # run_sbatch(base + f" --gen_arch {gen}  --disc_arch SCNN-ksize=9", f"{gen}-SCNN22_{name}", hours)
+            # run_sbatch(base + f" --gen_arch {gen}  --disc_arch SCNN-ksize=22", f"{gen}-SCNN9_{name}", hours)
+
+if __name__ == '__main__':
+    run_WGAN()

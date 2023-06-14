@@ -27,10 +27,11 @@ class PLTLogger:
         # Plot single plots
         for k, v in self.data.items():
             if self.data[k]:
+                last_value = self.data[k][-1]
                 self.data_avgs[k] += [np.mean(self.data[k])]
                 self.data[k] = []
                 plt.plot(np.arange(len(self.data_avgs[k])), self.data_avgs[k])
-                plt.title(k + f" Last: {self.data_avgs[k][-1]:.5f}")
+                plt.title(k + f" Last value: {last_value:.5f}")
                 plt.savefig(self.save_dir + f"/{k}.png")
                 plt.clf()
 
