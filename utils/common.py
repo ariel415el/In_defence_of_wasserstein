@@ -28,8 +28,5 @@ def parse_classnames_and_kwargs(string, kwargs=None):
     return class_name, kwargs
 
 def dump_images(batch, fname, nrow):
-    batch += 1
-    batch = batch / 2
-    # batch *= 255
-    # batch = torch.clip(batch, 0, 255)
-    save_image(batch, fname, nrow=nrow, normalize=False)
+    save_image(batch, fname, nrow=nrow, normalize=True)
+    # save_image((batch + 1) / 2, fname, nrow=nrow, normalize=False)

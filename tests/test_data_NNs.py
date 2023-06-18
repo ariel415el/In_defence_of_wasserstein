@@ -81,7 +81,7 @@ def find_nns(G, z_dim, data, outputs_dir, device):
         for i in range(8):
             fake_image = G(torch.randn((1, z_dim), device=device))
             # dists = [percept(fake_image, data[i].unsqueeze(0)).sum().item() for i in range(len(data))]
-            dists = [vgg_fe.extract(fake_image) - vgg_fe.extract(data[i].unsqueeze(0)).pow(2).sum().item() for i in range(len(data))]
+            dists = [(vgg_fe.extract(fake_image) - vgg_fe.extract(data[i].unsqueeze(0))).pow(2).sum().item() for i in range(len(data))]
             nn_indices = np.argsort(dists)
             nns = data[nn_indices[:4]]
 

@@ -16,7 +16,7 @@ class CtransformLoss:
         fs = critic(batch)
 
         # C = torch.mean(torch.abs(batch[:, None, ...] - gen_batch[None, ...]), dim=(2, 3, 4))
-        C = torch.mean((batch[:, None] - gen_batch[None, :]) ** 2, dim=(-3, -2,-1))
+        C = torch.sqrt(torch.sum((batch[:, None] - gen_batch[None, :]) ** 2, dim=(-3, -2,-1)))
 
         f_cs = torch.min(C - fs[:, None], dim=0)[0]
         ot = fs.mean() + f_cs.mean().mean()
@@ -27,17 +27,16 @@ class CtransformLoss:
             penalty1 = torch.mean(admisibility_gap**2)
             penalty2 = torch.mean(torch.clamp(admisibility_gap, max=0)**2)
 
-            return ot, penalty1, penalty2
+            return ot, C, penalty1, penalty2
         return ot
 
     @staticmethod
     def compute_full_space_ot(f, reals, fakes, compute_penalties=True, run_in_batch=False):
+        """Searche the NN of fake images in both real and fake sets to make the search space larger. See paper."""
         b = len(reals)
         B = torch.cat([reals, fakes], dim=0)
 
-        # Bys = torch.cat([reals, fakes], dim=0)
-
-        if run_in_batch:
+        if run_in_batch: # When f has some kind of BN layer this might matter
             fs = f(B)
         else:
             fs = torch.cat([f(reals), f(fakes)])
@@ -62,9 +61,16 @@ class CtransformLoss:
             return OT
 
     def trainD(self, netD, real_data, fake_data):
-        OT, penalty1, penalty2 = CtransformLoss.compute_ot(netD, real_data, fake_data.detach(), compute_penalties=True)
+        OT, C, penalty1, penalty2 = CtransformLoss.compute_ot(netD, real_data, fake_data.detach(), compute_penalties=True)
         Dloss = -OT + self.c1 * penalty1 + self.c2 * penalty2  # Maximize OT with penalties
-        debug_dict = {"CT-OT": OT.item()}
+
+        import numpy as np
+        import ot
+        uniform_x = np.ones(C.shape[0]) / C.shape[0]
+        uniform_y = np.ones(C.shape[1]) / C.shape[1]
+        OT_primal = ot.emd2(uniform_x, uniform_y, C.detach().cpu().numpy())
+
+        debug_dict = {"CT-OT": OT.item(), "Primal-OT": OT_primal}
 
         return Dloss, debug_dict
 

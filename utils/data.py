@@ -84,7 +84,7 @@ class InfiniteSamplerWrapper(data.sampler.Sampler):
         return 2 ** 31
 
 
-def get_dataloader(data_root, im_size, batch_size, n_workers, val_percentage=0.1, load_to_memory=False):
+def get_dataloader(data_root, im_size, batch_size, n_workers, val_percentage=0.1, load_to_memory=False, infinite_sampler=True):
     # paths = sorted([os.path.join(data_root, im_name) for im_name in os.listdir(data_root)])
     paths = [os.path.join(data_root, im_name) for im_name in os.listdir(data_root)]
     shuffle(paths)
@@ -98,18 +98,22 @@ def get_dataloader(data_root, im_size, batch_size, n_workers, val_percentage=0.1
     train_dataset = dataset_type(paths=train_paths, im_size=im_size)
     test_dataset = dataset_type(paths=test_paths, im_size=im_size)
 
-    train_loader = iter(DataLoader(train_dataset, batch_size=batch_size,
+    sampler = lambda x: InfiniteSamplerWrapper(x) if infinite_sampler else None
+    train_loader = DataLoader(train_dataset, batch_size=batch_size,
                                  shuffle=False,
-                                 sampler=InfiniteSamplerWrapper(train_dataset),
+                                 sampler=sampler(train_dataset),
                                  num_workers=n_workers,
-                                 pin_memory=True))
+                                 pin_memory=True)
 
     test_loader = None
     if val_percentage > 0:
-        test_loader = iter(DataLoader(test_dataset, batch_size=batch_size,
+        test_loader = DataLoader(test_dataset, batch_size=batch_size,
                                      shuffle=False,
-                                     sampler=InfiniteSamplerWrapper(test_dataset),
+                                     sampler=sampler(test_dataset),
                                      num_workers=n_workers,
-                                     pin_memory=True))
+                                     pin_memory=True)
 
-    return train_loader, test_loader
+    if infinite_sampler:
+        return iter(train_loader), iter(test_loader)
+    else:
+        return train_loader, test_loader

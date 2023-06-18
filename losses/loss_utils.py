@@ -22,11 +22,12 @@ def calc_gradient_penalty(netD, real_data, fake_data, one_sided=False):
                                     only_inputs=True)[0]
 
     gradients = gradients.view(gradients.shape[0], -1)
-    diff = (gradients.norm(2, dim=1) - 1)
+    gradient_norm = gradients.norm(2, dim=1)
+    diff = (gradient_norm - 1)
     if one_sided:
         diff = torch.clamp(diff, min=0)
     gradient_penalty = (diff ** 2).mean()
-    return gradient_penalty
+    return gradient_penalty, gradient_norm.mean().item()
 
 
 def get_dist_metric(name):

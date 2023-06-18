@@ -50,8 +50,7 @@ if __name__ == '__main__':
     # No data tests
     find_mode_collapses(netG, netD, z_dim, outputs_dir, device)
     interpolate(netG, z_dim, n_zs=15, steps=25, outputs_dir=outputs_dir, device=device)
-    exit()
-    #
+
     # # partial data tests
     data = get_data(args['data_path'], args['im_size'], args['center_crop'], limit_data=9).to(device)
     # saliency_maps(netG, netD, z_dim, data, outputs_dir, device)
