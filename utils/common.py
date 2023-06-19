@@ -29,4 +29,4 @@ def parse_classnames_and_kwargs(string, kwargs=None):
 
 
 def dump_images(batch, fname, nrow):
-    save_image((batch + 1)/2, fname, nrow=nrow, normalize=False)
+    save_image((batch + 1)/2, fname, nrow=nrow, normalize=False, pad_value=1, scale_each=True)
