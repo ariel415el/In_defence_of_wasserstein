@@ -84,7 +84,7 @@ class InfiniteSamplerWrapper(data.sampler.Sampler):
         return 2 ** 31
 
 
-def get_dataloader(data_root, im_size, batch_size, n_workers, val_percentage=0.1, load_to_memory=False, infinite_sampler=True):
+def get_dataloader(data_root, im_size, batch_size, n_workers, val_percentage=0, load_to_memory=False, infinite_sampler=True):
     # paths = sorted([os.path.join(data_root, im_name) for im_name in os.listdir(data_root)])
     paths = [os.path.join(data_root, im_name) for im_name in os.listdir(data_root)]
     shuffle(paths)

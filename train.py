@@ -29,7 +29,6 @@ def get_models_and_optimizers(args):
     optimizerD = optim.Adam(netD.parameters(), lr=args.lrD, betas=(0.5, 0.9))
 
     start_iteration = 0
-    # netG.load_state_dict(torch.load('/home/ariel/university/repos/DataEfficientGANs/outputs/GANs/FFHQ_128_64x64_G-pixels_D-DCGAN_L-BatchEMD-dist=L2_Z-64_B-64_test/models/last.pth')['netG'])
     if args.resume_last_ckpt:
         ckpts = glob.glob(f'{saved_model_folder}/*.pth')
         if ckpts:
@@ -48,7 +47,6 @@ def train_GAN(args):
     logger = (WandbLogger if args.wandb else PLTLogger)(args, plots_image_folder)
     debug_fixed_noise = torch.randn((args.batch_size, args.z_dim)).to(device)
     debug_fixed_reals = next(train_loader).to(device)
-    debug_fixed_reals_test = next(test_loader).to(device)
 
     inception_metrics = InceptionMetrics([next(train_loader) for _ in range(args.fid_n_batches)], torch.device("cpu"))
     other_metrics = [
@@ -122,7 +120,7 @@ def train_GAN(args):
             load_params(netG, avg_param_G)
 
             evaluate(netG, netD, inception_metrics, other_metrics, debug_fixed_noise,
-                     debug_fixed_reals, debug_fixed_reals_test, saved_image_folder, iteration, logger, args)
+                     debug_fixed_reals, saved_image_folder, iteration, logger, args)
             fname = f"{saved_model_folder}/{'last' if not args.save_every else iteration}.pth"
             torch.save({"iteration": iteration, 'netG': netG.state_dict(), 'netD': netD.state_dict(),
                         "optimizerG":optimizerG.state_dict(), "optimizerD": optimizerD.state_dict()},
@@ -131,29 +129,19 @@ def train_GAN(args):
             load_params(netG, backup_para)
 
 
-def evaluate(netG, netD, inception_metrics, other_metrics, fixed_noise, debug_fixed_reals, debug_fixed_reals_test,
+def evaluate(netG, netD, inception_metrics, other_metrics, fixed_noise, debug_fixed_reals,
              saved_image_folder, iteration, logger, args):
     netG.eval()
     netD.eval()
     start = time()
     with torch.no_grad():
         fixed_noise_fake_images = netG(fixed_noise)
-        D_noise = netD(fixed_noise_fake_images)
-        D_train = netD(debug_fixed_reals)
-        D_test = netD(debug_fixed_reals_test)
-        logger.log({'D_train': D_train.mean().item(),
-                   'D_test':D_test.mean().item(),
-                   'D_noise': D_noise.mean().item(),
-                   # 'rv': (D_train.mean().item() - D_test.mean().item()) / (D_train.mean().item() - D_noise.mean().item()),
-                   # 'rt': (D_train.sign().mean().item()),
-                   # 'train\\test': (D_train.mean().item() / D_test.mean().item()),
-                   # 'train\\fake': (D_train.mean().item() / D_noise.mean().item())
+        D_fake = netD(fixed_noise_fake_images)
+        D_real = netD(debug_fixed_reals)
+        logger.log({'D_real': D_real.mean().item(),
+                   'D_fake': D_fake.mean().item(),
                    }, step=iteration)
 
-        if args.ensemble_models != 1:
-            logger.log({'Ensemble_STD_real_train': netD(debug_fixed_reals, return_std=True)[1],
-                       'Ensemble_STD_fixed_noise': netD(fixed_noise_fake_images, return_std=True)[1],
-                       }, step=iteration)
         
         if args.fid_n_batches > 0 and iteration % args.fid_freq == 0:
             fake_batches = [netG(torch.randn_like(fixed_noise).to(device)) for _ in range(args.fid_n_batches)]
@@ -162,14 +150,12 @@ def evaluate(netG, netD, inception_metrics, other_metrics, fixed_noise, debug_fi
         for metric in other_metrics:
             logger.log({
                 f'{metric.name}_fixed_noise_gen_to_train': metric(fixed_noise_fake_images, debug_fixed_reals),
-                f'{metric.name}_fixed_noise_gen_to_test': metric(fixed_noise_fake_images, debug_fixed_reals_test),
             }, step=iteration)
 
         nrow = int(sqrt(args.batch_size))
         dump_images(fixed_noise_fake_images,  f'{saved_image_folder}/{iteration}.png', nrow=nrow)
         if iteration == 0:
             dump_images(debug_fixed_reals, f'{saved_image_folder}/debug_fixed_reals.png', nrow=nrow)
-            dump_images(debug_fixed_reals_test, f'{saved_image_folder}/debug_fixed_reals_test.png', nrow=nrow)
 
     netG.train()
     netD.train()
@@ -191,8 +177,6 @@ if __name__ == "__main__":
     parser.add_argument('--im_size', default=64, type=int)
     parser.add_argument('--z_dim', default=64, type=int)
     parser.add_argument('--spectral_normalization', action='store_true', default=False)
-    parser.add_argument('--ensemble_models', default=1, type=int)
-    parser.add_argument('--stochastic_ensemble', action='store_true', default=False)
 
     # Training
     parser.add_argument('--batch_size', default=64, type=int)
@@ -212,8 +196,8 @@ if __name__ == "__main__":
     parser.add_argument('--log_freq', default=1000, type=int)
     parser.add_argument('--save_every', action='store_true', default=False)
     parser.add_argument('--fid_freq', default=10000, type=int)
-    parser.add_argument('--fid_n_batches', default=0, type=int, help="How many batches of train/test to compute "
-                                                                     "reference FID statistics (0 turns off FID)")
+    parser.add_argument('--fid_n_batches', default=0, type=int, help="How many batches batches for reference FID"
+                                                                     " statistics (0 turns off FID)")
 
     # Other
     parser.add_argument('--project_name', default='GANs')
@@ -235,8 +219,8 @@ if __name__ == "__main__":
 
     saved_model_folder, saved_image_folder, plots_image_folder = get_dir(args)
 
-    train_loader, test_loader = get_dataloader(args.data_path, args.im_size, args.batch_size, args.n_workers,
-                                               val_percentage=0.01,
+    train_loader, _ = get_dataloader(args.data_path, args.im_size, args.batch_size, args.n_workers,
+                                               val_percentage=0,
                                                load_to_memory=args.load_data_to_memory)
 
     train_GAN(args)

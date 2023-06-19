@@ -2,7 +2,6 @@ import argparse
 import importlib
 
 from utils.common import parse_classnames_and_kwargs
-from models.model_utils.discriminator_ensamble import Ensemble, StochasticEnsemble
 
 
 def get_models(args, device):
@@ -15,12 +14,6 @@ def get_models(args, device):
     if args.spectral_normalization:
         from models.model_utils.spectral_normalization import make_model_spectral_normalized
         netD = make_model_spectral_normalized(netD)
-
-    if args.ensemble_models != 1:
-        if args.stochastic_ensemble:
-            netD = StochasticEnsemble(netD, args.ensemble_models)
-        else:
-            netD = Ensemble(netD, args.ensemble_models)
 
     print(f"G params: {print_num_params(netG)}, D params: {print_num_params(netD)}", )
 

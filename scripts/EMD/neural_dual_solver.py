@@ -16,8 +16,6 @@ from utils.logger import get_dir, PLTLogger, WandbLogger
 def get_models_and_optimizers(args):
     args.gen_arch = "FC"
     args.z_dim =  100
-    args.ensemble_models =  1
-    args.stochastic_ensemble =  False
     _, netD = get_models(args, device)
     netD.train()
 
