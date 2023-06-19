@@ -86,9 +86,9 @@ def train_GAN(args):
         if iteration % args.D_step_every == 0 and args.D_step_every > 0:
             Dloss, debug_Dlosses = loss_function.trainD(netD, real_images, fake_images)
             if args.gp_weight > 0:
-                gp, gradient_norm = args.gp_weight * calc_gradient_penalty(netD, real_images, fake_images)
-                debug_Dlosses['gradient_norm'] = gradient_norm.item()
-                Dloss += gp
+                gp, gradient_norm = calc_gradient_penalty(netD, real_images, fake_images)
+                debug_Dlosses['gradient_norm'] = gradient_norm
+                Dloss += args.gp_weight * gp
             netD.zero_grad()
             Dloss.backward()
             optimizerD.step()

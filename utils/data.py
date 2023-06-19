@@ -114,6 +114,8 @@ def get_dataloader(data_root, im_size, batch_size, n_workers, val_percentage=0.1
                                      pin_memory=True)
 
     if infinite_sampler:
-        return iter(train_loader), iter(test_loader)
-    else:
-        return train_loader, test_loader
+        train_loader =  iter(train_loader)
+        if test_loader is not None:
+            test_loader = iter(test_loader)
+
+    return train_loader, test_loader
