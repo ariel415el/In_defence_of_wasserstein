@@ -87,7 +87,7 @@ def set_layer(model, name, layer):
 def make_model_spectral_normalized(model):
     for name, module in model.named_modules():
         if isinstance(module, torch.nn.Linear):
-            new_conv = SNLinear(in_features=module.in_features, out_features=module.out_features, bias=module.bias)
+            new_conv = SNLinear(in_features=module.in_features, out_features=module.out_features, bias=module.bias is not None)
         elif isinstance(module, torch.nn.Conv2d):
             new_conv = SNConv2d(in_channels=module.in_channels,
                                 out_channels=module.out_channels,

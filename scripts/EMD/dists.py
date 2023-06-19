@@ -11,14 +11,14 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 from losses.loss_utils import get_dist_metric
 
 
-def emd(x,y, dist='L2'):
+def emd(x,y, dist='L2', numItermax=100000):
     uniform_x = np.ones(len(x)) / len(x)
     uniform_y = np.ones(len(y)) / len(y)
     # M = ot.dist(x, y) / x.shape[1]
     # M = efficient_L2_distances(x, y).cpu().numpy()
     dist_function = get_dist_metric(dist)
     M = batch_dist_matrix(x, y, b=512, dist_function=dist_function).cpu().numpy()
-    dist = ot.emd2(uniform_x, uniform_y, M)
+    dist = ot.emd2(uniform_x, uniform_y, M, numItermax=numItermax)
     # dist = ot.sinkhorn2(uniform_x, uniform_y, M, 1)
     return dist
 

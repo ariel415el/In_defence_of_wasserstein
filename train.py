@@ -180,7 +180,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     # Data
-    parser.add_argument('--data_path', default="/mnt/storage_ssd/datasets/FFHQ_1000/FFHQ_1000",
+    parser.add_argument('--data_path', default="/mnt/storage_ssd/datasets/FFHQ/FFHQ_1000/FFHQ_1000",
                         help="Path to train images")
     parser.add_argument('--center_crop', default=None, help='center_crop_data to specified size', type=int)
     parser.add_argument('--augmentation', default='', help="comma separated data augmentation ('color,translation')")

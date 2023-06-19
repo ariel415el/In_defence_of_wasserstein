@@ -1,5 +1,5 @@
 from scripts.EMD.dists import emd
-from utils import get_data
+from scripts.EMD.utils import get_data
 
 if __name__ == '__main__':
     data_path = '/mnt/storage_ssd/datasets/FFHQ/FFHQ_128/FFHQ_128'
