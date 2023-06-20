@@ -90,6 +90,11 @@ def train_GAN(args):
             netD.zero_grad()
             Dloss.backward()
             optimizerD.step()
+
+            if args.weight_clipping is not None:
+                for p in netD.parameters():
+                    p.data.clamp_(-args.weight_clipping, args.weight_clipping)
+
             logger.log(debug_Dlosses, step=iteration)
 
         if not args.no_fake_resample:
@@ -177,6 +182,7 @@ if __name__ == "__main__":
     parser.add_argument('--im_size', default=64, type=int)
     parser.add_argument('--z_dim', default=64, type=int)
     parser.add_argument('--spectral_normalization', action='store_true', default=False)
+    parser.add_argument('--weight_clipping', type=float, default=None)
 
     # Training
     parser.add_argument('--batch_size', default=64, type=int)
