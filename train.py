@@ -46,9 +46,9 @@ def get_models_and_optimizers(args):
 def train_GAN(args):
     logger = (WandbLogger if args.wandb else PLTLogger)(args, plots_image_folder)
     debug_fixed_noise = torch.randn((args.batch_size, args.z_dim)).to(device)
-    debug_fixed_reals = next(train_loader).to(device)
+    debug_fixed_reals = next(iter(train_loader)).to(device)
 
-    inception_metrics = InceptionMetrics([next(train_loader) for _ in range(args.fid_n_batches)], torch.device("cpu"))
+    inception_metrics = InceptionMetrics([next(iter(train_loader)) for _ in range(args.fid_n_batches)], torch.device("cpu"))
     other_metrics = [
                 # get_loss_function("BatchEMD-dist=L1"),
                 get_loss_function("BatchEMD-dist=L2"),
@@ -70,68 +70,72 @@ def train_GAN(args):
     avg_param_G = copy_G_params(netG)
 
     start = time()
-    for iteration in range(start_iteration, args.n_iterations + 1):
-        real_images = next(train_loader).to(device)
-        b = real_images.size(0)
+    iteration = start_iteration
+    while iteration < args.n_iterations:
+        for real_images in train_loader:
+            real_images = real_images.to(device)
+            b = real_images.size(0)
 
-        noise = torch.randn((b, args.z_dim)).to(device)
-        fake_images = netG(noise)
-
-        real_images = DiffAugment(real_images, policy=args.augmentation)
-        fake_images = DiffAugment(fake_images, policy=args.augmentation)
-
-        # #####  1. train Discriminator #####
-        if iteration % args.D_step_every == 0 and args.D_step_every > 0:
-            Dloss, debug_Dlosses = loss_function.trainD(netD, real_images, fake_images)
-            if args.gp_weight > 0:
-                gp, gradient_norm = calc_gradient_penalty(netD, real_images, fake_images)
-                debug_Dlosses['gradient_norm'] = gradient_norm
-                Dloss += args.gp_weight * gp
-            netD.zero_grad()
-            Dloss.backward()
-            optimizerD.step()
-
-            if args.weight_clipping is not None:
-                for p in netD.parameters():
-                    p.data.clamp_(-args.weight_clipping, args.weight_clipping)
-
-            logger.log(debug_Dlosses, step=iteration)
-
-        if not args.no_fake_resample:
             noise = torch.randn((b, args.z_dim)).to(device)
             fake_images = netG(noise)
+
+            real_images = DiffAugment(real_images, policy=args.augmentation)
             fake_images = DiffAugment(fake_images, policy=args.augmentation)
 
-        # #####  2. train Generator #####
-        if iteration % args.G_step_every == 0:
-            Gloss, debug_Glosses = loss_function.trainG(netD, real_images, fake_images)
-            netG.zero_grad()
-            Gloss.backward()
-            optimizerG.step()
-            logger.log(debug_Glosses, step=iteration)
+            # #####  1. train Discriminator #####
+            if iteration % args.D_step_every == 0 and args.D_step_every > 0:
+                Dloss, debug_Dlosses = loss_function.trainD(netD, real_images, fake_images)
+                if args.gp_weight > 0:
+                    gp, gradient_norm = calc_gradient_penalty(netD, real_images, fake_images)
+                    debug_Dlosses['gradient_norm'] = gradient_norm
+                    Dloss += args.gp_weight * gp
+                netD.zero_grad()
+                Dloss.backward()
+                optimizerD.step()
 
-        # Update avg weights
-        for p, avg_p in zip(netG.parameters(), avg_param_G):
-            avg_p.mul_(1 - args.avg_update_factor).add_(args.avg_update_factor * p.data)
+                if args.weight_clipping is not None:
+                    for p in netD.parameters():
+                        p.data.clamp_(-args.weight_clipping, args.weight_clipping)
 
-        if iteration % 100 == 0:
-            it_sec = max(1, iteration - start_iteration) / (time() - start)
-            print(f"Iteration: {iteration}: it/sec: {it_sec:.1f}")
-            logger.plot()
+                logger.log(debug_Dlosses, step=iteration)
+
+            if not args.no_fake_resample:
+                noise = torch.randn((b, args.z_dim)).to(device)
+                fake_images = netG(noise)
+                fake_images = DiffAugment(fake_images, policy=args.augmentation)
+
+            # #####  2. train Generator #####
+            if iteration % args.G_step_every == 0:
+                Gloss, debug_Glosses = loss_function.trainG(netD, real_images, fake_images)
+                netG.zero_grad()
+                Gloss.backward()
+                optimizerG.step()
+                logger.log(debug_Glosses, step=iteration)
+
+            # Update avg weights
+            for p, avg_p in zip(netG.parameters(), avg_param_G):
+                avg_p.mul_(1 - args.avg_update_factor).add_(args.avg_update_factor * p.data)
+
+            if iteration % 100 == 0:
+                it_sec = max(1, iteration - start_iteration) / (time() - start)
+                print(f"Iteration: {iteration}: it/sec: {it_sec:.1f}")
+                logger.plot()
 
 
-        if iteration % args.log_freq == 0:
-            backup_para = copy_G_params(netG)
-            load_params(netG, avg_param_G)
+            if iteration % args.log_freq == 0:
+                backup_para = copy_G_params(netG)
+                load_params(netG, avg_param_G)
 
-            evaluate(netG, netD, inception_metrics, other_metrics, debug_fixed_noise,
-                     debug_fixed_reals, saved_image_folder, iteration, logger, args)
-            fname = f"{saved_model_folder}/{'last' if not args.save_every else iteration}.pth"
-            torch.save({"iteration": iteration, 'netG': netG.state_dict(), 'netD': netD.state_dict(),
-                        "optimizerG":optimizerG.state_dict(), "optimizerD": optimizerD.state_dict()},
-                       fname)
+                evaluate(netG, netD, inception_metrics, other_metrics, debug_fixed_noise,
+                         debug_fixed_reals, saved_image_folder, iteration, logger, args)
+                fname = f"{saved_model_folder}/{'last' if not args.save_every else iteration}.pth"
+                torch.save({"iteration": iteration, 'netG': netG.state_dict(), 'netD': netD.state_dict(),
+                            "optimizerG":optimizerG.state_dict(), "optimizerD": optimizerD.state_dict()},
+                           fname)
 
-            load_params(netG, backup_para)
+                load_params(netG, backup_para)
+
+            iteration += 1
 
 
 def evaluate(netG, netD, inception_metrics, other_metrics, fixed_noise, debug_fixed_reals,

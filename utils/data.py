@@ -59,32 +59,7 @@ class DiskDataset(Dataset):
         return img
 
 
-def InfiniteSampler(n):
-    """Data sampler"""
-    i = n - 1
-    order = np.random.permutation(n)
-    while True:
-        yield order[i]
-        i += 1
-        if i >= n:
-            np.random.seed()
-            order = np.random.permutation(n)
-            i = 0
-
-
-class InfiniteSamplerWrapper(data.sampler.Sampler):
-    """Data sampler wrapper"""
-    def __init__(self, data_source):
-        self.num_samples = len(data_source)
-
-    def __iter__(self):
-        return iter(InfiniteSampler(self.num_samples))
-
-    def __len__(self):
-        return 2 ** 31
-
-
-def get_dataloader(data_root, im_size, batch_size, n_workers, val_percentage=0, load_to_memory=False, infinite_sampler=True):
+def get_dataloader(data_root, im_size, batch_size, n_workers, val_percentage=0, load_to_memory=False, drop_last=False):
     # paths = sorted([os.path.join(data_root, im_name) for im_name in os.listdir(data_root)])
     paths = [os.path.join(data_root, im_name) for im_name in os.listdir(data_root)]
     shuffle(paths)
@@ -98,24 +73,16 @@ def get_dataloader(data_root, im_size, batch_size, n_workers, val_percentage=0, 
     train_dataset = dataset_type(paths=train_paths, im_size=im_size)
     test_dataset = dataset_type(paths=test_paths, im_size=im_size)
 
-    sampler = lambda x: InfiniteSamplerWrapper(x) if infinite_sampler else None
     train_loader = DataLoader(train_dataset, batch_size=batch_size,
-                                 shuffle=False,
-                                 sampler=sampler(train_dataset),
+                                 shuffle=True,
                                  num_workers=n_workers,
-                                 pin_memory=True)
+                                 pin_memory=True, drop_last=drop_last)
 
     test_loader = None
     if val_percentage > 0:
         test_loader = DataLoader(test_dataset, batch_size=batch_size,
-                                     shuffle=False,
-                                     sampler=sampler(test_dataset),
+                                     shuffle=True,
                                      num_workers=n_workers,
-                                     pin_memory=True)
-
-    if infinite_sampler:
-        train_loader =  iter(train_loader)
-        if test_loader is not None:
-            test_loader = iter(test_loader)
+                                     pin_memory=True, drop_last=drop_last)
 
     return train_loader, test_loader
