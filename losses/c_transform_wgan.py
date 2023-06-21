@@ -16,7 +16,8 @@ class CtransformLoss:
         fs = critic(batch)
 
         # C = torch.mean(torch.abs(batch[:, None, ...] - gen_batch[None, ...]), dim=(2, 3, 4))
-        C = torch.sqrt(torch.sum((batch[:, None] - gen_batch[None, :]) ** 2, dim=(-3, -2,-1)))
+        C = ((batch[:, None] - gen_batch[None, :]) ** 2).reshape(len(batch), len(gen_batch), -1)
+        C = torch.sqrt(torch.sum(C, dim=-1))
 
         f_cs = torch.min(C - fs[:, None], dim=0)[0]
         ot = fs.mean() + f_cs.mean().mean()

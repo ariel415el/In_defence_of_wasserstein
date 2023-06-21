@@ -17,6 +17,7 @@ class PLTLogger:
         self.save_dir = save_dir
         os.makedirs(save_dir, exist_ok=True)
         self.data_avgs = defaultdict(list)
+        self.data_stds = defaultdict(list)
         self.data = defaultdict(list)
 
     def log(self, data_dict, step):
@@ -28,9 +29,15 @@ class PLTLogger:
         for k, v in self.data.items():
             if self.data[k]:
                 last_value = self.data[k][-1]
+                self.data_stds[k] += [np.std(self.data[k])]
                 self.data_avgs[k] += [np.mean(self.data[k])]
                 self.data[k] = []
-                plt.plot(np.arange(len(self.data_avgs[k])), self.data_avgs[k])
+                x = np.arange(len(self.data_avgs[k]))
+                plt.plot(x, self.data_avgs[k], label=k, color='b', alpha=0.75)
+                vals = np.array(self.data_avgs[k])
+                stds = np.array(self.data_stds[k])
+                plt.fill_between(x, vals - stds / 2, vals + stds / 2, alpha=0.15, color='b')
+
                 plt.title(k + f" Last value: {last_value:.5f}")
                 plt.savefig(self.save_dir + f"/{k}.png")
                 plt.clf()

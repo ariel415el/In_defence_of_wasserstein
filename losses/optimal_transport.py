@@ -22,7 +22,7 @@ def to_patches(x, p=8, s=4):
 
 
 class BatchEMD:
-    def __init__(self, dist='L1'):
+    def __init__(self, dist='L2'):
         self.metric = get_dist_metric(dist)
 
     def compute(self, images_X, images_Y):
@@ -49,7 +49,7 @@ class BatchEMD:
 
 class BatchPatchEMD:
     """Split images to patches and sample n_samples from each to compute on."""
-    def __init__(self, dist='L1', n_samples='all', p=5, s=1):
+    def __init__(self, dist='L2', n_samples='all', p=5, s=1):
         self.metric = get_dist_metric(dist)
         self.n_samples = int(n_samples if n_samples != "all" else -1)
         self.p = int(p)
