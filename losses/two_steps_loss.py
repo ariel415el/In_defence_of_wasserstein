@@ -60,7 +60,7 @@ class AmortizedDualWasserstein:
         sol = cvxopt.solvers.lp(self.ab, self.fi_gj, constraints, primalstart=self.pStart, solver='glpk')
 
         x = np.array(sol['x'])[:, 0]
-        x = x - x.mean()  # Since the solution is shift invariant we may as well take take the zero shirt one ( This is true only in the +- formulation not in ++)
+        x = x - x.mean()  # Since the solution is shift invariant we may as well take the zero shirt one ( This is true only in the +- formulation not in ++)
         fg = torch.from_numpy(x).to(reals.device).float()
         f = fg[:self.d]
         g = fg[self.d:]

@@ -231,7 +231,7 @@ if __name__ == "__main__":
 
     train_loader, _ = get_dataloader(args.data_path, args.im_size, args.batch_size, args.n_workers,
                                                val_percentage=0,
-                                               load_to_memory=args.load_data_to_memory)
+                                               load_to_memory=args.load_data_to_memory, drop_last=True)
 
     train_GAN(args)
 
