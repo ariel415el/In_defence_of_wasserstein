@@ -37,15 +37,15 @@ def train_dual_function(args):
     while iteration < args.n_iterations :
         batches_1 = iter(loader_1)
         batches_2 = iter(loader_2)
-        for j in range(min(len(loader_1), len(loader_2))):
+        for _ in range(min(len(loader_1), len(loader_2))):
             batch_1 = next(batches_1).to(device)
             batch_2 = next(batches_2).to(device)
+
             # #####  1. train Discriminator #####
             Dloss, debug_Dlosses = loss_function.trainD(netD, batch_1, batch_2)
             if args.gp_weight > 0:
                 gp, gradient_norm = calc_gradient_penalty(netD, batch_1, batch_2)
                 debug_Dlosses['gradient_norm'] = gradient_norm
-                debug_Dlosses['Normalized_W1'] = debug_Dlosses['W1'] / gradient_norm # TODO delete
                 Dloss +=  args.gp_weight * gp
             netD.zero_grad()
             Dloss.backward()
@@ -63,13 +63,12 @@ def train_dual_function(args):
                 logger.plot()
 
             if iteration > 0 and iteration % args.log_freq == 0:
-                _, gradient_norm = calc_gradient_penalty(netD, batch_1, batch_2)
-                evaluate(netD, loader_1, loader_2, iteration, logger, gradient_norm, args)
+                evaluate(netD, loader_1, loader_2, iteration, logger, args)
 
             iteration += 1
 
 
-def evaluate(netD, loader_1, loader_2, iteration, logger, gradient_norm, args):
+def evaluate(netD, loader_1, loader_2, iteration, logger, args):
     print("Evaluating", end="...")
     with torch.no_grad():
         netD.eval()
@@ -84,7 +83,6 @@ def evaluate(netD, loader_1, loader_2, iteration, logger, gradient_norm, args):
         w1 = w1 / (len(loader_1.dataset) + len(loader_2.dataset))
 
         logger.log({'Full-W1': w1.item()}, step=iteration)
-        logger.log({'Normzlied-Full-W1': w1.item() / gradient_norm}, step=iteration)
         netD.train()
     print(f"Evaluation finished in {time() - start} seconds")
 

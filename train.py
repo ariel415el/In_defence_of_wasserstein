@@ -60,7 +60,7 @@ def train_GAN(args):
                 # get_loss_function("BatchPatchSWD-p=9"),
                 # get_loss_function("BatchPatchSWD-p=17"),
                 # get_loss_function("BatchPatchSWD-p=33"),
-                LapSWD()
+                # LapSWD()
               ]
 
     loss_function = get_loss_function(args.loss_function)
@@ -121,7 +121,6 @@ def train_GAN(args):
                 print(f"Iteration: {iteration}: it/sec: {it_sec:.1f}")
                 logger.plot()
 
-
             if iteration % args.log_freq == 0:
                 backup_para = copy_G_params(netG)
                 load_params(netG, avg_param_G)
@@ -151,7 +150,6 @@ def evaluate(netG, netD, inception_metrics, other_metrics, fixed_noise, debug_fi
                    'D_fake': D_fake.mean().item(),
                    }, step=iteration)
 
-        
         if args.fid_n_batches > 0 and iteration % args.fid_freq == 0:
             fake_batches = [netG(torch.randn_like(fixed_noise).to(device)) for _ in range(args.fid_n_batches)]
             logger.log(inception_metrics(fake_batches), step=iteration)
@@ -161,10 +159,9 @@ def evaluate(netG, netD, inception_metrics, other_metrics, fixed_noise, debug_fi
                 f'{metric.name}_fixed_noise_gen_to_train': metric(fixed_noise_fake_images, debug_fixed_reals),
             }, step=iteration)
 
-        nrow = int(sqrt(args.batch_size))
-        dump_images(fixed_noise_fake_images,  f'{saved_image_folder}/{iteration}.png', nrow=nrow)
+        dump_images(fixed_noise_fake_images,  f'{saved_image_folder}/{iteration}.png')
         if iteration == 0:
-            dump_images(debug_fixed_reals, f'{saved_image_folder}/debug_fixed_reals.png', nrow=nrow)
+            dump_images(debug_fixed_reals, f'{saved_image_folder}/debug_fixed_reals.png')
 
     netG.train()
     netD.train()

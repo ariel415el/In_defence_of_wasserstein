@@ -1,5 +1,6 @@
 import sys
 from copy import deepcopy
+from math import sqrt
 
 import torch
 from torchvision.utils import save_image
@@ -28,5 +29,6 @@ def parse_classnames_and_kwargs(string, kwargs=None):
     return class_name, kwargs
 
 
-def dump_images(batch, fname, nrow):
+def dump_images(batch, fname):
+    nrow = int(sqrt(len(batch)))
     save_image((batch + 1)/2, fname, nrow=nrow, normalize=False, pad_value=1, scale_each=True)

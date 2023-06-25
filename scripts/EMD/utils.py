@@ -15,7 +15,6 @@ def get_data(data_path, im_size=None, c=3, flatten=True, limit_data=10000):
         image_paths = [data_path]
 
 
-
     transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Resize(im_size) if im_size is not None else transforms.Lambda(lambda x: x),
