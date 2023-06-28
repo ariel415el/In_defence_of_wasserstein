@@ -38,7 +38,7 @@ class PLTLogger:
                 stds = np.array(self.data_stds[k])
                 plt.fill_between(x, vals - stds / 2, vals + stds / 2, alpha=0.15, color='b')
 
-                plt.title(k + f" Last value: {last_value:.5f}")
+                plt.title(k + f"\n Last value: {last_value:.5f}")
                 plt.savefig(self.save_dir + f"/{k}.png")
                 plt.clf()
 

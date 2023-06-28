@@ -28,7 +28,7 @@ def get_models_and_optimizers(args):
     optimizerG = optim.Adam(netG.parameters(), lr=args.lrG, betas=(0.5, 0.9))
     optimizerD = optim.Adam(netD.parameters(), lr=args.lrD, betas=(0.5, 0.9))
 
-    # netG.load_state_dict(torch.load('/cs/labs/yweiss/ariel1/repos/DataEfficientGANs/outputs/GANs/FFHQ_128_64x64_G-pixels_D-FC_L-WGANLoss_Z-64_B-64_higher_lrs/models/last.pth')['netG'])
+    # netG.load_state_dict(torch.load('/home/ariel/university/repos/DataEfficientGANs/outputs/GANs/FFHQ_128_64x64_G-pixels-n=4_D-DCGAN_L-BatchEMD_Z-64_B-64_test/models/last.pth')['netG'])
     start_iteration = 0
     if args.resume_last_ckpt:
         ckpts = glob.glob(f'{saved_model_folder}/*.pth')
@@ -51,16 +51,8 @@ def train_GAN(args):
 
     inception_metrics = InceptionMetrics([next(iter(train_loader)) for _ in range(args.fid_n_batches)], torch.device("cpu"))
     other_metrics = [
-                # get_loss_function("BatchEMD-dist=L1"),
                 get_loss_function("BatchEMD-dist=L2"),
-                # get_loss_function("BatchEMD-dist=vgg"),
-                # get_loss_function("BatchEMD-dist=inception"),
-                # get_loss_function("BatchPatchEMD-p=9"),
-                # get_loss_function("BatchPatchEMD-p=17"),
-                # get_loss_function("BatchPatchEMD-p=33"),
-                # get_loss_function("BatchPatchSWD-p=9"),
-                # get_loss_function("BatchPatchSWD-p=17"),
-                # get_loss_function("BatchPatchSWD-p=33"),
+                get_loss_function("BatchPatchEMD-dist=L2-p=16-s=16-n_samples=1024"),
                 # LapSWD()
               ]
 
@@ -90,6 +82,8 @@ def train_GAN(args):
                     gp, gradient_norm = calc_gradient_penalty(netD, real_images, fake_images)
                     debug_Dlosses['gradient_norm'] = gradient_norm
                     Dloss += args.gp_weight * gp
+                    if "W1" in debug_Dlosses:
+                        debug_Dlosses['normalized W1'] = debug_Dlosses['W1'] /  gradient_norm
                 netD.zero_grad()
                 Dloss.backward()
                 optimizerD.step()

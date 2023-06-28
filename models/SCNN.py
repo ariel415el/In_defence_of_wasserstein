@@ -3,17 +3,18 @@ from torch import nn
 
 class Discriminator(nn.Module):
     def __init__(self, input_dim=64,
-                 ksize=7,
-                 hdim=128,
-                 n_local_layers=4,
-                 stride=1,
+                 p: int=7,
+                 hdim: int =128,
+                 depth: int =4,
+                 s: int =1,
                  normalize='none'):
         super().__init__()
-        ksize = int(ksize)
-        stride = int(stride)
-        # layers = [nn.Conv2d(3, hdim, ksize, stride=stride, padding=ksize // 2)]
-        layers = [nn.Conv2d(3, hdim, ksize, stride=stride, padding=0), nn.LeakyReLU(0.2)]
-        for i in range(n_local_layers):
+        p = int(p)
+        s = int(s)
+        depth = int(depth)
+        hdim = int(hdim)
+        layers = [nn.Conv2d(3, hdim, p, stride=s, padding=0), nn.LeakyReLU(0.2)]
+        for i in range(depth):
             layers.append(nn.Conv2d(hdim, hdim, 1))
 
             if normalize == "bn":
