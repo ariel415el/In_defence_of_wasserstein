@@ -42,6 +42,9 @@ class PLTLogger:
                 plt.savefig(self.save_dir + f"/{k}.png")
                 plt.clf()
 
+            f = open(f'{self.save_dir}/{k}.pkl', 'wb')
+            pickle.dump(self.data_avgs[k], f)
+
 
 class WandbLogger:
     def __init__(self, args, save_dir):
