@@ -59,9 +59,11 @@ class DiskDataset(Dataset):
         return img
 
 
-def get_dataloader(data_root, im_size, batch_size, n_workers, val_percentage=0, load_to_memory=False, drop_last=False):
+def get_dataloader(data_root, im_size, batch_size, n_workers, val_percentage=0, load_to_memory=False, drop_last=False, limit_data=None):
     # paths = sorted([os.path.join(data_root, im_name) for im_name in os.listdir(data_root)])
     paths = [os.path.join(data_root, im_name) for im_name in os.listdir(data_root)]
+    if limit_data is not None:
+        paths = paths[:limit_data]
     shuffle(paths)
 
     n_val_images = int(val_percentage * len(paths))

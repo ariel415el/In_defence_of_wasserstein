@@ -28,6 +28,7 @@ def get_models_and_optimizers(args):
     optimizerG = optim.Adam(netG.parameters(), lr=args.lrG, betas=(0.5, 0.9))
     optimizerD = optim.Adam(netD.parameters(), lr=args.lrD, betas=(0.5, 0.9))
 
+    # netG.load_state_dict(torch.load('/cs/labs/yweiss/ariel1/repos/DataEfficientGANs/outputs/GANs/FFHQ_128_64x64_G-pixels_D-FC_L-WGANLoss_Z-64_B-64_higher_lrs/models/last.pth')['netG'])
     start_iteration = 0
     if args.resume_last_ckpt:
         ckpts = glob.glob(f'{saved_model_folder}/*.pth')
@@ -176,6 +177,7 @@ if __name__ == "__main__":
                         help="Path to train images")
     parser.add_argument('--center_crop', default=None, help='center_crop_data to specified size', type=int)
     parser.add_argument('--augmentation', default='', help="comma separated data augmentation ('color,translation')")
+    parser.add_argument('--limit_data', default=None, type=int, help="limit the size of the dataset")
 
     # Model
     parser.add_argument('--gen_arch', default='DCGAN')
@@ -228,7 +230,7 @@ if __name__ == "__main__":
 
     train_loader, _ = get_dataloader(args.data_path, args.im_size, args.batch_size, args.n_workers,
                                                val_percentage=0,
-                                               load_to_memory=args.load_data_to_memory, drop_last=True)
+                                               load_to_memory=args.load_data_to_memory, drop_last=True, limit_data=args.limit_data)
 
     train_GAN(args)
 

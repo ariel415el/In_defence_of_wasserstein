@@ -58,7 +58,7 @@ class L2:
     def __call__(self, X, Y):
         assert len(X.shape) == len(Y.shape) == 2
         dist = (X * X).sum(1)[:, None] + (Y * Y).sum(1)[None, :] - 2.0 * torch.mm(X, torch.transpose(Y, 0, 1))
-        dist = torch.sqrt(dist)
+        dist = torch.sqrt(torch.clamp(dist, min=1e-10)) # When loss is 0 the gradient of sqrt is nan
         return dist
 
 
