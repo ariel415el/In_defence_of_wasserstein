@@ -59,7 +59,7 @@ class DiskDataset(Dataset):
         return img
 
 
-def get_dataloader(data_root, im_size, batch_size, n_workers, val_percentage=0, load_to_memory=False, drop_last=False, limit_data=None):
+def get_dataloader(data_root, im_size, batch_size, n_workers, val_percentage=0, load_to_memory=False, limit_data=None):
     # paths = sorted([os.path.join(data_root, im_name) for im_name in os.listdir(data_root)])
     paths = [os.path.join(data_root, im_name) for im_name in os.listdir(data_root)]
     if limit_data is not None:
@@ -74,7 +74,7 @@ def get_dataloader(data_root, im_size, batch_size, n_workers, val_percentage=0, 
 
     train_dataset = dataset_type(paths=train_paths, im_size=im_size)
     test_dataset = dataset_type(paths=test_paths, im_size=im_size)
-
+    drop_last = (not limit_data) or (limit_data != batch_size)
     train_loader = DataLoader(train_dataset, batch_size=batch_size,
                                  shuffle=True,
                                  num_workers=n_workers,

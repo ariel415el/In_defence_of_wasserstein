@@ -22,4 +22,9 @@ def get_data(data_root, im_size, center_crop, limit_data=None):
         im = T(im)
         images += [im]
 
-    return torch.stack(images)
+    data = torch.stack(images)
+
+    if data.shape[1] == 1:
+        data = data.repeat(1,3,1,1)
+
+    return data

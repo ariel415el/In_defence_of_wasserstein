@@ -3,6 +3,7 @@ from copy import deepcopy
 
 import numpy as np
 import torch
+from matplotlib import pyplot as plt
 from torchvision import utils as vutils
 
 
@@ -76,3 +77,18 @@ def saliency_maps(netG, netD, z_dim, data, outputs_dir, device):
 
         vutils.save_image(get_score_gradient_map(GuidedBackprop(netD), data),
                           f'{outputs_dir}/discriminator_visualization/{name}_guided_gradients.png', nrow=nrow, normalize=True)
+
+
+def test_range(netG, netD, z_dim, data, outputs_dir, device):
+    os.makedirs(f"{outputs_dir}/discriminator_visualization", exist_ok=True)
+    with torch.no_grad():
+        reals = []
+        fakes = []
+        for i in range(len(data)):
+            reals.append(netD(data[i].unsqueeze(0)).item())
+            fakes.append(netD(netG(torch.randn((1, z_dim), device=device))).item())
+
+    plt.plot(np.arange(len(data)), reals, label='reals', color='b')
+    plt.plot(np.arange(len(data)), fakes, label='fakes', color='r')
+    plt.legend()
+    plt.savefig(f'{outputs_dir}/discriminator_visualization/disc_range.png')

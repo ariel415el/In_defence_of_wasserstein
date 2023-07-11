@@ -71,7 +71,7 @@ def find_patch_nns(G, z_dim, data, patch_size, stride, search_margin, outputs_di
             vutils.save_image(x.add(1).mul(0.5), f'{out_dir}/patches-{j}.png', normalize=False, nrow=len(q_patches))
 
 
-def find_nns(G, z_dim, data, outputs_dir, device):
+def find_nns_percept(G, z_dim, data, outputs_dir, device):
     with torch.no_grad():
         vgg_fe = vgg_dist_calculator(layer_idx=9, device=device)
         # percept = lpips.LPIPS(net='vgg', lpips=False).to(device)
@@ -90,5 +90,20 @@ def find_nns(G, z_dim, data, outputs_dir, device):
         vutils.save_image(torch.cat(results, dim=0).add(1).mul(0.5), f'{outputs_dir}/nns/im.png', normalize=False, nrow=5)
 
 
+def find_nns(G, z_dim, data, outputs_dir, device):
+    with torch.no_grad():
+        os.makedirs(f'{outputs_dir}/nns', exist_ok=True)
+        results = []
+        n_examples = 100
+        fake_image = G(torch.randn((n_examples, z_dim), device=device))
+        # dists_mat = (fake_image - data).pow(2).sum(dim=(1,2,3)).numpy()#
+        for i in range(n_examples):
+            # dists = dists_mat[i]
+            dists = [(fake_image[i] - data[j]).pow(2).sum().item() for j in range(len(data))]
+            nn_indices = np.argsort(dists)
+            nns = data[nn_indices[:4]]
+            results.append(torch.cat([fake_image[i].unsqueeze(0), nns]))
+
+        vutils.save_image(torch.cat(results, dim=0).add(1).mul(0.5), f'{outputs_dir}/nns/im.png', normalize=False, nrow=5)
 
 

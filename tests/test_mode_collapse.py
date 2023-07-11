@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from torchvision import utils as vutils
 
-from losses.loss_utils import vgg_dist_calculator
+from losses.loss_utils import vgg_dist_calculator, L2
 
 
 def find_mode_collapses(G, D, z_dim, outputs_dir, device):
@@ -14,12 +14,14 @@ def find_mode_collapses(G, D, z_dim, outputs_dir, device):
     """
     with torch.no_grad():
         os.makedirs(f"{outputs_dir}/mode_collapses", exist_ok=True)
-        b = 256
+        b = 100
         fixed_noise = torch.randn((b, z_dim), device=device)
         g_images = G(fixed_noise)
 
-        calc = vgg_dist_calculator(layer_idx=9)
-        dists_mat = calc(g_images, g_images)
+        # calc = vgg_dist_calculator(layer_idx=9)
+        # dists_mat = calc(g_images, g_images)
+        calc = L2()
+        dists_mat = calc(g_images.reshape(b, -1), g_images.reshape(b, -1))
 
         second_NN_indices = torch.argsort(dists_mat, dim=1)[:, 1]
 

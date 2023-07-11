@@ -10,7 +10,7 @@ from tests.test_data_NNs import find_nns, find_patch_nns
 # from tests.latent_inversion import inverse_image
 from tests.test_mode_collapse import find_mode_collapses
 from tests.test_utils import get_data
-from tests.test_discriminator import saliency_maps
+from tests.test_discriminator import saliency_maps, test_range
 
 
 def load_pretrained_models(args, ckpt_path, device):
@@ -27,10 +27,11 @@ def load_pretrained_models(args, ckpt_path, device):
 
     return netG, netD
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('model_dir', help="Path to trained model dir")
-    parser.add_argument('--ckpt_name', default='1000', type=str)
+    parser.add_argument('--ckpt_name', default='last', type=str)
     parser.add_argument('--device', default="cpu")
     args = parser.parse_args()
     model_dir = args.model_dir
@@ -48,18 +49,17 @@ if __name__ == '__main__':
     print("Done")
 
     # No data tests
-    find_mode_collapses(netG, netD, z_dim, outputs_dir, device)
-    interpolate(netG, z_dim, n_zs=15, steps=25, outputs_dir=outputs_dir, device=device)
+    # find_mode_collapses(netG, netD, z_dim, outputs_dir, device)
+    # interpolate(netG, z_dim, n_zs=15, steps=25, outputs_dir=outputs_dir, device=device)
 
-    # # partial data tests
-    data = get_data(args['data_path'], args['im_size'], args['center_crop'], limit_data=9).to(device)
+    # Partial data tests
+    # data = get_data(args['data_path'], args['im_size'], args['center_crop'], limit_data=9).to(device)
     # saliency_maps(netG, netD, z_dim, data, outputs_dir, device)
+    # test_range(netG, netD, z_dim, data, outputs_dir, device)
     # inverse_image(netG, z_dim, data, outputs_dir=outputs_dir, device=device)
 
     # Full data tests
-    data = get_data(args['data_path'], args['im_size'], args['center_crop'], limit_data=None)
-    data = data.to(device)
-
+    data = get_data(args['data_path'], args['im_size'], args['center_crop'], limit_data=50000).to(device)
     find_nns(netG, z_dim, data, outputs_dir=outputs_dir, device=device)
     find_patch_nns(netG, z_dim, data, patch_size=16, stride=4, search_margin=6, outputs_dir=outputs_dir, device=device)
     find_patch_nns(netG, z_dim, data, patch_size=24, stride=4, search_margin=6, outputs_dir=outputs_dir, device=device)

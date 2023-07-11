@@ -28,7 +28,7 @@ def get_models_and_optimizers(args):
     optimizerG = optim.Adam(netG.parameters(), lr=args.lrG, betas=(0.5, 0.9))
     optimizerD = optim.Adam(netD.parameters(), lr=args.lrD, betas=(0.5, 0.9))
 
-    # netG.load_state_dict(torch.load('/home/ariel/university/repos/DataEfficientGANs/outputs/GANs/FFHQ_128_64x64_G-pixels-n=4_D-DCGAN_L-BatchEMD_Z-64_B-64_test/models/last.pth')['netG'])
+    # netG.load_state_dict(torch.load('path')['netG'])
     start_iteration = 0
     if args.resume_last_ckpt:
         ckpts = glob.glob(f'{saved_model_folder}/*.pth')
@@ -224,7 +224,7 @@ if __name__ == "__main__":
 
     train_loader, _ = get_dataloader(args.data_path, args.im_size, args.batch_size, args.n_workers,
                                                val_percentage=0,
-                                               load_to_memory=args.load_data_to_memory, drop_last=True, limit_data=args.limit_data)
+                                               load_to_memory=args.load_data_to_memory, limit_data=args.limit_data)
 
     train_GAN(args)
 

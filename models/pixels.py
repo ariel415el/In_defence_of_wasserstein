@@ -3,10 +3,9 @@ from torch import nn
 
 
 class Generator(nn.Module):
-    def __init__(self, z_dim, output_dim, n=64, b=64, init_mode='noise'):
+    def __init__(self, z_dim, output_dim, n=64, init_mode='noise'):
         super(Generator, self).__init__()
         self.n = int(n)
-        self.b = int(b)
         if init_mode == "noise":
             images = torch.randn(self.n, 3 ,output_dim, output_dim) * 0.5
         elif init_mode == "ones":
@@ -19,8 +18,10 @@ class Generator(nn.Module):
         # self.clip()
 
     def forward(self, input):
-        if self.b < self.n:
-            outputs = self.images[torch.randperm(self.n)[:self.b]]
+        b = input.shape[0]
+        if b < self.n:
+
+            outputs = self.images[torch.randperm(self.n)[:b]]
         else:
             outputs = self.images
         return torch.tanh(outputs)
