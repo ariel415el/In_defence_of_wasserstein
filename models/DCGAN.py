@@ -18,7 +18,7 @@ def conv_block(c_in, c_out, k_size, stride, pad, normalize='in', transpose=False
 
 
 class Generator(nn.Module):
-    def __init__(self, z_dim, output_dim=64, nf='64',  normalize='none', **kwargs):
+    def __init__(self, z_dim, output_dim=64, nf=64,  normalize='none', **kwargs):
         super(Generator, self).__init__()
         channels = 3
         nf = int(nf)
@@ -93,4 +93,4 @@ class Discriminator(nn.Module):
 
 if __name__ == '__main__':
     netD = Discriminator(bn=False)
-    x = 1
+    netD(torch.ones(5,3,32,32))

@@ -12,7 +12,7 @@ def compute_receptive_field(depth, k):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, input_dim, depth=3, nf=64, normalize='in', k=3, pad=0, **kwargs):
+    def __init__(self, input_dim, depth=3, nf=64, normalize='none', k=3, pad=0, **kwargs):
         super(Discriminator, self).__init__()
         channels=3
         depth = int(depth)
@@ -42,7 +42,7 @@ class Discriminator(nn.Module):
 
 
 if __name__ == '__main__':
-    print(compute_receptive_field(3, 3))
+    print(compute_receptive_field(3, 4))
     x = torch.ones(5,3,23,15)
     D = Discriminator(None, depth=3, k=3, normalize='none')
 

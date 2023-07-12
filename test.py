@@ -5,8 +5,10 @@ import os
 import torch
 
 from models import get_models
+from tests.generate_images import generate_images
 from tests.interpolate import interpolate
 from tests.test_data_NNs import find_nns, find_patch_nns
+from tests.test_emd import test_emd
 # from tests.latent_inversion import inverse_image
 from tests.test_mode_collapse import find_mode_collapses
 from tests.test_utils import get_data
@@ -49,6 +51,7 @@ if __name__ == '__main__':
     print("Done")
 
     # No data tests
+    generate_images(netG, z_dim, outputs_dir, device)
     # find_mode_collapses(netG, netD, z_dim, outputs_dir, device)
     # interpolate(netG, z_dim, n_zs=15, steps=25, outputs_dir=outputs_dir, device=device)
 
@@ -60,7 +63,12 @@ if __name__ == '__main__':
 
     # Full data tests
     data = get_data(args['data_path'], args['im_size'], args['center_crop'], limit_data=50000).to(device)
-    find_nns(netG, z_dim, data, outputs_dir=outputs_dir, device=device)
-    find_patch_nns(netG, z_dim, data, patch_size=16, stride=4, search_margin=6, outputs_dir=outputs_dir, device=device)
-    find_patch_nns(netG, z_dim, data, patch_size=24, stride=4, search_margin=6, outputs_dir=outputs_dir, device=device)
+    test_emd(netG, z_dim, data, outputs_dir=outputs_dir, device=device)
+    # find_nns(netG, z_dim, data, outputs_dir=outputs_dir, device=device)
+    # find_patch_nns(netG, z_dim, data, patch_size=16, stride=4, search_margin=6, outputs_dir=outputs_dir, device=device)
+    # find_patch_nns(netG, z_dim, data, patch_size=24, stride=4, search_margin=6, outputs_dir=outputs_dir, device=device)
 
+
+# import os
+# for dname in os.listdir("outputs/GANs"):
+#     os.system(f"python3 test.py outputs/GANs/{dname}")
