@@ -6,7 +6,7 @@ def conv_block(c_in, c_out, k_size, stride, pad, normalize='in', transpose=False
     module = []
 
     conv_type = nn.ConvTranspose2d if transpose else nn.Conv2d
-    module.append(conv_type(c_in, c_out, k_size, stride, pad, bias=normalize is None))
+    module.append(conv_type(c_in, c_out, k_size, stride, pad, bias=normalize == 'none'))
 
     if normalize == "bn":
         module.append(nn.BatchNorm2d(c_out))

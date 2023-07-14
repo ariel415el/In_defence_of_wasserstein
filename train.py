@@ -44,9 +44,29 @@ def get_models_and_optimizers(args):
     return netG, netD, optimizerG, optimizerD, start_iteration
 
 
+class Prior:
+    def __init__(self, prior_type, z_dim):
+        self.prior_type = prior_type
+        self.z_dim = z_dim
+        if self.prior_type == "const":
+            self.z = None
+    def sample(self, b):
+        if self.prior_type == "const":
+            if self.z is None:
+                self.z = torch.randn((b, self.z_dim))
+            z = self.z
+        elif self.prior_type == "binary":
+            z = torch.sign(torch.randn((b, self.z_dim)))
+        elif self.prior_type == "uniform":
+            z = torch.rand((b, self.z_dim))
+        else:
+            z = torch.randn((b, self.z_dim))
+        return z
+
 def train_GAN(args):
     logger = (WandbLogger if args.wandb else PLTLogger)(args, plots_image_folder)
-    debug_fixed_noise = torch.randn((args.batch_size, args.z_dim)).to(device)
+    prior = Prior(args.z_prior, args.z_dim)
+    debug_fixed_noise = prior.sample(args.batch_size).to(device)
     debug_fixed_reals = next(iter(train_loader)).to(device)
 
     inception_metrics = InceptionMetrics([next(iter(train_loader)) for _ in range(args.fid_n_batches)], torch.device("cpu"))
@@ -69,7 +89,7 @@ def train_GAN(args):
             real_images = real_images.to(device)
             b = real_images.size(0)
 
-            noise = torch.randn((b, args.z_dim)).to(device)
+            noise = prior.sample(b).to(device)
             fake_images = netG(noise)
 
             real_images = DiffAugment(real_images, policy=args.augmentation)
@@ -95,7 +115,7 @@ def train_GAN(args):
                 logger.log(debug_Dlosses, step=iteration)
 
             if not args.no_fake_resample:
-                noise = torch.randn((b, args.z_dim)).to(device)
+                noise = prior.sample(b).to(device)
                 fake_images = netG(noise)
                 fake_images = DiffAugment(fake_images, policy=args.augmentation)
 
@@ -178,6 +198,7 @@ if __name__ == "__main__":
     parser.add_argument('--disc_arch', default='DCGAN')
     parser.add_argument('--im_size', default=64, type=int)
     parser.add_argument('--z_dim', default=64, type=int)
+    parser.add_argument('--z_prior', default="normal", type=str, help="[normal, binary, uniform]")
     parser.add_argument('--spectral_normalization', action='store_true', default=False)
     parser.add_argument('--weight_clipping', type=float, default=None)
 
@@ -213,8 +234,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    args.name = f"{os.path.basename(args.data_path)}_{args.im_size}x{args.im_size}_G-{args.gen_arch}" \
-                f"_D-{args.disc_arch}_L-{args.loss_function}_Z-{args.z_dim}_B-{args.batch_size}_{args.tag}"
+    args.name = f"{os.path.basename(args.data_path)}_I-{args.im_size}x{args.im_size}_G-{args.gen_arch}" \
+                f"_D-{args.disc_arch}_L-{args.loss_function}_Z-{args.z_dim}x{args.z_prior}_B-{args.batch_size}_{args.tag}"
 
     device = torch.device(args.device)
     if args.device != 'cpu':

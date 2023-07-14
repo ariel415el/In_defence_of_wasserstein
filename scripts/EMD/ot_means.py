@@ -20,6 +20,9 @@ def get_ot_plan(C):
 def dist_mat(X, Y):
     return ((X * X).sum(1)[:, None] + (Y * Y).sum(1)[None, :] - 2.0 * X @ Y.T)**0.5
 
+def compute_means(ot_map, data, k):
+    return (ot_map[:,:, None] * data[None, ] * k).sum(1)
+
 def ot_means(data, k, n_iters):
     data = data.reshape(len(data), -1).numpy()
     centroids = np.random.randn(k, data.shape[-1]) * 0.5
@@ -28,11 +31,37 @@ def ot_means(data, k, n_iters):
     for i in pbar:
         C =  dist_mat(centroids, data)
         ot_map = get_ot_plan(C)
-        centroids = (ot_map[:,:, None] * data[None, ] * k).sum(1)
+        centroids = compute_means(ot_map, data, k)
+
+        C =  dist_mat(centroids, data)
         loss = np.sum(ot_map * C)
         losses.append(loss)
         pbar.set_description(f"Loss: {loss}")
         dump_images(torch.from_numpy(centroids), 64, 64, 3, f"outputs/OTMeans-{i}.png")
+    return losses
+
+def weisfeld_step(X, dist, W):
+    nominator = (W / dist) @ X         ## np.allclose(nominator[0],((1/C)[0][:, None] * data).sum(0))
+    denominator = (W / dist).sum(1)[:, None]
+    new_centroids = nominator / denominator
+    return new_centroids
+
+def ot_means_weisfeld(data, k, n_iters, n_weisfeld):
+    data = data.reshape(len(data), -1).numpy()
+    centroids = np.random.randn(k, data.shape[-1]) * 0.5
+    losses = []
+    pbar = tqdm(range(n_iters))
+    for i in pbar:
+        for j in range(n_weisfeld):
+            C = dist_mat(centroids, data)
+            ot_map = get_ot_plan(C)
+            centroids = weisfeld_step(data, C, ot_map)
+        C = dist_mat(centroids, data)
+        ot_map = get_ot_plan(C)
+        loss = np.sum(ot_map * C)
+        losses.append(loss)
+        pbar.set_description(f"Loss: {loss}")
+        dump_images(torch.from_numpy(centroids), 64, 64, 3, f"outputs/OTMeans_weisfeld-{i}.png")
     return losses
 
 
@@ -80,11 +109,13 @@ if __name__ == "__main__":
 
     data = get_data(args.data_path, args.im_size, 3)
 
-    losses_pixel_ot = pixel_ot(data, args.k, 250)
+    # losses_pixel_ot = pixel_ot(data, args.k, 250)
+    losses_ot_weisfeld_means = ot_means_weisfeld(data, args.k, 10, 25)
     losses_ot_means = ot_means(data, args.k, 10)
 
-    plt.plot(np.arange(len(losses_pixel_ot)), losses_pixel_ot, label="PixelOT", color="r")
+    # plt.plot(np.arange(len(losses_pixel_ot)), losses_pixel_ot, label="PixelOT", color="r")
     plt.plot(np.arange(len(losses_ot_means)), losses_ot_means, label="OTMeans", color="b")
+    plt.plot(np.arange(len(losses_ot_weisfeld_means)), losses_ot_weisfeld_means, label="OTMeansWeisfeld", color="g")
     plt.legend()
     plt.savefig("Losses.png")
     plt.clf()

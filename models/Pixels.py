@@ -19,7 +19,7 @@ class Generator(nn.Module):
 
     def forward(self, input):
         b = input.shape[0]
-        if b < self.n:
+        if b != self.n:
             outputs = self.images[hash_vectors(input.detach(), n=self.n)]
             # outputs = self.images[torch.randperm(self.n)[:b]]
         else:
