@@ -90,7 +90,7 @@ def find_nns_percept(G, z_dim, data, outputs_dir, device):
         vutils.save_image(torch.cat(results, dim=0).add(1).mul(0.5), f'{outputs_dir}/nns/im.png', normalize=False, nrow=5)
 
 
-def find_nns(G, z_dim, data, outputs_dir, device):
+def find_nns(G, z_dim, data, outputs_dir, device, show_first_n=2):
     with torch.no_grad():
         os.makedirs(f'{outputs_dir}/nns', exist_ok=True)
         results = []
@@ -101,7 +101,7 @@ def find_nns(G, z_dim, data, outputs_dir, device):
             # dists = dists_mat[i]
             dists = [(fake_image[i] - data[j]).pow(2).sum().item() for j in range(len(data))]
             nn_indices = np.argsort(dists)
-            nns = data[nn_indices[:4]]
+            nns = data[nn_indices[:show_first_n]]
             results.append(torch.cat([fake_image[i].unsqueeze(0), nns]))
 
         vutils.save_image(torch.cat(results, dim=0).add(1).mul(0.5), f'{outputs_dir}/nns/im.png', normalize=False, nrow=5)

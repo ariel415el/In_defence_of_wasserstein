@@ -34,10 +34,10 @@ def compute_distances_batch(X, Y, b):
 
     return dist_mat
 def test_emd(G, z_dim, data, outputs_dir, device):
+    """Generate len(data) images and compute EMD (by finding NNs and computing distances)"""
     with torch.no_grad():
         n = len(data)
         fake_imgs = G(torch.randn((n, z_dim)).to(device))
-
 
         dists = compute_distances_batch(fake_imgs.reshape(n, -1), data.reshape(n, -1), b=128)
         nn_indices = torch.argsort(dists, dim=1)[:, 0]
@@ -52,7 +52,6 @@ def test_emd(G, z_dim, data, outputs_dir, device):
         n_samples = 5
         s = 3
         fig, axs = plt.subplots(n_samples, 4, figsize=(4*s, n_samples*s))
-
 
         perm = torch.from_numpy(np.load('/mnt/storage_ssd/datasets/FFHQ/FFHQ64_1000_shuffled/perm.npy'))
         inverser_perm = np.argsort(perm)

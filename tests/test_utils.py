@@ -7,9 +7,9 @@ from PIL import Image
 from utils.data import get_transforms
 
 
-def get_data(data_root, im_size, center_crop, limit_data=None):
+def get_data(data_root, im_size, center_crop, gray_scale, limit_data=None):
     """Load entire dataset to memory as a single batch"""
-    T = get_transforms(im_size, center_crop)
+    T = get_transforms(im_size, center_crop, gray_scale)
 
     images = []
     print("Loading data to memory to find NNs")
@@ -23,8 +23,5 @@ def get_data(data_root, im_size, center_crop, limit_data=None):
         images += [im]
 
     data = torch.stack(images)
-
-    if data.shape[1] == 1:
-        data = data.repeat(1,3,1,1)
 
     return data
