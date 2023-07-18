@@ -12,9 +12,10 @@ def block(in_feat, out_feat, normalize='in'):
 
 
 class Generator(nn.Module):
-    def __init__(self, z_dim, output_dim=64, nf=128, depth=4, normalize='none', **kwargs):
+    def __init__(self, z_dim, output_dim=64, nf=128, depth=4, normalize='none', channels=3):
         super(Generator, self).__init__()
         self.output_dim = output_dim
+        self.c = channels
         nf = int(nf)
         depth = int(depth)
 
@@ -23,22 +24,23 @@ class Generator(nn.Module):
         for i in range(depth - 1):
             layers += block(nf, nf, normalize=normalize)
 
-        layers += [nn.Linear(nf, 3*output_dim**2), nn.Tanh()]
+        layers += [nn.Linear(nf, self.c*output_dim**2), nn.Tanh()]
         self.model = nn.Sequential(*layers)
 
     def forward(self, z):
         img = self.model(z)
-        img = img.view(img.size(0), 3, self.output_dim, self.output_dim)
+        img = img.view(img.size(0), self.c, self.output_dim, self.output_dim)
         return img
 
 
 class Discriminator(nn.Module):
-    def __init__(self, input_dim=64,  nf=128, depth=2, normalize='none', **kwargs):
+    def __init__(self, input_dim=64,  nf=128, depth=2, normalize='none', channels=3, **kwargs):
         super(Discriminator, self).__init__()
+        self.c = channels
         nf = int(nf)
         depth = int(depth)
 
-        layers = block(3*input_dim**2, nf, normalize='none') # bn is not good for RGB values
+        layers = block(self.c*input_dim**2, nf, normalize='none') # bn is not good for RGB values
 
         for i in range(depth - 1):
             layers += block(nf, nf, normalize=normalize)

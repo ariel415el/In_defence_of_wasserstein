@@ -12,9 +12,8 @@ def compute_receptive_field(depth, k):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, input_dim, depth=3, nf=64, normalize='none', k=3, pad=0, **kwargs):
+    def __init__(self, input_dim, depth=3, nf=64, normalize='none', channels=3, k=3, pad=0, **kwargs):
         super(Discriminator, self).__init__()
-        channels=3
         depth = int(depth)
         nf = int(nf)
         k = int(k)

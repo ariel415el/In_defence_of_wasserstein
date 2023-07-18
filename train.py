@@ -102,8 +102,8 @@ def train_GAN(args):
                     gp, gradient_norm = calc_gradient_penalty(netD, real_images, fake_images)
                     debug_Dlosses['gradient_norm'] = gradient_norm
                     Dloss += args.gp_weight * gp
-                    if "W1" in debug_Dlosses:
-                        debug_Dlosses['normalized W1'] = debug_Dlosses['W1'] /  gradient_norm
+                    # if "W1" in debug_Dlosses:
+                    #     debug_Dlosses['normalized W1'] = debug_Dlosses['W1'] /  gradient_norm
                 netD.zero_grad()
                 Dloss.backward()
                 optimizerD.step()
@@ -189,9 +189,10 @@ if __name__ == "__main__":
     # Data
     parser.add_argument('--data_path', default="/mnt/storage_ssd/datasets/FFHQ/FFHQ_1000/FFHQ_1000",
                         help="Path to train images")
-    parser.add_argument('--center_crop', default=None, help='center_crop_data to specified size', type=int)
     parser.add_argument('--augmentation', default='', help="comma separated data augmentation ('color,translation')")
     parser.add_argument('--limit_data', default=None, type=int, help="limit the size of the dataset")
+    parser.add_argument('--center_crop', default=None, help='center_crop_data to specified size', type=int)
+    parser.add_argument('--gray_scale', action='store_true', default=False, help="Load data as grayscale")
 
     # Model
     parser.add_argument('--gen_arch', default='DCGAN')
@@ -235,6 +236,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     args.name = f"{os.path.basename(args.data_path)}_I-{args.im_size}x{args.im_size}_G-{args.gen_arch}" \
+                f"{'_GS' if args.gray_scale else ''}{f'_CC-{args.center_crop}' if args.center_crop else ''}" \
                 f"_D-{args.disc_arch}_L-{args.loss_function}_Z-{args.z_dim}x{args.z_prior}_B-{args.batch_size}_{args.tag}"
 
     device = torch.device(args.device)
@@ -244,7 +246,7 @@ if __name__ == "__main__":
     saved_model_folder, saved_image_folder, plots_image_folder = get_dir(args)
 
     train_loader, _ = get_dataloader(args.data_path, args.im_size, args.batch_size, args.n_workers,
-                                               val_percentage=0,
+                                               val_percentage=0, gray_scale=args.gray_scale, center_crop=args.center_crop,
                                                load_to_memory=args.load_data_to_memory, limit_data=args.limit_data)
 
     train_GAN(args)

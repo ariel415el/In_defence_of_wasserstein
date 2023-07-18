@@ -18,9 +18,8 @@ def conv_block(c_in, c_out, k_size, stride, pad, normalize='in', transpose=False
 
 
 class Generator(nn.Module):
-    def __init__(self, z_dim, output_dim=64, nf=64,  normalize='none', **kwargs):
+    def __init__(self, z_dim, output_dim=64, nf=64,  normalize='none', channels=3, **kwargs):
         super(Generator, self).__init__()
-        channels = 3
         nf = int(nf)
         normalize = str(normalize)
         layer_depths = [z_dim, nf*8, nf*4, nf*2, nf]
@@ -53,9 +52,9 @@ class Generator(nn.Module):
 
 class Discriminator(nn.Module):
     """ DC-discriminator receptive field by layer (4, 10, 22, 46, 94)"""
-    def __init__(self, input_dim=64, nf='64', normalize='in', num_outputs=1, **kwargs):
+    def __init__(self, input_dim=64, nf='64', normalize='in', num_outputs=1, channels=3, **kwargs):
         super(Discriminator, self).__init__()
-        channels=3
+
         nf = int(nf)
         normalize = str(normalize)
         input_dim = int(input_dim)

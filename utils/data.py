@@ -10,24 +10,27 @@ from torchvision import transforms as T
 from tqdm import tqdm
 
 
-def get_transforms(im_size, center_crop):
-    transforms = [
-             T.ToTensor(),
+def get_transforms(im_size, center_crop,  gray_scale):
+    transforms = [T.ToTensor()]
+
+    if center_crop:
+        transforms += [T.CenterCrop(size=center_crop)]
+    if gray_scale:
+        transforms += [T.Grayscale()]
+
+    transforms+=[
              T.Resize(im_size, antialias=True),
              T.CenterCrop(size=im_size),
              T.Normalize((0.5,), (0.5,))
         ]
 
-    if center_crop:
-        transforms = [T.CenterCrop(size=center_crop)] + transforms
-
     return T.Compose(transforms)
 
 
 class MemoryDataset(Dataset):
-    def __init__(self, paths, im_size, center_crop=None):
+    def __init__(self, paths, im_size, center_crop=None, gray_scale=False):
         super(MemoryDataset, self).__init__()
-        transforms = get_transforms(im_size, center_crop)
+        transforms = get_transforms(im_size, center_crop, gray_scale)
 
         self.images = []
         for path in tqdm(paths, desc="Loading images into memory"):
@@ -47,10 +50,10 @@ class MemoryDataset(Dataset):
 
 
 class DiskDataset(Dataset):
-    def __init__(self, paths, im_size, center_crop=None):
+    def __init__(self, paths, im_size, center_crop=None, gray_scale=False):
         super(DiskDataset, self).__init__()
         self.paths = paths
-        self.transforms = get_transforms(im_size, center_crop)
+        self.transforms = get_transforms(im_size, center_crop, gray_scale)
 
     def __len__(self):
         return len(self.paths)
@@ -63,7 +66,8 @@ class DiskDataset(Dataset):
         return img
 
 
-def get_dataloader(data_root, im_size, batch_size, n_workers, val_percentage=0, load_to_memory=False, limit_data=None):
+def get_dataloader(data_root, im_size, batch_size, n_workers, val_percentage=0,
+                   load_to_memory=False, limit_data=None, gray_scale=False, center_crop=None):
     # paths = sorted([os.path.join(data_root, im_name) for im_name in os.listdir(data_root)])
     paths = [os.path.join(data_root, im_name) for im_name in os.listdir(data_root)]
     if limit_data is not None:
@@ -76,7 +80,7 @@ def get_dataloader(data_root, im_size, batch_size, n_workers, val_percentage=0, 
 
     dataset_type = MemoryDataset if load_to_memory else DiskDataset
 
-    train_dataset = dataset_type(paths=train_paths, im_size=im_size)
+    train_dataset = dataset_type(paths=train_paths, im_size=im_size, gray_scale=gray_scale, center_crop=center_crop)
     drop_last = (not limit_data) or (limit_data != batch_size)
     train_loader = DataLoader(train_dataset, batch_size=batch_size,
                                  shuffle=True,

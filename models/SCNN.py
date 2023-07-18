@@ -7,13 +7,14 @@ class Discriminator(nn.Module):
                  hdim: int =128,
                  depth: int =4,
                  s: int =1,
+                 channels=3,
                  normalize='none'):
         super().__init__()
         p = int(p)
         s = int(s)
         depth = int(depth)
         hdim = int(hdim)
-        layers = [nn.Conv2d(3, hdim, p, stride=s, padding=0), nn.LeakyReLU(0.2)]
+        layers = [nn.Conv2d(channels, hdim, p, stride=s, padding=0), nn.LeakyReLU(0.2)]
         for i in range(depth):
             layers.append(nn.Conv2d(hdim, hdim, 1))
 
