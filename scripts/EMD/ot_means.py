@@ -1,13 +1,15 @@
 import argparse
 import os
+import sys
 
 import numpy as np
 import ot
 import torch
 from matplotlib import pyplot as plt
+from torch import nn
 from tqdm import tqdm
 
-from scripts.EMD.utils import get_data, dump_images
+from utils import get_data, dump_images
 
 
 def get_ot_plan(C):
@@ -37,7 +39,7 @@ def ot_means(data, k, n_iters):
         loss = np.sum(ot_map * C)
         losses.append(loss)
         pbar.set_description(f"Loss: {loss}")
-        dump_images(torch.from_numpy(centroids), 64, 64, 3, f"outputs/OTMeans-{i}.png")
+        dump_images(torch.from_numpy(centroids), 64, 64, 3, f"{out_dir}/OTMeans-{i}.png")
     return losses
 
 def weisfeld_step(X, dist, W):
@@ -48,7 +50,7 @@ def weisfeld_step(X, dist, W):
 
 def ot_means_weisfeld(data, k, n_iters, n_weisfeld):
     data = data.reshape(len(data), -1).numpy()
-    centroids = np.random.randn(k, data.shape[-1]) * 0.5
+    centroids = np.random.randn(k, data.shape[-1]).astype(np.float64) * 0.5
     losses = []
     pbar = tqdm(range(n_iters))
     for i in pbar:
@@ -61,7 +63,7 @@ def ot_means_weisfeld(data, k, n_iters, n_weisfeld):
         loss = np.sum(ot_map * C)
         losses.append(loss)
         pbar.set_description(f"Loss: {loss}")
-        dump_images(torch.from_numpy(centroids), 64, 64, 3, f"outputs/OTMeans_weisfeld-{i}.png")
+        dump_images(torch.from_numpy(centroids), k, 64, 3, f"{out_dir}/OTMeans_weisfeld-{i}.png")
     return losses
 
 
@@ -85,12 +87,66 @@ def pixel_ot(data, k, n_iters):
         losses.append(loss.item())
         pbar.set_description(f"Loss: {loss}")
         if i % 100:
-            dump_images(centroids, 64, 64, 3, f"outputs/pixelOT-{i}.png")
+            dump_images(centroids, k, 64, 3, f"{out_dir}/pixelOT-{i}.png")
     return losses
 
+def block(in_feat, out_feat, normalize='in'):
+    layers = [nn.Linear(in_feat, out_feat)]
+    if normalize == "bn":
+        layers.append(nn.BatchNorm1d(out_feat))
+    elif normalize == "in":
+        layers.append(nn.InstanceNorm1d(out_feat))
+    layers.append(nn.LeakyReLU(0.2, inplace=True))
+    return layers
+
+
+class Generator(nn.Module):
+    def __init__(self, z_dim, output_dim=64, nf=128, depth=4, normalize='none', **kwargs):
+        super(Generator, self).__init__()
+        self.output_dim = output_dim
+        nf = int(nf)
+        depth = int(depth)
+
+        layers = block(z_dim, nf, normalize=normalize)
+
+        for i in range(depth - 1):
+            layers += block(nf, nf, normalize=normalize)
+
+        layers += [nn.Linear(nf, 3*output_dim**2), nn.Tanh()]
+        self.model = nn.Sequential(*layers)
+
+    def forward(self, z):
+        img = self.model(z)
+        return img
+
+def generator_ot_means(data, k, n_iters, n_steps):
+    z_dim = 64
+    data = data.reshape(len(data), -1).cuda()
+    latents = torch.randn(k, z_dim).cuda()
+    netG = Generator(z_dim, output_dim=64, nf=32, depth=1).cuda()
+    opt = torch.optim.Adam(netG.parameters(), lr=0.01)
+
+    losses = []
+    pbar = tqdm(range(n_iters))
+    for i in pbar:
+        centroids = netG(latents)
+        C =  dist_mat(centroids, data)
+        ot_map = get_ot_plan(C.cpu().detach().numpy())
+        for j  in range(n_steps):
+            C = dist_mat(centroids, data)
+            loss = torch.sum(torch.from_numpy(ot_map).cuda() * C)
+            opt.zero_grad()
+            loss.backward()
+            opt.step()
+            centroids = netG(latents)
+            losses.append(loss.item())
+
+            pbar.set_description(f"Loss: {loss}")
+        if i % 10 == 0:
+            dump_images(centroids, k, 64, 3, f"{out_dir}/GeneratorOTMeans-{i}.png")
+    return losses
 
 if __name__ == "__main__":
-    os.makedirs("outputs",exist_ok=True)
     parser = argparse.ArgumentParser()
 
     # Data
@@ -104,19 +160,23 @@ if __name__ == "__main__":
 
     # Other
     parser.add_argument('--n_workers', default=4, type=int)
-
     args = parser.parse_args()
+
+    out_dir = f"outputs/OTMeans/{os.path.basename(args.data_path)}_K-{args.k}"
+    os.makedirs(out_dir, exist_ok=True)
 
     data = get_data(args.data_path, args.im_size, 3)
 
     # losses_pixel_ot = pixel_ot(data, args.k, 250)
-    losses_ot_weisfeld_means = ot_means_weisfeld(data, args.k, 10, 25)
-    losses_ot_means = ot_means(data, args.k, 10)
+    losses_generator_ot_means = generator_ot_means(data, args.k, 100, 100)
+    losses_ot_weisfeld_means = ot_means_weisfeld(data, args.k, 10, 10)
+    # losses_ot_means = ot_means(data, args.k, 10)
 
     # plt.plot(np.arange(len(losses_pixel_ot)), losses_pixel_ot, label="PixelOT", color="r")
-    plt.plot(np.arange(len(losses_ot_means)), losses_ot_means, label="OTMeans", color="b")
+    plt.plot(np.arange(len(losses_generator_ot_means)), losses_generator_ot_means, label="GenOTMeans", color="y")
+    # plt.plot(np.arange(len(losses_ot_means)), losses_ot_means, label="OTMeans", color="b")
     plt.plot(np.arange(len(losses_ot_weisfeld_means)), losses_ot_weisfeld_means, label="OTMeansWeisfeld", color="g")
     plt.legend()
-    plt.savefig("Losses.png")
+    plt.savefig(f"{out_dir}/Losses.png")
     plt.clf()
 

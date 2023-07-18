@@ -73,7 +73,7 @@ def to_patches(x, d, c, p=8, s=4, limit_patches=None):
 
 
 def dump_images(imgs, b, d, c, fname):
-    save_image(imgs.reshape(b, c, d, d), fname, normalize=True, nrow=int(np.sqrt(b)))
+    save_image(imgs.reshape(b, c, d, d), fname, normalize=True, nrow=int(np.sqrt(b)), pad_value=1, scale_each=True)
 
 
 def batch_to_image(batch, d, c, n=9):
