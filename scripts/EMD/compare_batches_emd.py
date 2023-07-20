@@ -10,7 +10,7 @@ from scripts.EMD.dists import discrete_dual, swd, emd
 
 from utils import get_data, dump_images, batch_to_image, to_patches, read_grid_batch
 
-if __name__ == '__main__':
+def main():
     device = torch.device('cpu')
     c = 3
     b = 64
@@ -72,3 +72,31 @@ if __name__ == '__main__':
 
 
 
+if __name__ == '__main__':
+    device = torch.device('cpu')
+    d=64
+    c=3
+    data = get_data('/mnt/storage_ssd/datasets/FFHQ/FFHQ_1000/FFHQ_1000', d, c).to(device)
+    OTMEANS = read_grid_batch('/home/ariel/Downloads/re/results/OTMeans.png', d, c).to(device)
+    CTGAN = read_grid_batch('/home/ariel/Downloads/re/results/CTGAN.png', d, c).to(device)
+    DDGAN = read_grid_batch('/home/ariel/Downloads/re/results/DDGAN.png', d, c).to(device)
+
+    fig, ax = plt.subplots(nrows=1, ncols=3, figsize=(12, 5))
+    ax[0].imshow(batch_to_image(OTMEANS, d, c))
+    ax[0].axis('off')
+    ax[0].set_title(f"OT-Means\nEMD:{emd(OTMEANS, data):.3f}")
+
+    ax[1].imshow(batch_to_image(CTGAN, d, c))
+    ax[1].axis('off')
+    ax[1].set_title(f"CTransform-GAN\nEMD:{emd(CTGAN, data):.3f}")
+
+    ax[2].imshow(batch_to_image(DDGAN, d, c))
+    ax[2].axis('off')
+    ax[2].set_title(f"DiscreteDual-GAN\nEMD:{emd(DDGAN, data):.3f}")
+
+    plt.tight_layout()
+    plt.savefig('/home/ariel/Downloads/re/results/plot.png')
+
+    print("OTMEans: ", emd(OTMEANS, data))
+    print("CTGAN: ", emd(CTGAN, data))
+    print("DDGAN: ", emd(DDGAN, data))

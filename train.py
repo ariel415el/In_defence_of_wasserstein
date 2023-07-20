@@ -73,7 +73,7 @@ def train_GAN(args):
     logger = (WandbLogger if args.wandb else PLTLogger)(args, plots_image_folder)
     prior = Prior(args.z_prior, args.z_dim)
     debug_fixed_noise = prior.sample(args.batch_size).to(device)
-    debug_fixed_reals = next(iter(train_loader)).to(device)
+    debug_fixed_reals = next(iter(tmp_loader)).to(device)
 
     inception_metrics = InceptionMetrics([next(iter(train_loader)) for _ in range(args.fid_n_batches)], torch.device("cpu"))
     other_metrics = [
@@ -241,9 +241,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    args.name = f"{os.path.basename(args.data_path)}_I-{args.im_size}x{args.im_size}_G-{args.gen_arch}" \
+    args.name = f"{os.path.basename(args.data_path)}_I-{args.im_size}x{args.im_size}_G-{args.gen_arch}_D-{args.disc_arch}" \
                 f"{'_GS' if args.gray_scale else ''}{f'_CC-{args.center_crop}' if args.center_crop else ''}" \
-                f"_D-{args.disc_arch}_L-{args.loss_function}_Z-{args.z_dim}x{args.z_prior}_B-{args.batch_size}_{args.tag}"
+                f"_L-{args.loss_function}_Z-{args.z_dim}x{args.z_prior}_B-{args.batch_size}_{args.tag}"
 
     device = torch.device(args.device)
     if args.device != 'cpu':
@@ -254,6 +254,11 @@ if __name__ == "__main__":
     train_loader, _ = get_dataloader(args.data_path, args.im_size, args.batch_size, args.n_workers,
                                                val_percentage=0, gray_scale=args.gray_scale, center_crop=args.center_crop,
                                                load_to_memory=args.load_data_to_memory, limit_data=args.limit_data)
+
+    tmp_loader, _ = get_dataloader(args.data_path, args.im_size, 1000, args.n_workers,
+                                               val_percentage=0, gray_scale=args.gray_scale, center_crop=args.center_crop,
+                                               load_to_memory=args.load_data_to_memory, limit_data=args.limit_data)
+
 
     train_GAN(args)
 

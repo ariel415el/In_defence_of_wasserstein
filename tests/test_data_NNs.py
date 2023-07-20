@@ -104,6 +104,6 @@ def find_nns(G, z_dim, data, outputs_dir, device, show_first_n=2):
             nns = data[nn_indices[:show_first_n]]
             results.append(torch.cat([fake_image[i].unsqueeze(0), nns]))
 
-        vutils.save_image(torch.cat(results, dim=0).add(1).mul(0.5), f'{outputs_dir}/nns/im.png', normalize=False, nrow=5)
+        vutils.save_image(torch.cat(results, dim=0).add(1).mul(0.5), f'{outputs_dir}/nns/im.png', normalize=False, nrow=1+show_first_n)
 
 
