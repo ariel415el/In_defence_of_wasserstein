@@ -18,10 +18,11 @@ class Generator(nn.Module):
         self.c = channels
         nf = int(nf)
         depth = int(depth)
+        assert depth >= 2, "At least two layers please"
 
         layers = block(z_dim, nf, normalize=normalize)
 
-        for i in range(depth - 1):
+        for i in range(depth - 2):
             layers += block(nf, nf, normalize=normalize)
 
         layers += [nn.Linear(nf, self.c*output_dim**2), nn.Tanh()]
@@ -34,15 +35,16 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, input_dim=64,  nf=128, depth=2, normalize='none', channels=3, **kwargs):
+    def __init__(self, input_dim=64,  nf=128, depth=4, normalize='none', channels=3, **kwargs):
         super(Discriminator, self).__init__()
         self.c = channels
         nf = int(nf)
         depth = int(depth)
+        assert depth >= 2, "At least two layers please"
 
         layers = block(self.c*input_dim**2, nf, normalize='none') # bn is not good for RGB values
 
-        for i in range(depth - 1):
+        for i in range(depth - 2):
             layers += block(nf, nf, normalize=normalize)
 
         layers += [nn.Linear(nf, 1)]

@@ -108,8 +108,8 @@ def train_GAN(args):
                     gp, gradient_norm = calc_gradient_penalty(netD, real_images, fake_images)
                     debug_Dlosses['gradient_norm'] = gradient_norm
                     Dloss += args.gp_weight * gp
-                    # if "W1" in debug_Dlosses:
-                    #     debug_Dlosses['normalized W1'] = debug_Dlosses['W1'] /  gradient_norm
+                    if "W1" in debug_Dlosses:
+                        debug_Dlosses['normalized W1'] = (debug_Dlosses['W1'] /  gradient_norm) if  gradient_norm > 0 else 0
                 netD.zero_grad()
                 Dloss.backward()
                 optimizerD.step()
