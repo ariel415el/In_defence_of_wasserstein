@@ -1,5 +1,6 @@
 import argparse
 import os
+import pickle
 import sys
 
 import numpy as np
@@ -123,7 +124,7 @@ def generator_ot_means(data, k, n_iters, n_steps):
     z_dim = 64
     data = data.reshape(len(data), -1).cuda()
     latents = torch.randn(k, z_dim).cuda()
-    netG = Generator(z_dim, output_dim=64, nf=32, depth=1).cuda()
+    netG = Generator(z_dim, output_dim=64, nf=128, depth=2).cuda()
     opt = torch.optim.Adam(netG.parameters(), lr=0.01)
 
     losses = []
@@ -168,14 +169,15 @@ if __name__ == "__main__":
     data = get_data(args.data_path, args.im_size, 3)
 
     # losses_pixel_ot = pixel_ot(data, args.k, 250)
-    losses_generator_ot_means = generator_ot_means(data, args.k, 100, 100)
-    losses_ot_weisfeld_means = ot_means_weisfeld(data, args.k, 10, 10)
+    # losses_generator_ot_means = generator_ot_means(data, args.k, 100, 1000)
+    losses_ot_weisfeld_means = ot_means_weisfeld(data, args.k, 10, 15)
     # losses_ot_means = ot_means(data, args.k, 10)
 
     # plt.plot(np.arange(len(losses_pixel_ot)), losses_pixel_ot, label="PixelOT", color="r")
-    plt.plot(np.arange(len(losses_generator_ot_means)), losses_generator_ot_means, label="GenOTMeans", color="y")
+    # plt.plot(np.arange(len(losses_generator_ot_means)), losses_generator_ot_means, label="GenOTMeans", color="y")
     # plt.plot(np.arange(len(losses_ot_means)), losses_ot_means, label="OTMeans", color="b")
     plt.plot(np.arange(len(losses_ot_weisfeld_means)), losses_ot_weisfeld_means, label="OTMeansWeisfeld", color="g")
+    pickle.dump(losses_ot_weisfeld_means, open(f'{out_dir}/losses_ot_weisfeld_means.pkl', 'wb'))
     plt.legend()
     plt.savefig(f"{out_dir}/Losses.png")
     plt.clf()

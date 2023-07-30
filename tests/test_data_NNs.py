@@ -65,19 +65,25 @@ def find_patch_nns(G, z_dim, data, patch_size, stride, search_margin, outputs_di
             # vutils.save_image(query_image.add(1).mul(0.5), f'{out_dir}/query_img-{j}.png', normalize=False, nrow=2)
 
             s = 3
-            fig, ax = plt.subplots(nrows=len(centers), ncols=2, figsize=(s * 2, s * len(centers)))
+            fig, ax = plt.subplots(nrows=len(centers), ncols=3, figsize=(s * 3, s * len(centers)))
             for i, center in enumerate(tqdm(centers)):
                 query_patch, rgb_nn_patch, gs_nn_patch, edge_nn_patch = search_for_nn_patches_in_locality(query_image, data, center, p=patch_size, s=1, search_margin=search_margin)
 
                 cmap = 'gray' if query_patch.shape[1] == 1 else 'rgb'
                 axs = ax[0] if len(centers) == 1 else ax[i, 0]
-                axs.imshow(query_patch[0].permute(1,2,0).numpy(),cmap=cmap)
+                axs.imshow(query_patch[0].permute(1,2,0).numpy(), cmap=cmap)
                 axs.axis('off')
                 axs.set_title('Query patch')
+
                 axs = ax[1] if len(centers) == 1 else ax[i, 1]
-                axs.imshow(edge_nn_patch.permute(1,2,0).numpy(),cmap=cmap)
+                axs.imshow(rgb_nn_patch.permute(1,2,0).numpy(), cmap=cmap)
                 axs.axis('off')
-                axs.set_title('Edges NN')
+                axs.set_title('RGB NN')
+
+                axs = ax[2] if len(centers) == 1 else ax[i, 2]
+                axs.imshow((rgb_nn_patch - query_patch).abs()[0].permute(1,2,0).numpy(), cmap=cmap)
+                axs.axis('off')
+                axs.set_title('diff NN')
 
             plt.tight_layout()
             fig.savefig(f'{out_dir}/patches-{j}.png')

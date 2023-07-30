@@ -76,7 +76,7 @@ def dump_images(imgs, b, d, c, fname):
     save_image(imgs.reshape(b, c, d, d), fname, normalize=True, nrow=int(np.sqrt(b)), pad_value=1, scale_each=True)
 
 
-def batch_to_image(batch, d, c, n=9):
+def batch_to_image(batch, d, c, n=16):
     t_batch = batch.reshape(-1, c, d, d)
     grid = make_grid(t_batch[:n], normalize=True, nrow=int(np.sqrt(n)))
     # Add 0.5 after unnormalizing to [0, 255] to round to nearest integer
