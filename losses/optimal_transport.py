@@ -2,153 +2,86 @@ import numpy as np
 import ot
 import torch
 import torch.nn.functional as F
+from geomloss import SamplesLoss
+
 from losses.loss_utils import get_dist_metric
+from utils.common import parse_classnames_and_kwargs
 
 
-def get_ot_plan(C):
+def get_ot_plan(C, sinkhorn=0):
     """Use POT to compute optimal transport between two emprical (uniforms) distriutaion with distance matrix C"""
     uniform_x = np.ones(C.shape[0]) / C.shape[0]
     uniform_y = np.ones(C.shape[1]) / C.shape[1]
-    OTplan = ot.emd(uniform_x, uniform_y, C)
+    if sinkhorn > 0:
+        OTplan = ot.sinkhorn(uniform_x, uniform_y, C, reg=sinkhorn)
+    else:
+        OTplan = ot.emd(uniform_x, uniform_y, C)
     return OTplan
 
 
-def to_patches(x, p=8, s=4):
+def to_patches(x, p=8, s=4, sample_patches=None):
     """extract flattened patches from a pytorch image"""
     patches = F.unfold(x, kernel_size=p, stride=s)  # shape (b, c*p*p, N_patches)
     patches = patches.permute(0, 2, 1)
-    patches = patches.reshape(-1, patches.shape[-1])
+    patches = patches.reshape(-1, x.shape[1], p, p)
+    if sample_patches is not None:
+        patches = patches[torch.randperm(len(patches))[:sample_patches]]
     return patches
 
 
-class BatchEMD:
-    def __init__(self, dist='L2'):
-        self.metric = get_dist_metric(dist)
+def w1(x, y, **kwargs):
+    base_metric = get_dist_metric("L2")
+    C = base_metric(x.reshape(len(x), -1), y.reshape(len(y), -1))
+    OTPlan = get_ot_plan(C.detach().cpu().numpy())
+    OTPlan = torch.from_numpy(OTPlan).to(C.device)
+    W1 = torch.sum(OTPlan * C)
+    return W1, {"W1-L1": W1}
 
-    def compute(self, images_X, images_Y):
-        C = self.metric(images_X.reshape(len(images_X), -1), images_Y.reshape(len(images_Y), -1))
+def swd(x, y, num_proj=512, **kwargs):
+    num_proj = int(num_proj)
+    b, c, h, w = x.shape
 
-        OTPlan = get_ot_plan(C.detach().cpu().numpy())
-        OTPlan = torch.from_numpy(OTPlan).to(C.device)
+    # Sample random normalized projections
+    rand = torch.randn(num_proj, c * h * w).to(x.device)  # (slice_size**2*ch)
+    rand = rand / torch.norm(rand, dim=1, keepdim=True)  # noramlize to unit directions
 
-        OT = torch.sum(OTPlan * C)
+    # Project images
+    projx = torch.mm(x.reshape(b, c * h * w), rand.T)
+    projy = torch.mm(y.reshape(b, c * h * w), rand.T)
 
-        return OT
+    # Sort and compute L1 loss
+    projx, _ = torch.sort(projx, dim=1)
+    projy, _ = torch.sort(projy, dim=1)
+
+    SWD = torch.abs(projx - projy).mean()
+    return SWD, {"SWD": SWD}
+
+def sinkhorn(x, y, epsilon=1, **kwargs):
+    sinkhorn_loss = SamplesLoss(loss="sinkhorn", p=1, blur=int(epsilon))
+    SH = sinkhorn_loss(x.reshape(len(x), -1), y.reshape(len(x), -1))
+    return SH, {"Sinkhorm-eps=1": SH}
+
+class MiniBatchLoss:
+    def __init__(self, dist='w1', **kwargs):
+        # self.metric = {"w1": w1, "sinkhorn": sinkhorn, "swd": swd}[name]
+        self.metric =globals()[dist]
+        self.kwargs = kwargs
 
     def __call__(self, images_X, images_Y):
         with torch.no_grad():
-            return self.compute(images_X, images_Y)
+            return self.metric(images_X, images_Y, **self.kwargs)[0]
 
     def trainD(self, netD, real_data, fake_data):
         raise NotImplemented("BatchEMD should be run with --n_D_steps 0")
 
     def trainG(self, netD, real_data, fake_data):
-        OT = self.compute(real_data, fake_data)
-        return OT, {"OT": OT.item()}
+        return self.metric(real_data, fake_data, **self.kwargs)
 
 
-class BatchPatchEMD:
-    """Split images to patches and sample n_samples from each to compute on."""
-    def __init__(self, dist='L2', n_samples='all', p=5, s=1):
-        self.metric = get_dist_metric(dist)
-        self.n_samples = int(n_samples if n_samples != "all" else -1)
-        self.p = int(p)
-        self.s = int(s)
-
-    def compute(self, images_X, images_Y):
-        X_patches = to_patches(images_X, p=self.p, s=self.s)
-        Y_patches = to_patches(images_Y, p=self.p, s=self.s)
-
-        X_patches = X_patches[torch.randperm(len(X_patches))[:self.n_samples]]
-        Y_patches = Y_patches[torch.randperm(len(Y_patches))[:self.n_samples]]
-
-        C = self.metric(X_patches, Y_patches)
-
-        OTPlan = get_ot_plan(C.detach().cpu().numpy())
-        OTPlan = torch.from_numpy(OTPlan).to(C.device)
-
-        OT = torch.sum(OTPlan * C)
-
-        return OT
-
-    def __call__(self, images_X, images_Y):
-        with torch.no_grad():
-            return self.compute(images_X.cpu(), images_Y.cpu())
-
-    def trainD(self, netD, real_data, fake_data):
-        raise NotImplemented("BatchPatchEMD should be run with --n_D_steps 0")
-
-    def trainG(self, netD, real_data, fake_data):
-        OT = self.compute(real_data, fake_data)
-        return OT, {"OT": OT.item()}
-
-
-class BatchSWD:
-    """Project images on random directions and solve 1D OT"""
-    def __init__(self, num_proj=128):
-        self.num_proj = int(num_proj)
-
-    def compute(self, images_X, images_Y):
-        b, c, h, w = images_X.shape
-
-        # Sample random normalized projections
-        rand = torch.randn(self.num_proj, c*h*w).to(images_X.device) # (slice_size**2*ch)
-        rand = rand / torch.norm(rand, dim=1, keepdim=True) # noramlize to unit directions
-
-        # Project images
-        projx = torch.mm(images_X.reshape(b, c*h*w), rand.T)
-        projy = torch.mm(images_Y.reshape(b, c*h*w), rand.T)
-
-        # Sort and compute L1 loss
-        projx, _ = torch.sort(projx, dim=1)
-        projy, _ = torch.sort(projy, dim=1)
-
-        return torch.abs(projx - projy).mean()
-
-    def __call__(self, images_X, images_Y):
-        with torch.no_grad():
-            return self.compute(images_X, images_Y)
-
-    def trainD(self, netD, real_data, fake_data):
-        raise NotImplemented("BatchSWD should be run with --n_D_steps 0")
-
-    def trainG(self, netD, real_data, fake_data):
-        SWD = self.compute(real_data, fake_data)
-        return SWD, {"SWD": SWD.item()}
-
-
-class BatchPatchSWD:
-    """Project patches into 1D with random convolutions and compute 1D OT"""
-    def __init__(self, n_proj=128, p=5, s=1):
-        self.num_proj = int(n_proj)
-        self.p = int(p)
-        self.s = int(s)
-
-    def compute(self, images_X, images_Y):
-        b, c, h, w = images_X.shape
-
-        # Sample random normalized projections
-        rand = torch.randn(self.num_proj, c*self.p**2).to(images_X.device) # (slice_size**2*ch)
-        rand = rand / torch.norm(rand, dim=1, keepdim=True)  # noramlize to unit directions
-        rand = rand.reshape(self.num_proj, c, self.p, self.p)
-
-        # Project patches
-        projx = F.conv2d(images_X, rand, stride=self.s).transpose(1,0).reshape(self.num_proj, -1)
-        projy = F.conv2d(images_Y, rand, stride=self.s).transpose(1,0).reshape(self.num_proj, -1)
-
-        # Sort and compute L1 loss
-        projx, _ = torch.sort(projx, dim=1)
-        projy, _ = torch.sort(projy, dim=1)
-
-        return torch.abs(projx - projy).mean()
-
-    def __call__(self, images_X, images_Y):
-        with torch.no_grad():
-            return self.compute(images_X, images_Y)
-
-    def trainD(self, netD, real_data, fake_data):
-        raise NotImplemented("BatchPatchSWD should be run with --n_D_steps 0")
-
-    def trainG(self, netD, real_data, fake_data):
-        PatchSWD = self.compute(real_data, fake_data)
-        return PatchSWD, {"PatchSWD": PatchSWD.item()}
+class MiniBatchPatchLoss(MiniBatchLoss):
+    def __init__(self, dist='w1', p=5, s=1, sample_patches=None, **kwargs):
+        super(MiniBatchPatchLoss, self).__init__(dist,  **kwargs)
+        p = int(p)
+        s = int(s)
+        self.metric = lambda x, y : self.metric(to_patches(x, p, s, sample_patches),
+                                                to_patches(y, p, s, sample_patches))

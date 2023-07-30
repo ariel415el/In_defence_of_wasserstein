@@ -1,82 +1,43 @@
 import torch
 
+from losses.loss_utils import get_dist_metric
+
 
 class CtransformLoss:
     """Following c-transform WGAN from:
      "(p,q)-WGAN defined at Mallasto, Anton, et al. "(q, p)-Wasserstein GANs: Comparing Ground Metrics for Wasserstein GANs."
     Code inspired by https://github.com/sverdoot/qp-wgan
     """
-    def __init__(self, search_space='full', c1=0.1, c2=0.1):
-        self.search_space = search_space
-        self.c1 = float(c1)
-        self.c2 = float(c2)
+    def __init__(self, epsilon=0):
+        self.base_metric = get_dist_metric("L2")
+        self.epsilon = float(epsilon)
 
-    @staticmethod
-    def compute_ot(critic, batch, gen_batch, compute_penalties=False):
+    def compute_ot(self, critic, batch, gen_batch):
         fs = critic(batch)
+        C = self.base_metric(batch.reshape(len(batch), -1), gen_batch.reshape(len(gen_batch), -1))
 
-        # C = torch.mean(torch.abs(batch[:, None, ...] - gen_batch[None, ...]), dim=(2, 3, 4))
-        C = ((batch[:, None] - gen_batch[None, :]) ** 2).reshape(len(batch), len(gen_batch), -1)
-        C = torch.sqrt(torch.sum(C, dim=-1))
+        c_m_f = C - fs[:, None]
+        if self.epsilon <= 0:
+            f_cs = torch.min(c_m_f, dim=0)[0]
+        else:
+            from math import log
+            f_cs = -1 * self.epsilon * (torch.logsumexp(c_m_f / self.epsilon, dim=0) - log(len(batch)))
+            # f_cs = -1 * self.epsilon * torch.log(torch.exp(c_m_f / self.epsilon).mean(0))
 
-        f_cs = torch.min(C - fs[:, None], dim=0)[0]
         ot = fs.mean() + f_cs.mean().mean()
 
-        if compute_penalties:
-            admisibility_gap = C - fs[:, None] - f_cs[None, :]  # admisibility_gap[i,j] = norm(Bxs[i]-Bys[j]) - f[Bxs[i]] - f_C[Bys[j]]
-
-            penalty1 = torch.mean(admisibility_gap**2)
-            penalty2 = torch.mean(torch.clamp(admisibility_gap, max=0)**2)
-
-            return ot, C, penalty1, penalty2
         return ot
 
-    @staticmethod
-    def compute_full_space_ot(f, reals, fakes, compute_penalties=True, run_in_batch=False):
-        """Searche the NN of fake images in both real and fake sets to make the search space larger. See paper."""
-        b = len(reals)
-        B = torch.cat([reals, fakes], dim=0)
-
-        if run_in_batch: # When f has some kind of BN layer this might matter
-            fs = f(B)
-        else:
-            fs = torch.cat([f(reals), f(fakes)])
-
-        C = torch.norm(B[:, None, ...] - B[None, ...], p=1, dim=(2, 3, 4))
-        f_cs = torch.min(C - fs[:, None], dim=0)[0]      # f_cs[j] = min_i {D[i,j] - f[i]}
-
-        f_reals = fs[:b]
-        f_c_fakes = f_cs[b:]
-
-        OT = f_reals.mean() + f_c_fakes.mean()
-        if compute_penalties:
-            full_admisibility_gap = C - fs[:, None] - f_cs[None, :]  # full_admisibility_gap[i,j] = norm(Bxs[i]-Bys[j]) - f[Bxs[i]] - f_C[Bys[j]]
-            couples_admisibility_gap = C[:b, b:] - f_reals[:, None] - f_c_fakes[None, :]
-
-            penalty1 = torch.mean(couples_admisibility_gap**2)
-            penalty2 = torch.mean(torch.clamp(full_admisibility_gap, max=0)**2)
-
-            return OT, penalty1, penalty2
-
-        else:
-            return OT
-
     def trainD(self, netD, real_data, fake_data):
-        OT, C, penalty1, penalty2 = CtransformLoss.compute_ot(netD, real_data, fake_data.detach(), compute_penalties=True)
-        Dloss = -OT + self.c1 * penalty1 + self.c2 * penalty2  # Maximize OT with penalties
+        OT = self.compute_ot(netD, real_data, fake_data.detach())
+        Dloss = -OT # Maximize OT with penalties
 
-        import numpy as np
-        import ot
-        uniform_x = np.ones(C.shape[0]) / C.shape[0]
-        uniform_y = np.ones(C.shape[1]) / C.shape[1]
-        OT_primal = ot.emd2(uniform_x, uniform_y, C.detach().cpu().numpy())
-
-        debug_dict = {"CT-OT": OT.item(), "Primal-OT": OT_primal}
+        debug_dict = {"CT-OT": OT.item()}
 
         return Dloss, debug_dict
 
     def trainG(self, netD, real_data, fake_data):
-        OT = CtransformLoss.compute_ot(netD, real_data, fake_data, compute_penalties=False)
+        OT = self.compute_ot(netD, real_data, fake_data)
         Gloss = OT  # Minimize OT
 
         return Gloss, {"CT-OT": OT.item()}

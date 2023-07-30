@@ -19,7 +19,7 @@ def emd(x,y, dist='L2', numItermax=100000, sinkhorn=0):
     dist_function = get_dist_metric(dist)
     M = batch_dist_matrix(x, y, b=512, dist_function=dist_function).cpu().numpy()
     if sinkhorn > 0:
-        dist = ot.sinkhorn2(uniform_x, uniform_y, M, reg=sinkhorn)
+        dist = ot.sinkhorn2(uniform_x, uniform_y, M, numItermax=numItermax, reg=sinkhorn)
     else:
         dist = ot.emd2(uniform_x, uniform_y, M, numItermax=numItermax)
     return dist

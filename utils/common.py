@@ -32,3 +32,28 @@ def parse_classnames_and_kwargs(string, kwargs=None):
 def dump_images(batch, fname):
     nrow = int(sqrt(len(batch)))
     save_image((batch + 1)/2, fname, nrow=nrow, normalize=False, pad_value=1, scale_each=True)
+
+
+class Prior:
+    def __init__(self, prior_type, z_dim):
+        self.prior_type = prior_type
+        self.z_dim = z_dim
+        if "const" in self.prior_type:
+            self.z = None
+            self.b = int(self.prior_type.split("=")[1])
+
+    def sample(self, b):
+        if "const" in self.prior_type:
+            if self.z is None:
+                self.z = torch.randn((self.b, self.z_dim))
+            if b != self.b:
+                z = self.z[torch.randint(self.b, (b,))]
+            else:
+                z = self.z
+        elif self.prior_type == "binary":
+            z = torch.sign(torch.randn((b, self.z_dim)))
+        elif self.prior_type == "uniform":
+            z = torch.rand((b, self.z_dim))
+        else:
+            z = torch.randn((b, self.z_dim))
+        return z

@@ -1,20 +1,16 @@
 import argparse
 import glob
 import os.path
-from math import sqrt
 
-import wandb
 from time import time
 
 import torch
 import torch.optim as optim
-from torchvision import utils as vutils
 
-from benchmarking.lap_swd import LapSWD
 from benchmarking.neural_metrics import InceptionMetrics
 from utils.diffaug import DiffAugment
 from models import get_models
-from utils.common import copy_G_params, load_params, dump_images
+from utils.common import copy_G_params, load_params, dump_images, Prior
 from losses import get_loss_function, calc_gradient_penalty
 from utils.data import get_dataloader
 from utils.logger import get_dir, PLTLogger, WandbLogger
@@ -44,31 +40,6 @@ def get_models_and_optimizers(args):
     return netG, netD, optimizerG, optimizerD, start_iteration
 
 
-class Prior:
-    def __init__(self, prior_type, z_dim):
-        self.prior_type = prior_type
-        self.z_dim = z_dim
-        if "const" in self.prior_type:
-            self.z = None
-            self.b = int(self.prior_type.split("=")[1])
-
-    def sample(self, b):
-        if "const" in self.prior_type:
-            if self.z is None:
-                self.z = torch.randn((self.b, self.z_dim))
-            if b != self.b:
-                z = self.z[torch.randint(self.b, (b,))]
-            else:
-                z = self.z
-        elif self.prior_type == "binary":
-            z = torch.sign(torch.randn((b, self.z_dim)))
-        elif self.prior_type == "uniform":
-            z = torch.rand((b, self.z_dim))
-        else:
-            z = torch.randn((b, self.z_dim))
-        return z
-
-
 def train_GAN(args):
     logger = (WandbLogger if args.wandb else PLTLogger)(args, plots_image_folder)
     prior = Prior(args.z_prior, args.z_dim)
@@ -77,8 +48,8 @@ def train_GAN(args):
 
     inception_metrics = InceptionMetrics([next(iter(train_loader)) for _ in range(args.fid_n_batches)], torch.device("cpu"))
     other_metrics = [
-                get_loss_function("BatchEMD-dist=L2"),
-                get_loss_function("BatchPatchEMD-dist=L2-p=16-s=16-n_samples=1024"),
+                get_loss_function("MiniBatchLoss-dist=w1"),
+                get_loss_function("MiniBatchLoss-dist=w1-p=16-s=16-n_samples=1024"),
                 # LapSWD()
               ]
 
