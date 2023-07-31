@@ -2,10 +2,8 @@ import numpy as np
 import ot
 import torch
 import torch.nn.functional as F
-from geomloss import SamplesLoss
 
 from losses.loss_utils import get_dist_metric
-from utils.common import parse_classnames_and_kwargs
 
 
 def get_ot_plan(C, sinkhorn=0):
@@ -57,6 +55,7 @@ def swd(x, y, num_proj=512, **kwargs):
     return SWD, {"SWD": SWD}
 
 def sinkhorn(x, y, epsilon=1, **kwargs):
+    from geomloss import SamplesLoss
     sinkhorn_loss = SamplesLoss(loss="sinkhorn", p=1, blur=int(epsilon))
     SH = sinkhorn_loss(x.reshape(len(x), -1), y.reshape(len(x), -1))
     return SH, {"Sinkhorm-eps=1": SH}
@@ -72,7 +71,7 @@ class MiniBatchLoss:
             return self.metric(images_X, images_Y, **self.kwargs)[0]
 
     def trainD(self, netD, real_data, fake_data):
-        raise NotImplemented("BatchEMD should be run with --n_D_steps 0")
+        raise NotImplemented("MiniBatchLosses should be run with --n_D_steps 0")
 
     def trainG(self, netD, real_data, fake_data):
         return self.metric(real_data, fake_data, **self.kwargs)
