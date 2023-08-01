@@ -15,27 +15,33 @@ def send_tasks(datasets):
                f"  --n_iterations 100000 " \
                f"--gen_arch {gen_arch} --lrG 0.001"
 
-
+        # WGANs
         run_sbatch(base + f" --loss_function WGANLoss --gp_weight 10 --lrD 0.0001 --G_step_every 5 --disc_arch FC-depth=3",
                    f"PixelWGAN-FC", hours)
-
         run_sbatch(base + f" --loss_function WGANLoss --gp_weight 10 --lrD 0.0001 --G_step_every 5 --disc_arch PatchGAN-normalize=none-k=4",
                    f"PixelWGAN-GAP-22", hours)
+        run_sbatch(base + f" --loss_function WGANLoss --gp_weight 10 --lrD 0.0001 --G_step_every 5 --disc_arch PatchGAN-depth=4-normalize=none-k=4",
+                   f"PixelWGAN-GAP-48", hours)
+        run_sbatch(base + f" --loss_function WGANLoss --gp_weight 10 --lrD 0.0001 --G_step_every 5 --disc_arch DCGAN-normalize=none",
+                   f"PixelWGAN-DC", hours)
 
-        # run_sbatch(base + f" --loss_function WGANLoss --gp_weight 10 --lrD 0.0001 --G_step_every 5 --disc_arch PatchGAN-depth=4-normalize=none-k=4",
-        #            f"PixelWGAN-GAP-48", hours)
-        #
-        # run_sbatch(base + f" --loss_function WGANLoss --gp_weight 10 --lrD 0.0001 --G_step_every 5 --disc_arch DCGAN-normalize=none",
-        #            f"PixelWGAN-DC", hours)
-
+        # Direct W1
         run_sbatch(base + f" --loss_function MiniBatchLoss-dist=w1 --D_step_every -1",
                    f"Pixel-W1", hours)
-
         run_sbatch(base + f" --loss_function MiniBatchPatchLoss-dist=w1-p=22-s=8 --D_step_every -1",
                    f"Pixel-W1-22", hours)
+        run_sbatch(base + f" --loss_function MiniBatchPatchLoss-dist=w1-p=48-s=16 --D_step_every -1",
+                   f"Pixel-W1-48", hours)
 
-        # run_sbatch(base + f" --loss_function MiniBatchPatchLoss-dist=w1-p=48-s=16 --D_step_every -1",
-        #            f"Pixel-W1-48", hours)
+        # Direct Sinkhorn
+        eps=100
+        run_sbatch(base + f" --loss_function MiniBatchLoss-dist=sinkhorn-epsilon={eps} --D_step_every -1",
+                   f"Pixel-SH100", hours)
+        run_sbatch(base + f" --lss_function MiniBatchPatchLoss-dist=sinkhorn-epsilon={eps}-p=22-s=8 --D_step_every -1",
+                   f"Pixel-SH{eps}-22", hours)
+        run_sbatch(base + f" --loss_function MiniBatchPatchLoss-dist=sinkhorn-epsilon={eps}-p=48-s=16 --D_step_every -1",
+                   f"Pixel-SH{eps}-48", hours)
+
 
 
 
