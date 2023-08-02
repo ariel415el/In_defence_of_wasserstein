@@ -4,22 +4,20 @@ import torch
 from tqdm import tqdm
 import numpy as np
 from PIL import Image
-from torchvision import transforms
-from torchvision.utils import save_image, make_grid
+from torchvision.utils import make_grid
 import torch.nn.functional as F
 
-def get_data(data_path, im_size=None, c=3, flatten=True, limit_data=10000):
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "utils"))
+from data import get_transforms
+
+def get_data(data_path, im_size=None, c=3, center_crop=None, gray_scale=False, flatten=True, limit_data=10000):
     if os.path.isdir(data_path):
         image_paths = sorted([os.path.join(data_path, x) for x in os.listdir(data_path)])[:limit_data]
     else:
         image_paths = [data_path]
 
-
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Resize(im_size) if im_size is not None else transforms.Lambda(lambda x: x),
-        transforms.Normalize((0.5,), (0.5,))
-    ])
+    transform = get_transforms(im_size, center_crop,  gray_scale)
 
     data = []
     for i, path in enumerate(tqdm(image_paths)):
@@ -70,10 +68,6 @@ def to_patches(x, d, c, p=8, s=4, limit_patches=None):
         samples = np.random.choice(len(patches), size=min(len(x), limit_patches), replace=False)
         patches = patches[samples]
     return patches
-
-
-def dump_images(imgs, b, d, c, fname):
-    save_image(imgs.reshape(b, c, d, d), fname, normalize=True, nrow=int(np.sqrt(b)), pad_value=1, scale_each=True)
 
 
 def batch_to_image(batch, d, c, n=16):

@@ -20,7 +20,6 @@ def get_transforms(im_size, center_crop,  gray_scale):
 
     transforms+=[
              T.Resize(im_size, antialias=True),
-             T.CenterCrop(size=im_size),
              T.Normalize((0.5,), (0.5,))
         ]
 

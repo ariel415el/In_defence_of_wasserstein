@@ -10,7 +10,9 @@ from matplotlib import pyplot as plt
 from torch import nn
 from tqdm import tqdm
 
-from utils import get_data, dump_images
+from utils import get_data
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "utils"))
+from common import dump_images
 
 
 def get_ot_plan(C):
@@ -40,7 +42,7 @@ def ot_means(data, k, n_iters):
         loss = np.sum(ot_map * C)
         losses.append(loss)
         pbar.set_description(f"Loss: {loss}")
-        dump_images(torch.from_numpy(centroids), 64, 64, 3, f"{out_dir}/OTMeans-{i}.png")
+        dump_images(torch.from_numpy(centroids).reshape(args.k, -1, args.im_size, args.im_size), f"{out_dir}/OTMeans-{i}.png")
     return losses
 
 def weisfeld_step(X, dist, W):
@@ -64,7 +66,7 @@ def ot_means_weisfeld(data, k, n_iters, n_weisfeld):
         loss = np.sum(ot_map * C)
         losses.append(loss)
         pbar.set_description(f"Loss: {loss}")
-        dump_images(torch.from_numpy(centroids), k, 64, 3, f"{out_dir}/OTMeans_weisfeld-{i}.png")
+        dump_images(torch.from_numpy(centroids).reshape(args.k, -1, args.im_size, args.im_size), f"{out_dir}/OTMeans_weisfeld-{i}.png")
     return losses
 
 
@@ -88,7 +90,7 @@ def pixel_ot(data, k, n_iters):
         losses.append(loss.item())
         pbar.set_description(f"Loss: {loss}")
         if i % 100:
-            dump_images(centroids, k, 64, 3, f"{out_dir}/pixelOT-{i}.png")
+            dump_images(centroids.reshape(args.k, -1, args.im_size, args.im_size), f"{out_dir}/pixelOT-{i}.png")
     return losses
 
 def block(in_feat, out_feat, normalize='in'):
@@ -144,15 +146,17 @@ def generator_ot_means(data, k, n_iters, n_steps):
 
             pbar.set_description(f"Loss: {loss}")
         if i % 10 == 0:
-            dump_images(centroids, k, 64, 3, f"{out_dir}/GeneratorOTMeans-{i}.png")
+            dump_images(centroids.reshape(args.k, -1, args.im_size, args.im_size), f"{out_dir}/GeneratorOTMeans-{i}.png")
     return losses
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     # Data
-    parser.add_argument('--data_path', default="/mnt/storage_ssd/datasets/FFHQ/FFHQ_1000/FFHQ_1000",
+    parser.add_argument('--data_path', default="/mnt/storage_ssd/datasets/FFHQ/FFHQ/FFHQ",
                         help="Path to train images")
+    parser.add_argument('--center_crop', default=90, type=int)
+    parser.add_argument('--limit_data', default=10000, type=int)
 
     # Model
     parser.add_argument('--k', default=64, type=int)
@@ -160,13 +164,14 @@ if __name__ == "__main__":
 
 
     # Other
+    parser.add_argument('--project_name', default="OTMeans", type=str)
     parser.add_argument('--n_workers', default=4, type=int)
     args = parser.parse_args()
 
-    out_dir = f"outputs/OTMeans/{os.path.basename(args.data_path)}_K-{args.k}"
+    out_dir = f"outputs/{args.project_name}/{os.path.basename(args.data_path)}_K-{args.k}"
     os.makedirs(out_dir, exist_ok=True)
 
-    data = get_data(args.data_path, args.im_size, 3)
+    data = get_data(args.data_path, args.im_size, c=3, limit_data=args.limit_data, center_crop=args.center_crop)
 
     # losses_pixel_ot = pixel_ot(data, args.k, 250)
     # losses_generator_ot_means = generator_ot_means(data, args.k, 100, 1000)
