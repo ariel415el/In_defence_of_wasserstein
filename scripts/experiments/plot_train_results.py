@@ -28,7 +28,7 @@ def find_dir(root, names, disallowed_names=[]):
 def find_last_image(dir):
     files = glob.glob(f'{dir}/*.png')
     if files:
-        return max(files, key=os.path.getctime)
+        return os.path.basename(max(files, key=os.path.getctime))
 
 
 def plot(root, datasets, titles_and_name_lists_dict, iteration=None, seperate_plots=False, s=4,  n=4, h=3):
@@ -48,9 +48,8 @@ def plot(root, datasets, titles_and_name_lists_dict, iteration=None, seperate_pl
                 if not found_path:
                     continue
                 dir = os.path.join(root, found_path)
-                # path = f"{iteration}.png" if iteration is not None else (find_last_image(os.path.join(dir, "images")))
-                path = find_last_image(os.path.join(dir, "images"))
-                images = os.path.join(dir, "images", path)
+                img_name = find_last_image(os.path.join(dir, "images"))
+                images = os.path.join(dir, "images", img_name)
                 images = np.array(Image.open(images))
                 d = images.shape[0] // 2
                 f = n * d // 2
