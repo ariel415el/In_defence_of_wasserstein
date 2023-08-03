@@ -31,7 +31,7 @@ def find_last_image(dir):
         return os.path.basename(max(files, key=os.path.getctime))
 
 
-def plot(root, datasets, titles_and_name_lists_dict, iteration=None, seperate_plots=False, s=4,  n=4, h=3):
+def plot(root, datasets, titles_and_name_lists_dict, seperate_plots=False, s=4,  n=4, h=3):
     """
     s: base unit for the size of plot
     n: #images in row of displayed images

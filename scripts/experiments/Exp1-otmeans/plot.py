@@ -11,18 +11,18 @@ from plot_train_results import find_dir, find_last_image, plot
 
 
 def create_plot(project_name, dataset):
-    plot(f'outputs/GANs',
+    plot(f'outputs/{project_name}',
         [
                 dataset
         ],
          {
              f"plot.png": [
-                 (f"OTmeans", ["L-MiniBatch"], []),
+                 (f"OTmeans", ["K-64"], []),
                  (f"BatchW1", ["L-MiniBatch"], []),
                  (f"CTGAN", ["L-CtransformLoss"], []),
              ]
          },
-         seperate_plots=False
+         seperate_plots=False, n=8
     )
 
 if __name__ == '__main__':
