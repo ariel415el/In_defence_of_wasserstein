@@ -67,11 +67,11 @@ class DiskDataset(Dataset):
 
 def get_dataloader(data_root, im_size, batch_size, n_workers, val_percentage=0,
                    load_to_memory=False, limit_data=None, gray_scale=False, center_crop=None):
-    # paths = sorted([os.path.join(data_root, im_name) for im_name in os.listdir(data_root)])
-    paths = [os.path.join(data_root, im_name) for im_name in os.listdir(data_root)]
+    # paths = [os.path.join(data_root, im_name) for im_name in os.listdir(data_root)]
+    # shuffle(paths)
+    paths = sorted([os.path.join(data_root, im_name) for im_name in os.listdir(data_root)])
     if limit_data is not None:
         paths = paths[:limit_data]
-    shuffle(paths)
 
     n_val_images = int(val_percentage * len(paths))
     train_paths, test_paths = paths[n_val_images:], paths[:n_val_images]
@@ -82,16 +82,16 @@ def get_dataloader(data_root, im_size, batch_size, n_workers, val_percentage=0,
     train_dataset = dataset_type(paths=train_paths, im_size=im_size, gray_scale=gray_scale, center_crop=center_crop)
     drop_last = (not limit_data) or (limit_data != batch_size)
     train_loader = DataLoader(train_dataset, batch_size=batch_size,
-                                 shuffle=True,
-                                 num_workers=n_workers,
-                                 pin_memory=True, drop_last=drop_last)
+                              shuffle=True,
+                              num_workers=n_workers,
+                              pin_memory=True, drop_last=drop_last)
 
     test_loader = None
     if val_percentage > 0:
         test_dataset = dataset_type(paths=test_paths, im_size=im_size)
         test_loader = DataLoader(test_dataset, batch_size=batch_size,
-                                     shuffle=True,
-                                     num_workers=n_workers,
-                                     pin_memory=True, drop_last=drop_last)
+                                 shuffle=True,
+                                 num_workers=n_workers,
+                                 pin_memory=True, drop_last=drop_last)
 
     return train_loader, test_loader
