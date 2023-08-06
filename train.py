@@ -44,12 +44,13 @@ def train_GAN(args):
     logger = (WandbLogger if args.wandb else PLTLogger)(args, plots_image_folder)
     prior = Prior(args.z_prior, args.z_dim)
     debug_fixed_noise = prior.sample(args.batch_size).to(device)
-    debug_fixed_reals = next(iter(tmp_loader)).to(device)
+    debug_fixed_reals = next(iter(train_loader)).to(device)
 
     inception_metrics = InceptionMetrics([next(iter(train_loader)) for _ in range(args.fid_n_batches)], torch.device("cpu"))
     other_metrics = [
                 get_loss_function("MiniBatchLoss-dist=w1"),
                 get_loss_function("MiniBatchPatchLoss-dist=w1-p=16-s=16-n_samples=1024"),
+                get_loss_function("MiniBatchPatchLoss-dist=sinkhorn-epsilon=100-p=16-s=16-n_samples=1024"),
                 # LapSWD()
               ]
 
@@ -179,11 +180,13 @@ if __name__ == "__main__":
     parser.add_argument('--z_prior', default="normal", type=str, help="[normal, binary, uniform]")
     parser.add_argument('--spectral_normalization', action='store_true', default=False)
     parser.add_argument('--weight_clipping', type=float, default=None)
+    parser.add_argument('--gp_weight', default=0, type=float)
+    parser.add_argument('--n_generators', default=1, type=int)
+
 
     # Training
     parser.add_argument('--batch_size', default=64, type=int)
     parser.add_argument('--loss_function', default="NonSaturatingGANLoss", type=str)
-    parser.add_argument('--gp_weight', default=0, type=float)
     parser.add_argument('--lrG', default=0.0001, type=float)
     parser.add_argument('--lrD', default=0.0001, type=float)
     parser.add_argument('--avg_update_factor', default=1, type=float,
@@ -226,9 +229,9 @@ if __name__ == "__main__":
                                                val_percentage=0, gray_scale=args.gray_scale, center_crop=args.center_crop,
                                                load_to_memory=args.load_data_to_memory, limit_data=args.limit_data)
 
-    tmp_loader, _ = get_dataloader(args.data_path, args.im_size, 1000, args.n_workers,
-                                               val_percentage=0, gray_scale=args.gray_scale, center_crop=args.center_crop,
-                                               load_to_memory=args.load_data_to_memory, limit_data=1000)
+    # eval_loader, _ = get_dataloader(args.data_path, args.im_size, 10000, args.n_workers,
+    #                                            val_percentage=0, gray_scale=args.gray_scale, center_crop=args.center_crop,
+    #                                            load_to_memory=args.load_data_to_memory, limit_data=10000)
 
 
     train_GAN(args)

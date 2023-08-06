@@ -29,7 +29,7 @@ class Generator(nn.Module):
         s0 = self.s0 = 4
         nf = self.nf = nfilter
         nf_max = self.nf_max = nfilter_max
-        self.bn = bn
+        self.bn = bool(bn)
         self.z_dim = z_dim
 
         # Submodules

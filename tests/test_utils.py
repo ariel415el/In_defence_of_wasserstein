@@ -13,7 +13,7 @@ def get_data(data_root, im_size, center_crop, gray_scale, limit_data=None):
 
     images = []
     print("Loading data to memory to find NNs")
-    img_names = os.listdir(data_root)
+    img_names = sorted(os.listdir(data_root))
     # shuffle(img_names)
     if limit_data is not None:
         img_names = img_names[:limit_data]

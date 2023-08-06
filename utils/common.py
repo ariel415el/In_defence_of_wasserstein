@@ -1,4 +1,3 @@
-import sys
 from copy import deepcopy
 from math import sqrt
 
@@ -57,3 +56,17 @@ class Prior:
         else:
             z = torch.randn((b, self.z_dim))
         return z
+
+
+
+def find_nth_decimal(x, first, size=2):
+    "extract the nth to n+lth digits from a float"
+    return (x * 10**(first-1) % 1 * 10**size).to(int)
+
+def hash_vectors(x, n=1000):
+    """maps a (b,d) float tensor into (d,) integer tensor in range (0,n-1) in a deterministic manner (using 3 of its decimals)"""
+    l = 1
+    while 10**l < n:
+        l+=1
+    decimals = find_nth_decimal(x.mean(1), first=3, size=l)
+    return (decimals / 10 ** l * n).to(torch.long)

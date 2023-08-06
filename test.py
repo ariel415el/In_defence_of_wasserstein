@@ -62,12 +62,12 @@ if __name__ == '__main__':
     # inverse_image(netG, z_dim, data, outputs_dir=outputs_dir, device=device)
 
     # Full data tests
-    data = get_data(args['data_path'], args['im_size'], args['center_crop'], args['gray_scale'], limit_data=70000).to(device)
+    data = get_data(args['data_path'], args['im_size'], args['center_crop'], args['gray_scale'], limit_data=args['limit_data']).to(device)
     # test_emd(netG, z_dim, data, outputs_dir=outputs_dir, device=device)
     find_nns(netG, z_dim, data, outputs_dir=outputs_dir, device=device)
     # find_patch_nns(netG, z_dim, data, patch_size=64, stride=1, search_margin=8, outputs_dir=outputs_dir, device=device)
     # find_patch_nns(netG, z_dim, data, patch_size=48, stride=24, search_margin=8, outputs_dir=outputs_dir, device=device)
-    find_patch_nns(netG, z_dim, data, patch_size=24, stride=12, search_margin=4, outputs_dir=outputs_dir, device=device)
+    find_patch_nns(netG, z_dim, data, patch_size=24, stride=12, search_margin=1, outputs_dir=outputs_dir, device=device)
 
 
 # import os

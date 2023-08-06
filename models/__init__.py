@@ -1,5 +1,6 @@
 import importlib
 
+from models.model_utils.stochastic_emsamble import StochasticEnsemble
 from utils.common import parse_classnames_and_kwargs
 
 
@@ -12,6 +13,9 @@ def get_models(args, device):
     model_name, kwargs = parse_classnames_and_kwargs(args.disc_arch,
                                                      kwargs={"input_dim": args.im_size, "channels": c})
     netD = importlib.import_module("models." + model_name).Discriminator(**kwargs)
+
+    if args.n_generators > 1:
+        netG = StochasticEnsemble(netG, args.n_generators)
 
     if args.spectral_normalization:
         from models.model_utils.spectral_normalization import make_model_spectral_normalized
@@ -45,9 +49,12 @@ def print_num_params(model):
 
 
 if __name__ == '__main__':
-    for arch_name, s in [('FC', 64), ("DCGAN-nf=32", 64), ('ResNet', 64),
-                         ('FC', 128), ("DCGAN", 128),('ResNet', 128) , ("FastGAN", 128), ('StyleGAN', 128),
-                         ('BagNet-rf=9', 64), ('BagNet-rf=9', 128)]:
+    for arch_name, s in [('FC', 64), ('FC-nf=1024-depth=8', 64), ('DCGAN-normalize=in-nf=128', 64),
+                         # ("DCGAN-nf=64", 64), ('ResNet', 64),
+                         # ('FC', 128), ("DCGAN", 128),('ResNet', 128) ,
+                         # ("FastGAN", 128), ('StyleGAN', 128),
+                         # ('BagNet-rf=9', 64), ('BagNet-rf=9', 128)
+                         ]:
         print(f"{arch_name}: {s}x{s}")
 
         try:
@@ -57,6 +64,7 @@ if __name__ == '__main__':
 
             print("\t-G params (MB): ", print_num_params(netG))
         except Exception as e:
+            print(e)
             pass
         model_name, kwargs = parse_classnames_and_kwargs(arch_name, kwargs={"input_dim": s})
         netD = importlib.import_module("models." + model_name).Discriminator(**kwargs)

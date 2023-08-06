@@ -6,7 +6,7 @@ from models.DCGAN import conv_block
 def compute_receptive_field(depth, k):
     rf = 1
     for i in range(depth):
-        rf = rf * 2 + k-2
+        rf = rf * 2 + max(0,k-2)
 
     return rf
 
@@ -41,7 +41,8 @@ class Discriminator(nn.Module):
 
 
 if __name__ == '__main__':
-    print(compute_receptive_field(3, 4))
+    print(compute_receptive_field(3, 1))
+    print(compute_receptive_field(3, 3))
     x = torch.ones(5,3,23,15)
     D = Discriminator(None, depth=3, k=3, normalize='none')
 
