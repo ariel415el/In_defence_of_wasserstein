@@ -45,7 +45,7 @@ def search_for_nn_patches_in_locality(img, data, center, p, s, search_margin):
     return query_patch, refs[rgb_nn_index].clone(), refs[gs_nn_index].clone(), refs[edge_nn_index].clone()
 
 
-def find_patch_nns(G, z_dim, data, patch_size, stride, search_margin, outputs_dir, device, n_centers=10, n_images=10):
+def find_patch_nns(fake_images, data, patch_size, stride, search_margin, outputs_dir, n_centers=10):
     """
     Search for nearest patch in data to patches from generated images.
     Search is performed in a constrained locality of the query patch location
@@ -60,23 +60,22 @@ def find_patch_nns(G, z_dim, data, patch_size, stride, search_margin, outputs_di
         centers = list(itertools.product(centers, repeat=2))[:n_centers]
         shuffle(centers)
 
-        for j in range(n_images):
-            query_image = G(torch.randn(1, z_dim).to(device))
-            # vutils.save_image(query_image.add(1).mul(0.5), f'{out_dir}/query_img-{j}.png', normalize=False, nrow=2)
+        for j in range(len(fake_images)):
+            query_image = fake_images[j].unsqueeze(0)
 
             s = 3
             fig, ax = plt.subplots(nrows=len(centers), ncols=3, figsize=(s * 3, s * len(centers)))
             for i, center in enumerate(tqdm(centers)):
                 query_patch, rgb_nn_patch, gs_nn_patch, edge_nn_patch = search_for_nn_patches_in_locality(query_image, data, center, p=patch_size, s=1, search_margin=search_margin)
 
-                cmap = 'gray' if query_patch.shape[1] == 1 else 'rgb'
+                cmap = 'gray' if query_patch.shape[1] == 1 else None
                 axs = ax[0] if len(centers) == 1 else ax[i, 0]
-                axs.imshow(query_patch[0].permute(1,2,0).numpy(), cmap=cmap)
+                axs.imshow((query_patch[0].permute(1, 2,0).numpy() + 1)/2, cmap=cmap)
                 axs.axis('off')
                 axs.set_title('Query patch')
 
                 axs = ax[1] if len(centers) == 1 else ax[i, 1]
-                axs.imshow(rgb_nn_patch.permute(1,2,0).numpy(), cmap=cmap)
+                axs.imshow((rgb_nn_patch.permute(1,2,0).numpy() + 1)/2, cmap=cmap)
                 axs.axis('off')
                 axs.set_title('RGB NN')
 
@@ -90,7 +89,7 @@ def find_patch_nns(G, z_dim, data, patch_size, stride, search_margin, outputs_di
             plt.clf()
 
 
-def find_nns_percept(G, z_dim, data, outputs_dir, device):
+def find_nns_percept(fake_images, data, outputs_dir, device):
     with torch.no_grad():
         vgg_fe = vgg_dist_calculator(layer_idx=9, device=device)
         # percept = lpips.LPIPS(net='vgg', lpips=False).to(device)
@@ -98,7 +97,7 @@ def find_nns_percept(G, z_dim, data, outputs_dir, device):
         os.makedirs(f'{outputs_dir}/nns', exist_ok=True)
         results = []
         for i in range(8):
-            fake_image = G(torch.randn((1, z_dim), device=device))
+            fake_image = fake_images[i]
             # dists = [percept(fake_image, data[i].unsqueeze(0)).sum().item() for i in range(len(data))]
             dists = [(vgg_fe.extract(fake_image) - vgg_fe.extract(data[i].unsqueeze(0))).pow(2).sum().item() for i in range(len(data))]
             nn_indices = np.argsort(dists)
@@ -109,18 +108,18 @@ def find_nns_percept(G, z_dim, data, outputs_dir, device):
         vutils.save_image(torch.cat(results, dim=0).add(1).mul(0.5), f'{outputs_dir}/nns/im.png', normalize=False, nrow=5)
 
 
-def find_nns(G, z_dim, data, outputs_dir, device, show_first_n=2, n_examples=10):
+def find_nns(fake_images, data, outputs_dir, show_first_n=2):
     with torch.no_grad():
         os.makedirs(f'{outputs_dir}/nns', exist_ok=True)
         results = []
-        fake_image = G(torch.randn((n_examples, z_dim), device=device))
         # dists_mat = (fake_image - data).pow(2).sum(dim=(1,2,3)).numpy()#
-        for i in range(n_examples):
+        for i in range(len(fake_images)):
+            fake_image = fake_images[i]
             # dists = dists_mat[i]
-            dists = [(fake_image[i] - data[j]).pow(2).sum().item() for j in range(len(data))]
+            dists = [(fake_image - data[j]).pow(2).sum().item() for j in range(len(data))]
             nn_indices = np.argsort(dists)
             nns = data[nn_indices[:show_first_n]]
-            results.append(torch.cat([fake_image[i].unsqueeze(0), nns]))
+            results.append(torch.cat([fake_image.unsqueeze(0), nns]))
 
         vutils.save_image(torch.cat(results, dim=0).add(1).mul(0.5), f'{outputs_dir}/nns/im.png', normalize=False, nrow=1+show_first_n)
 

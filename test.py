@@ -44,6 +44,8 @@ if __name__ == '__main__':
     os.makedirs(outputs_dir, exist_ok=True)
 
     args = json.load(open(os.path.join(model_dir, "args.txt")))
+    args['n_generators'] = 1 # TODO remove this
+
     z_dim = args['z_dim']
     data_root = args['data_path']
     print("Loading models", end='...')
@@ -63,13 +65,6 @@ if __name__ == '__main__':
 
     # Full data tests
     data = get_data(args['data_path'], args['im_size'], args['center_crop'], args['gray_scale'], limit_data=args['limit_data']).to(device)
-    # test_emd(netG, z_dim, data, outputs_dir=outputs_dir, device=device)
-    find_nns(netG, z_dim, data, outputs_dir=outputs_dir, device=device)
-    # find_patch_nns(netG, z_dim, data, patch_size=64, stride=1, search_margin=8, outputs_dir=outputs_dir, device=device)
-    # find_patch_nns(netG, z_dim, data, patch_size=48, stride=24, search_margin=8, outputs_dir=outputs_dir, device=device)
-    find_patch_nns(netG, z_dim, data, patch_size=24, stride=12, search_margin=1, outputs_dir=outputs_dir, device=device)
-
-
-# import os
-# for dname in os.listdir("outputs/GANs"):
-#     os.system(f"python3 test.py outputs/GANs/{dname}")
+    fake_images = netG(torch.randn((8, z_dim), device=device))
+    find_nns(fake_images, data, outputs_dir=outputs_dir)
+    find_patch_nns(fake_images, data, patch_size=24, stride=12, search_margin=4, outputs_dir=outputs_dir)
