@@ -16,6 +16,7 @@ def run_sbatch(train_command, stdout_name, hours, killable=True, gpu_memory=8):
                    f"\ncd /cs/labs/yweiss/ariel1/repos/DataEfficientGANs" \
                    f"\n{train_command} --tag {stdout_name}_{strftime('%m-%d_T-%H:%M:%S')}" \
 
+    print("writing")
     f = open("send_task.csh", "w")
     f.write(sbatch_text)
     f.close()

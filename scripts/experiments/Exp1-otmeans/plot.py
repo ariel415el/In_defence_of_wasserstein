@@ -1,5 +1,4 @@
 import os
-
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from plot_train_results import find_dir, find_last_image, plot
@@ -13,7 +12,7 @@ def create_plot(project_name, dataset):
          {
              f"plot.png": [
                  (f"OTmeans", ["K-64"], []),
-                 (f"BatchW1", ["L-MiniBatch"], []),
+                 # (f"BatchW1", ["L-MiniBatch"], []),
                  (f"CTGAN", ["L-CtransformLoss"], []),
              ]
          },

@@ -17,16 +17,16 @@ def create_plot(project_name, dataset):
         ],
          {
              f"{gen_arch}.png": [
-                 (f"WGAN-FC-1024", ["L-WGANLoss", f"G-{gen_arch}", "D-FC-df=1024"], []),
-                 (f"CTGAN", ["L-CtransformLoss", f"G-{gen_arch}"], []),
+                 (f"DiscreteWGAN", ["L-WGANLoss", f"G-{gen_arch}", "D-FC-nf=1024"], []),
+                 (f"DiscreteCTGAN", ["L-CtransformLoss", f"G-{gen_arch}"], []),
                  # (f"W1", ["L-MiniBatchLoss-dist=w1", f"G-{gen_arch}"], []),
                  #(f"Sinkhorn-100-FC", ["L-MiniBatchLoss-dist=sinkhorn-epsilon=100", f"G-{gen_arch}"], []),
              ]
-             for gen_arch in ["Pixels", "FC"]
+             for gen_arch in ["FC"]
          },
          seperate_plots=False
     )
 
 if __name__ == '__main__':
-    # create_plot(project_name="discreteWGAN-1k", dataset='/cs/labs/yweiss/ariel1/data/FFHQ/FFHQ')
-    create_plot(project_name="discreteWGAN-10k", dataset='/cs/labs/yweiss/ariel1/data/FFHQ/FFHQ')
+    # create_plot(project_name="Exp2-discreteWGAN-1k", dataset='/cs/labs/yweiss/ariel1/data/FFHQ/FFHQ')
+    create_plot(project_name="Exp2-discreteWGAN-10k", dataset='/cs/labs/yweiss/ariel1/data/FFHQ/FFHQ')

@@ -31,7 +31,7 @@ def find_last_image(dir):
         return os.path.basename(max(files, key=os.path.getctime))
 
 
-def plot(root, datasets, titles_and_name_lists_dict, seperate_plots=False, s=4,  n=4, h=3):
+def plot(root, datasets, titles_and_name_lists_dict, seperate_plots=False, s=4,  n=5, h=3):
     """
     s: base unit for the size of plot
     n: #images in row of displayed images
@@ -48,6 +48,7 @@ def plot(root, datasets, titles_and_name_lists_dict, seperate_plots=False, s=4, 
                 if not found_path:
                     continue
                 dir = os.path.join(root, found_path)
+                print(dir)
                 img_name = find_last_image(os.path.join(dir, "images"))
                 images = os.path.join(dir, "images", img_name)
                 images = np.array(Image.open(images))
@@ -57,12 +58,10 @@ def plot(root, datasets, titles_and_name_lists_dict, seperate_plots=False, s=4, 
 
                 ax = fig.add_subplot(gs[:-1, i])
                 ax.imshow(images)
-                ax.set_title(f"16 / {(len(images) / 64) ** 2} images")
                 ax.axis('off')
-                ax.set_title(name, fontsize=4 * s)
-
                 plot = os.path.join(dir, "plots", "MiniBatchLoss-dist=w1_fixed_noise_gen_to_train.pkl")
                 plot = pickle.load((open(plot, "rb")))
+                ax.set_title(f"{name}  W1: {plot[-1]:.3f}", fontsize=4 * s)
                 # if iteration is not None:
                 #     plot = plot[:iteration // 1000]
                 #     print(len(plot))
@@ -75,7 +74,8 @@ def plot(root, datasets, titles_and_name_lists_dict, seperate_plots=False, s=4, 
                     ax2.plot(np.arange(len(patch_plot)), patch_plot, color=COLORS[1], label=f"Patch W1")
                 else:
                     ax2 = fig.add_subplot(gs[-1, :])
-                    ax2.plot(np.arange(len(plot)), plot, color=COLORS[i], label=f"{name}: Last:{plot[-1]:.3f}")
+                    # ax2.plot(np.arange(len(plot)), plot, color=COLORS[i], label=f"{name}: Last:{plot[-1]:.3f}")
+                    ax2.plot(np.arange(len(plot)), plot, color=COLORS[i], label=f"{name}")
 
                 ax2.legend()
                 ax2.set_ylabel(f"BatchW1")
