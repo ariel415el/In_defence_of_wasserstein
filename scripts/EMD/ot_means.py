@@ -29,6 +29,7 @@ def compute_means(ot_map, data, k):
     return (ot_map[:,:, None] * data[None, ] * k).sum(1)
 
 def ot_means(data, k, n_iters):
+    """at each iteration compute OT and replace centroid with weighted mean with the according OT map weights"""
     data = data.reshape(len(data), -1).numpy()
     centroids = np.random.randn(k, data.shape[-1]) * 0.5
     losses = []
@@ -52,6 +53,9 @@ def weisfeld_step(X, dist, W):
     return new_centroids
 
 def ot_means_weisfeld(data, k, n_iters, n_weisfeld):
+    """at each iteration compute OT and peroform Weisfeld steps to approximate the minimum of the weighted sum of
+     distances according OT map weights"""
+
     data = data.reshape(len(data), -1).numpy()
     centroids = np.random.randn(k, data.shape[-1]).astype(np.float64) * 0.5
     losses = []
@@ -66,12 +70,14 @@ def ot_means_weisfeld(data, k, n_iters, n_weisfeld):
         loss = np.sum(ot_map * C)
         losses.append(loss)
         pbar.set_description(f"Loss: {loss}")
-        dump_images(torch.from_numpy(centroids).reshape(args.k, -1, args.im_size, args.im_size), f"{out_dir}/OTMeans_weisfeld-{i}.png")
+        dump_images(torch.from_numpy(centroids).reshape(args.k, -1, args.im_size, args.im_size),
+                    f"{out_dir}/images/OTMeans_weisfeld-{i}.png")
     return losses
 
 
 
 def pixel_ot(data, k, n_iters):
+    """at each iteration compute OT and perform SGD to minimize the centroids"""
     data = data.reshape(len(data), -1).cuda()
     centroids = torch.randn(k, data.shape[-1]).cuda() * 0.5
     centroids.requires_grad_()
@@ -123,6 +129,8 @@ class Generator(nn.Module):
         return img
 
 def generator_ot_means(data, k, n_iters, n_steps):
+    """at each iteration compute OT and perform SGD to minimize the generator outputs"""
+
     z_dim = 64
     data = data.reshape(len(data), -1).cuda()
     latents = torch.randn(k, z_dim).cuda()
@@ -166,10 +174,13 @@ if __name__ == "__main__":
     # Other
     parser.add_argument('--project_name', default="OTMeans", type=str)
     parser.add_argument('--n_workers', default=4, type=int)
+    parser.add_argument("--tag", default="testt", type=str)
     args = parser.parse_args()
 
-    out_dir = f"outputs/{args.project_name}/{os.path.basename(args.data_path)}_K-{args.k}"
+    out_dir = f"outputs/{args.project_name}/{os.path.basename(args.data_path)}_I-{args.im_size}_K-{args.k}_{args.tag}"
     os.makedirs(out_dir, exist_ok=True)
+    os.makedirs(os.path.join(out_dir, "images"), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, "plots"), exist_ok=True)
 
     data = get_data(args.data_path, args.im_size, c=3, limit_data=args.limit_data, center_crop=args.center_crop)
 
@@ -182,7 +193,7 @@ if __name__ == "__main__":
     # plt.plot(np.arange(len(losses_generator_ot_means)), losses_generator_ot_means, label="GenOTMeans", color="y")
     # plt.plot(np.arange(len(losses_ot_means)), losses_ot_means, label="OTMeans", color="b")
     plt.plot(np.arange(len(losses_ot_weisfeld_means)), losses_ot_weisfeld_means, label="OTMeansWeisfeld", color="g")
-    pickle.dump(losses_ot_weisfeld_means, open(f'{out_dir}/losses_ot_weisfeld_means.pkl', 'wb'))
+    pickle.dump(losses_ot_weisfeld_means, open(f'{out_dir}/plots/MiniBatchLoss-dist=w1_fixed_noise_gen_to_train.pkl', 'wb'))
     plt.legend()
     plt.savefig(f"{out_dir}/Losses.png")
     plt.clf()
