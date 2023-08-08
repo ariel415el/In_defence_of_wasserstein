@@ -163,8 +163,9 @@ if __name__ == "__main__":
     # Data
     parser.add_argument('--data_path', default="/mnt/storage_ssd/datasets/FFHQ/FFHQ/FFHQ",
                         help="Path to train images")
-    parser.add_argument('--center_crop', default=90, type=int)
-    parser.add_argument('--limit_data', default=10000, type=int)
+    parser.add_argument('--center_crop', default=None, type=int)
+    parser.add_argument('--limit_data', default=None, type=int)
+    parser.add_argument('--gray_scale', action='store_true', default=False)
 
     # Model
     parser.add_argument('--k', default=64, type=int)
@@ -182,7 +183,8 @@ if __name__ == "__main__":
     os.makedirs(os.path.join(out_dir, "images"), exist_ok=True)
     os.makedirs(os.path.join(out_dir, "plots"), exist_ok=True)
 
-    data = get_data(args.data_path, args.im_size, c=3, limit_data=args.limit_data, center_crop=args.center_crop)
+    data = get_data(args.data_path, args.im_size, c=1 if args.gray_scale else 3,
+                    limit_data=args.limit_data, center_crop=args.center_crop)
 
     # losses_pixel_ot = pixel_ot(data, args.k, 250)
     # losses_generator_ot_means = generator_ot_means(data, args.k, 100, 1000)
