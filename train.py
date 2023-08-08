@@ -49,8 +49,9 @@ def train_GAN(args):
     inception_metrics = InceptionMetrics([next(iter(train_loader)) for _ in range(args.fid_n_batches)], torch.device("cpu"))
     other_metrics = [
                 get_loss_function("MiniBatchLoss-dist=w1"),
-                get_loss_function("MiniBatchPatchLoss-dist=w1-p=16-s=16-n_samples=1024"),
-                get_loss_function("MiniBatchPatchLoss-dist=sinkhorn-epsilon=100-p=16-s=16-n_samples=1024"),
+                get_loss_function("MiniBatchPatchLoss-dist=w1-p=11-s=4-n_samples=1024"),
+                get_loss_function("MiniBatchPatchLoss-dist=w1-p=22-s=8-n_samples=1024"),
+                get_loss_function("MiniBatchPatchLoss-dist=w1-p=48-s=16-n_samples=1024"),
                 # LapSWD()
               ]
 
