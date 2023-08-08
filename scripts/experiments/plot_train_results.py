@@ -48,7 +48,6 @@ def plot(root, datasets, titles_and_name_lists_dict, seperate_plots=False, s=4, 
                 if not found_path:
                     continue
                 dir = os.path.join(root, found_path)
-                print(dir)
                 img_name = find_last_image(os.path.join(dir, "images"))
                 images = os.path.join(dir, "images", img_name)
                 images = np.array(Image.open(images))

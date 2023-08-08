@@ -26,7 +26,7 @@ def send_tasks(project_name, dataset, additional_params):
                        f" --loss_function WGANLoss --gp_weight 10 --z_prior {z_prior} "
 
                 run_sbatch(base + f" --disc_arch {disc_arch}  --batch_size 64 --lrD 0.0001 --G_step_every 5 ",
-                               f"{gen_arch}-Z-{z_prior}-{disc_arch}", hours, killable, gpu_memory)
+                               f"Exp4-{gen_arch}-Z-{z_prior}-{disc_arch}", hours, killable, gpu_memory)
 
 
 if __name__ == '__main__':

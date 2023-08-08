@@ -5,7 +5,7 @@ from sbatch_python import run_sbatch
 
 
 def send_tasks(project_name, datasets):
-    gen_arch = "FC"
+    gen_arch = "FC-nf=1024"
     for dataset, dataset_params in datasets:
         base = f"python3 train.py  --data_path {dataset}  {dataset_params}" \
                f" --load_data_to_memory --n_workers 0 --project_name {project_name}" \
@@ -14,21 +14,21 @@ def send_tasks(project_name, datasets):
 
         # WGANs
         run_sbatch(base + f" --loss_function WGANLoss --gp_weight 10 --lrD 0.0001 --G_step_every 5 --disc_arch FC-nf=1024",
-                   f"DiscreteWGAN-FC", hours, killable)
+                   f"Exp3-DiscreteWGAN-FC", hours, killable)
         run_sbatch(base + f" --loss_function WGANLoss --gp_weight 10 --lrD 0.0001 --G_step_every 5 --disc_arch PatchGAN-normalize=none-k=4",
-                   f"DiscreteWGAN-GAP-22", hours, killable)
+                   f"Exp3-DiscreteWGAN-GAP-22", hours, killable)
         run_sbatch(base + f" --loss_function WGANLoss --gp_weight 10 --lrD 0.0001 --G_step_every 5 --disc_arch PatchGAN-depth=4-normalize=none-k=4-nf=128",
-                   f"DiscreteWGAN-GAP-48", hours, killable)
+                   f"Exp3-DiscreteWGAN-GAP-48", hours, killable)
         run_sbatch(base + f" --loss_function WGANLoss --gp_weight 10 --lrD 0.0001 --G_step_every 5 --disc_arch DCGAN-normalize=none",
-                   f"DiscreteWGAN-DC", hours, killable)
+                   f"Exp3-DiscreteWGAN-DC", hours, killable)
 
         # Direct W1
         run_sbatch(base + f" --loss_function MiniBatchLoss-dist=w1 --D_step_every -1",
-                   f"Discrete-W1", hours, killable)
+                   f"Exp3-Discrete-W1", hours, killable)
         run_sbatch(base + f" --loss_function MiniBatchPatchLoss-dist=w1-p=22-s=8 --D_step_every -1",
-                   f"Discrete-W1-22", hours, killable)
+                   f"Exp3-Discrete-W1-22", hours, killable)
         run_sbatch(base + f" --loss_function MiniBatchPatchLoss-dist=w1-p=48-s=16 --D_step_every -1",
-                   f"Discrete-W1-48", hours, killable)
+                   f"Exp3-Discrete-W1-48", hours, killable)
 
         # Direct Sinkhorn
         # eps=100

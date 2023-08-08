@@ -14,16 +14,16 @@ def send_tasks(project_name, dataset, additional_params):
                f"--gen_arch {gen_arch} "
 
         run_sbatch(base + f" --loss_function WGANLoss --gp_weight 10 --lrD 0.001 --G_step_every 5 --disc_arch FC-nf=1024",
-                   f"PixelWGAN-FC-1024", hours, killable)
+                   f"Exp2-PixelWGAN-FC-1024", hours, killable)
 
         run_sbatch(base + f" --loss_function CtransformLoss --gp_weight 10 --lrD 0.0001 --G_step_every 5 --disc_arch FC-nf=1024",
-                   f"PixelCTGAN-FC-1024", hours, killable)
+                   f"Exp2-PixelCTGAN-FC-1024", hours, killable)
         #
         # run_sbatch(base + f" --loss_function MiniBatchLoss-dist=w1 --D_step_every -1",
-        #            f"Pixel-W1", hours, killable)
+        #            f"Exp2-Pixel-W1", hours, killable)
 
         # run_sbatch(base + f" --loss_function MiniBatchLoss-dist=sinkhorn-epsilon=100 --D_step_every -1",
-        #            f"Pixel-sinkhorn100", hours, killable)
+        #            f"Exp2-Pixel-sinkhorn100", hours, killable)
 
 
 if __name__ == '__main__':
