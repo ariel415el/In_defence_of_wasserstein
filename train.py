@@ -43,8 +43,8 @@ def get_models_and_optimizers(args):
 def train_GAN(args):
     logger = (WandbLogger if args.wandb else PLTLogger)(args, plots_image_folder)
     prior = Prior(args.z_prior, args.z_dim)
-    debug_fixed_noise = prior.sample(args.batch_size).to(device)
-    debug_fixed_reals = next(iter(train_loader)).to(device)
+    debug_fixed_noise = prior.sample(args.f_bs).to(device)
+    debug_fixed_reals = next(iter(eval_loader)).to(device)
 
     inception_metrics = InceptionMetrics([next(iter(train_loader)) for _ in range(args.fid_n_batches)], torch.device("cpu"))
     other_metrics = [
@@ -66,9 +66,8 @@ def train_GAN(args):
     while iteration < args.n_iterations:
         for real_images in train_loader:
             real_images = real_images.to(device)
-            b = real_images.size(0)
 
-            noise = prior.sample(b).to(device)
+            noise = prior.sample(args.f_bs).to(device)
             fake_images = netG(noise)
 
             real_images = DiffAugment(real_images, policy=args.augmentation)
@@ -93,13 +92,13 @@ def train_GAN(args):
 
                 logger.log(debug_Dlosses, step=iteration)
 
-            if not args.no_fake_resample:
-                noise = prior.sample(b).to(device)
-                fake_images = netG(noise)
-                fake_images = DiffAugment(fake_images, policy=args.augmentation)
-
             # #####  2. train Generator #####
             if iteration % args.G_step_every == 0:
+                if not args.no_fake_resample:
+                    noise = prior.sample(args.f_bs).to(device)
+                    fake_images = netG(noise)
+                    fake_images = DiffAugment(fake_images, policy=args.augmentation)
+
                 Gloss, debug_Glosses = loss_function.trainG(netD, real_images, fake_images)
                 netG.zero_grad()
                 Gloss.backward()
@@ -186,7 +185,8 @@ if __name__ == "__main__":
 
 
     # Training
-    parser.add_argument('--batch_size', default=64, type=int)
+    parser.add_argument('--r_bs', default=64, type=int)
+    parser.add_argument('--f_bs', default=64, type=int)
     parser.add_argument('--loss_function', default="NonSaturatingGANLoss", type=str)
     parser.add_argument('--lrG', default=0.0001, type=float)
     parser.add_argument('--lrD', default=0.0001, type=float)
@@ -218,7 +218,7 @@ if __name__ == "__main__":
 
     args.name = f"{os.path.basename(args.data_path)}_I-{args.im_size}x{args.im_size}_G-{args.gen_arch}_D-{args.disc_arch}" \
                 f"{'_GS' if args.gray_scale else ''}{f'_CC-{args.center_crop}' if args.center_crop else ''}" \
-                f"_L-{args.loss_function}_Z-{args.z_dim}x{args.z_prior}_B-{args.batch_size}_{args.tag}"
+                f"_L-{args.loss_function}_Z-{args.z_dim}x{args.z_prior}_B-{args.r_bs}-{args.f_bs}_{args.tag}"
 
     device = torch.device(args.device)
     if args.device != 'cpu':
@@ -226,13 +226,14 @@ if __name__ == "__main__":
 
     saved_model_folder, saved_image_folder, plots_image_folder = get_dir(args)
 
-    train_loader, _ = get_dataloader(args.data_path, args.im_size, args.batch_size, args.n_workers,
+    train_loader, _ = get_dataloader(args.data_path, args.im_size, args.r_bs, args.n_workers,
                                                val_percentage=0, gray_scale=args.gray_scale, center_crop=args.center_crop,
                                                load_to_memory=args.load_data_to_memory, limit_data=args.limit_data)
 
-    # eval_loader, _ = get_dataloader(args.data_path, args.im_size, 10000, args.n_workers,
-    #                                            val_percentage=0, gray_scale=args.gray_scale, center_crop=args.center_crop,
-    #                                            load_to_memory=args.load_data_to_memory, limit_data=10000)
+    print(f"eval loader size {len(train_loader.dataset)}")
+    eval_loader, _ = get_dataloader(args.data_path, args.im_size, len(train_loader.dataset), args.n_workers,
+                                               val_percentage=0, gray_scale=args.gray_scale, center_crop=args.center_crop,
+                                               load_to_memory=args.load_data_to_memory, limit_data=len(train_loader.dataset))
 
 
     train_GAN(args)
