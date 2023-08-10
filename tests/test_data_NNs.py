@@ -27,7 +27,7 @@ def search_for_nn_patches_in_locality(img, data, center, p, s, search_margin):
     refs = refs.permute(0, 2, 1).reshape(-1, c, p, p)
 
     # Search in RGB values
-    print(f"Searching for NN patch in {len(refs)} patches:")
+    print(f"Searching for NN patch in {len(refs)} patches at center {center}:")
     dists = (refs - query_patch).reshape(refs.shape[0], -1)
     rgb_nn_index = torch.sort(torch.norm(dists, dim=1, p=1))[1][0]
 
@@ -45,7 +45,7 @@ def search_for_nn_patches_in_locality(img, data, center, p, s, search_margin):
     return query_patch, refs[rgb_nn_index].clone(), refs[gs_nn_index].clone(), refs[edge_nn_index].clone()
 
 
-def find_patch_nns(fake_images, data, patch_size, stride, search_margin, outputs_dir, n_centers=10):
+def find_patch_nns(fake_images, data, patch_size, search_margin, outputs_dir, n_centers=10):
     """
     Search for nearest patch in data to patches from generated images.
     Search is performed in a constrained locality of the query patch location
@@ -56,15 +56,16 @@ def find_patch_nns(fake_images, data, patch_size, stride, search_margin, outputs
         os.makedirs(out_dir, exist_ok=True)
         h = patch_size // 2
         img_dim = data.shape[-1]
-        centers = np.arange(h, img_dim - h + 1, stride)
-        centers = list(itertools.product(centers, repeat=2))[:n_centers]
+        centers = np.arange(h, img_dim - h + 1, 1)
+        centers = list(itertools.product(centers, repeat=2))
         shuffle(centers)
+        centers = centers[:n_centers]
 
         for j in range(len(fake_images)):
             query_image = fake_images[j].unsqueeze(0)
 
             s = 3
-            fig, ax = plt.subplots(nrows=len(centers), ncols=3, figsize=(s * 3, s * len(centers)))
+            fig, ax = plt.subplots(nrows=len(centers), ncols=2, figsize=(s * 3, s * len(centers)))
             for i, center in enumerate(tqdm(centers)):
                 query_patch, rgb_nn_patch, gs_nn_patch, edge_nn_patch = search_for_nn_patches_in_locality(query_image, data, center, p=patch_size, s=1, search_margin=search_margin)
 
@@ -79,10 +80,10 @@ def find_patch_nns(fake_images, data, patch_size, stride, search_margin, outputs
                 axs.axis('off')
                 axs.set_title('RGB NN')
 
-                axs = ax[2] if len(centers) == 1 else ax[i, 2]
-                axs.imshow((rgb_nn_patch - query_patch).abs()[0].permute(1,2,0).numpy(), cmap=cmap)
-                axs.axis('off')
-                axs.set_title('diff NN')
+                # axs = ax[2] if len(centers) == 1 else ax[i, 2]
+                # axs.imshow((rgb_nn_patch - query_patch).abs()[0].permute(1,2,0).numpy(), cmap=cmap)
+                # axs.axis('off')
+                # axs.set_title('diff NN')
 
             plt.tight_layout()
             fig.savefig(f'{out_dir}/patches-{j}.png')

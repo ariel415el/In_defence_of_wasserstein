@@ -188,7 +188,7 @@ if __name__ == "__main__":
 
     # losses_pixel_ot = pixel_ot(data, args.k, 250)
     # losses_generator_ot_means = generator_ot_means(data, args.k, 100, 1000)
-    losses_ot_weisfeld_means = ot_means_weisfeld(data, args.k, 10, 15)
+    losses_ot_weisfeld_means = ot_means_weisfeld(data, args.k, 25, 15)
     # losses_ot_means = ot_means(data, args.k, 10)
 
     # plt.plot(np.arange(len(losses_pixel_ot)), losses_pixel_ot, label="PixelOT", color="r")

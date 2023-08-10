@@ -65,6 +65,6 @@ if __name__ == '__main__':
 
     # Full data tests
     data = get_data(args['data_path'], args['im_size'], args['center_crop'], args['gray_scale'], limit_data=args['limit_data']).to(device)
-    fake_images = netG(torch.randn((8, z_dim), device=device))
-    find_nns(fake_images, data, outputs_dir=outputs_dir)
-    find_patch_nns(fake_images, data, patch_size=24, stride=12, search_margin=4, outputs_dir=outputs_dir)
+    fake_images = netG(torch.randn((4, z_dim), device=device))
+    find_nns(fake_images, data, outputs_dir=outputs_dir, show_first_n=2)
+    find_patch_nns(fake_images, data, patch_size=24, search_margin=4, outputs_dir=outputs_dir, n_centers=4)

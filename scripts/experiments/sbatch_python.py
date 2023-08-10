@@ -2,7 +2,7 @@ import subprocess
 from time import sleep, strftime
 import os
 
-def run_sbatch(train_command, stdout_name, hours=2, killable=True, gpu_memory=8):
+def run_sbatch(train_command, stdout_name, hours, killable, gpu_memory):
     sbatch_text = (f"#!/bin/csh\n#SBATCH --time={hours}:0:0"
                    f"\n#SBATCH --gres=gpu:1,vmem:{gpu_memory}g"
                    f"\n#SBATCH --mem=64g"

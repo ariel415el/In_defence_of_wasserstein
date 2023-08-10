@@ -44,7 +44,8 @@ def train_GAN(args):
     logger = (WandbLogger if args.wandb else PLTLogger)(args, plots_image_folder)
     prior = Prior(args.z_prior, args.z_dim)
     debug_fixed_noise = prior.sample(args.f_bs).to(device)
-    debug_fixed_reals = next(iter(eval_loader)).to(device)
+    debug_fixed_reals = next(iter(train_loader)).to(device)
+    debug_all_reals = next(iter(full_batch_loader)).to(device)
 
     inception_metrics = InceptionMetrics([next(iter(train_loader)) for _ in range(args.fid_n_batches)], torch.device("cpu"))
     other_metrics = [
@@ -119,7 +120,7 @@ def train_GAN(args):
                 load_params(netG, avg_param_G)
 
                 evaluate(netG, netD, inception_metrics, other_metrics, debug_fixed_noise,
-                         debug_fixed_reals, saved_image_folder, iteration, logger, args)
+                         debug_fixed_reals, debug_all_reals, saved_image_folder, iteration, logger, args)
                 fname = f"{saved_model_folder}/{'last' if not args.save_every else iteration}.pth"
                 torch.save({"iteration": iteration, 'netG': netG.state_dict(), 'netD': netD.state_dict(),
                             "optimizerG":optimizerG.state_dict(), "optimizerD": optimizerD.state_dict()},
@@ -131,7 +132,7 @@ def train_GAN(args):
 
 
 def evaluate(netG, netD, inception_metrics, other_metrics, fixed_noise, debug_fixed_reals,
-             saved_image_folder, iteration, logger, args):
+             debug_all_reals, saved_image_folder, iteration, logger, args):
     netG.eval()
     netD.eval()
     start = time()
@@ -149,7 +150,7 @@ def evaluate(netG, netD, inception_metrics, other_metrics, fixed_noise, debug_fi
 
         for metric in other_metrics:
             logger.log({
-                f'{metric.name}_fixed_noise_gen_to_train': metric(fixed_noise_fake_images, debug_fixed_reals),
+                f'{metric.name}_fixed_noise_gen_to_train': metric(fixed_noise_fake_images, debug_all_reals),
             }, step=iteration)
 
         dump_images(fixed_noise_fake_images,  f'{saved_image_folder}/{iteration}.png')
@@ -185,8 +186,8 @@ if __name__ == "__main__":
 
 
     # Training
-    parser.add_argument('--r_bs', default=64, type=int)
-    parser.add_argument('--f_bs', default=64, type=int)
+    parser.add_argument('--r_bs', default=64, type=int, help="Real data batch size: -1 for automaticly set as full size batch size")
+    parser.add_argument('--f_bs', default=64, type=int, help="Fake data batch size")
     parser.add_argument('--loss_function', default="NonSaturatingGANLoss", type=str)
     parser.add_argument('--lrG', default=0.0001, type=float)
     parser.add_argument('--lrD', default=0.0001, type=float)
@@ -216,25 +217,28 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    args.name = f"{os.path.basename(args.data_path)}_I-{args.im_size}x{args.im_size}_G-{args.gen_arch}_D-{args.disc_arch}" \
-                f"{'_GS' if args.gray_scale else ''}{f'_CC-{args.center_crop}' if args.center_crop else ''}" \
-                f"_L-{args.loss_function}_Z-{args.z_dim}x{args.z_prior}_B-{args.r_bs}-{args.f_bs}_{args.tag}"
-
     device = torch.device(args.device)
     if args.device != 'cpu':
         print(f"Working on device: {torch.cuda.get_device_name(device)}")
-
-    saved_model_folder, saved_image_folder, plots_image_folder = get_dir(args)
 
     train_loader, _ = get_dataloader(args.data_path, args.im_size, args.r_bs, args.n_workers,
                                                val_percentage=0, gray_scale=args.gray_scale, center_crop=args.center_crop,
                                                load_to_memory=args.load_data_to_memory, limit_data=args.limit_data)
 
-    print(f"eval loader size {len(train_loader.dataset)}")
-    eval_loader, _ = get_dataloader(args.data_path, args.im_size, len(train_loader.dataset), args.n_workers,
+    data_size = len(train_loader.dataset)
+    print(f"eval loader size {data_size}")
+    full_batch_loader, _ = get_dataloader(args.data_path, args.im_size, data_size, args.n_workers,
                                                val_percentage=0, gray_scale=args.gray_scale, center_crop=args.center_crop,
                                                load_to_memory=args.load_data_to_memory, limit_data=len(train_loader.dataset))
 
+    if args.r_bs == -1:
+        args.r_bs = data_size
+
+    args.name = f"{os.path.basename(args.data_path)}_I-{args.im_size}x{args.im_size}_G-{args.gen_arch}_D-{args.disc_arch}" \
+                f"{'_GS' if args.gray_scale else ''}{f'_CC-{args.center_crop}' if args.center_crop else ''}" \
+                f"_L-{args.loss_function}_Z-{args.z_dim}x{args.z_prior}_B-{args.r_bs}-{args.f_bs}_{args.tag}"
+
+    saved_model_folder, saved_image_folder, plots_image_folder = get_dir(args)
 
     train_GAN(args)
 

@@ -31,7 +31,7 @@ def find_last_image(dir):
         return os.path.basename(max(files, key=os.path.getctime))
 
 
-def plot(root, titles_and_name_lists_dict, seperate_plots=False, s=4,  n=5, h=3):
+def plot(root, titles_and_name_lists_dict, plot_loss=None, s=4,  n=5):
     """
     s: base unit for the size of plot
     n: #images in row of displayed images
@@ -39,7 +39,10 @@ def plot(root, titles_and_name_lists_dict, seperate_plots=False, s=4,  n=5, h=3)
     """
     for plot_name, titles_and_name_lists in titles_and_name_lists_dict.items():
         width = len(titles_and_name_lists)
-        fig = plt.figure(figsize=(width * s, 1.5 * s))
+        if plot_loss == "common":
+            width += 1
+        h=2 if plot_loss == "separate" else 1
+        fig = plt.figure(figsize=(width * s, h*s))
         gs = fig.add_gridspec(h, width)
         for i, (name, names_list, non_names) in enumerate(titles_and_name_lists):
             found_path = find_dir(root, names_list, non_names)
@@ -53,27 +56,40 @@ def plot(root, titles_and_name_lists_dict, seperate_plots=False, s=4,  n=5, h=3)
             f = n * d // 2
             images = images[d - f:d + f, d - f:d + f]
 
-            ax = fig.add_subplot(gs[:-1, i])
+            ax = fig.add_subplot(gs[0, i])
             ax.imshow(images)
             ax.axis('off')
+
             plot = os.path.join(dir, "plots", "MiniBatchLoss-dist=w1_fixed_noise_gen_to_train.pkl")
             plot = pickle.load((open(plot, "rb")))
             ax.set_title(f"{name}  W1: {plot[-1]:.3f}", fontsize=4 * s)
 
+            if plot_loss is not None:
+                all_axs = []
+                if plot_loss == "separate":
+                    ax2 = fig.add_subplot(gs[-1, i])
+                    ax2.plot(np.arange(len(plot)), plot, color=COLORS[0], label=f"Image W1")
 
-            if seperate_plots:
-                ax2 = fig.add_subplot(gs[-1, i])
-                patch_plot = os.path.join(dir, "plots", "MiniBatchPatchLoss-dist=w1-p=16-s=16-n_samples=1024_fixed_noise_gen_to_train.pkl")
-                patch_plot = pickle.load((open(patch_plot, "rb")))
-                ax2.plot(np.arange(len(plot)), plot, color=COLORS[0], label=f"Image W1")
-                ax2.plot(np.arange(len(patch_plot)), patch_plot, color=COLORS[1], label=f"Patch W1")
-            else:
-                ax2 = fig.add_subplot(gs[-1, :])
-                # ax2.plot(np.arange(len(plot)), plot, color=COLORS[i], label=f"{name}: Last:{plot[-1]:.3f}")
-                ax2.plot(np.arange(len(plot)), plot, color=COLORS[i], label=f"{name}")
+                    for j, (name, path) in enumerate([
+                        ("Patch-11-W1", "MiniBatchPatchLoss-dist=w1-p=11-s=4-n_samples=1024_fixed_noise_gen_to_train.pkl"),
+                        ("Patch-22-W1", "MiniBatchPatchLoss-dist=w1-p=22-s=8-n_samples=1024_fixed_noise_gen_to_train.pkl"),
+                        ("Patch-48-W1", "MiniBatchPatchLoss-dist=w1-p=48-s=16-n_samples=1024_fixed_noise_gen_to_train.pkl"),
+                    ]):
+                        patch_plot = os.path.join(dir, "plots", path)
+                        patch_plot = pickle.load((open(patch_plot, "rb")))
 
-            ax2.legend()
-            ax2.set_ylabel(f"BatchW1")
+                        ax2.plot(np.arange(len(patch_plot)), patch_plot, color=COLORS[j], label=name)
+                        ax2.set_yscale('log')
+                        # ax2.set_yticks([np.log(x) for x in range(1,101,10)])
+                        all_axs.append(ax2)
+                    all_axs[0].get_shared_x_axes().join(*all_axs)
+
+                else:
+                    ax2 = fig.add_subplot(gs[:, -1])
+                    ax2.plot(np.arange(len(plot)), plot, color=COLORS[i], label=f"{name}")
+
+                ax2.legend()
+                ax2.set_ylabel(f"BatchW1")
 
         plt.tight_layout()
         plt.savefig(os.path.join(root, plot_name))
