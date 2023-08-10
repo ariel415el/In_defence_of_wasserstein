@@ -138,11 +138,12 @@ def evaluate(netG, netD, inception_metrics, other_metrics, fixed_noise, debug_fi
     start = time()
     with torch.no_grad():
         fixed_noise_fake_images = netG(fixed_noise)
-        D_fake = netD(fixed_noise_fake_images)
-        D_real = netD(debug_fixed_reals)
-        logger.log({'D_real': D_real.mean().item(),
-                   'D_fake': D_fake.mean().item(),
-                   }, step=iteration)
+        if args.D_step_every > 0 :
+            D_fake = netD(fixed_noise_fake_images)
+            D_real = netD(debug_fixed_reals)
+            logger.log({'D_real': D_real.mean().item(),
+                       'D_fake': D_fake.mean().item(),
+                       }, step=iteration)
 
         if args.fid_n_batches > 0 and iteration % args.fid_freq == 0:
             fake_batches = [netG(torch.randn_like(fixed_noise).to(device)) for _ in range(args.fid_n_batches)]
