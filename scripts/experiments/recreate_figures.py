@@ -82,6 +82,7 @@ class Figure2:
 
 
 class Figure3:
+    """Compare DiscreteWGAN with CNN discriminator to direct patch ot minimization of patches of the same size"""
     @staticmethod
     def send_tasks(project_name, dataset, additional_params):
         n_iterations = 100000
@@ -90,7 +91,7 @@ class Figure3:
         base = f"python3 train.py  --data_path {dataset}  {additional_params}" \
                f" --load_data_to_memory --n_workers 0 --project_name {project_name}" \
                f" --n_iterations {n_iterations} " \
-               f"--gen_arch {gen_arch} --lrG 0.001 --z_prior const=64"
+               f"--gen_arch {gen_arch} --lrG 0.0001 --z_prior const=64"
 
         # WGANs
         run_sbatch(
@@ -142,23 +143,26 @@ class Figure3:
 
 
 class Figure4:
+    """Effect of generator prior size"""
     @staticmethod
     def send_tasks(project_name, dataset, additional_params):
         n_iterations = 250000
         for gen_arch in [
             # "FC",
             "FC-nf=1024",
-            # "DCGAN-normalize=in-nf=128",
+            "DCGAN-normalize=in-nf=128",
             # "ResNet"
         ]:
             for disc_arch in [
-                # "DCGAN-normalize=in-nf=128",
-                "PatchGAN-normalize=in-k=4-nf=128",
+                "DCGAN-normalize=in-nf=128",
+                # "PatchGAN-normalize=in-k=4-nf=128",
                 # "ResNet"
             ]:
                 for z_prior in [
                     "const=64",
-                    # "const=512"
+                    "const=256",
+                    "const=1024",
+                    "normal"
                 ]:
                     base = f"python3 train.py  --data_path {dataset}  {additional_params}" \
                            f" --load_data_to_memory --n_workers 0 --project_name {project_name}" \
@@ -172,20 +176,22 @@ class Figure4:
     def plot_fig(project_name, dataset):
         plot(f'{out_root}/{project_name}',
              {
-                 f"WGAN-{z_prior}.png": [
-                     # (f"f"{dataset}-Z-{z_prior}-WGAN-GAP-22", ["L-WGANLoss", "PatchGAN-depth=3-normalize=none-k=4", f"64x{z_prior}", f"G-{gen_arch}"], []),
-                     # (f"Z-{z_prior}-WGAN-GAP-48", ["L-WGANLoss", "PatchGAN-depth=4-normalize=none-k=4", f"64x{z_prior}", f"G-{gen_arch}"], []),
-                     (f"Z-GAP-48", ["L-WGANLoss", f"64x{z_prior}", "L-WGANLoss", "PatchGAN"], []),
-                     (f"Z-DCGAN", ["L-WGANLoss", f"64x{z_prior}", "L-WGANLoss", "DCGAN"], [])
-
-                     # (f"Z-{z_prior}-sinkhorn-epsilon={eps}", [f"MiniBatchLoss-dist=sinkhorn-epsilon={eps}", f"64x{z_prior}", f"G-{gen_arch}"], []),
-                     # (f"Z-{z_prior}-sinkhorn-epsilon={eps}-p=22-s=8", [f"MiniBatchPatchLoss-dist=sinkhorn-epsilon={eps}-p=22-s=8", f"64x{z_prior}", f"G-{gen_arch}"], []),
-                     # (f"Z-{z_prior}-sinkhorn-epsilon={eps}-p=48-s=16", [f"MiniBatchPatchLoss-dist=sinkhorn-epsilon={eps}-p=48-s=16", f"64x{z_prior}", f"G-{gen_arch}"], []),
+                 f"{dataset}-Effect-Gen-{z_prior}.png": [
+                     (f"Z-{z_prior}_G-FC", [dataset, "L-WGANLoss", f"64x{z_prior}", "L-WGANLoss", "G-FC"], []),
+                     (f"Z-{z_prior}_G-DCGAN", [dataset, "L-WGANLoss", f"64x{z_prior}", "L-WGANLoss", "G-DCGAN"], [])
                 ]
-            for z_prior in ["const=64"]},
+             for z_prior in ["const=64", "const=256", "const=1024", "normal"]},
              plot_loss="common"
              )
-
+        plot(f'{out_root}/{project_name}',
+             {
+                 f"{dataset}-Effect-prior-{gen_arch}.png": [
+                     (f"Z-{z_prior}_G-FC", [dataset, "L-WGANLoss", f"64x{z_prior}", "L-WGANLoss", f"G-{gen_arch}"], [])
+                     for z_prior in ["const=64", "const=256", "const=1024", "normal"]
+                ]
+             for gen_arch in ["FC", "DCGAN"]},
+             plot_loss="common"
+             )
 
 if __name__ == '__main__':
     data_root = '/cs/labs/yweiss/ariel1/data/'

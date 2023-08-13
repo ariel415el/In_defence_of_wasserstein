@@ -69,6 +69,7 @@ def plot(root, titles_and_name_lists_dict, plot_loss=None, s=4,  n=5):
                 if plot_loss == "separate":
                     ax2 = fig.add_subplot(gs[-1, i])
                     ax2.plot(np.arange(len(plot)), plot, color=COLORS[0], label=f"Image W1")
+                    plt.annotate(f"{plot[-1]:.2f}", (len(plot)-1, plot[-1]), textcoords="offset points", xytext=(-2, 2), ha="center")
 
                     for j, (name, path) in enumerate([
                         ("Patch-11-W1", "MiniBatchPatchLoss-dist=w1-p=11-s=4-n_samples=1024_fixed_noise_gen_to_train.pkl"),
@@ -79,16 +80,23 @@ def plot(root, titles_and_name_lists_dict, plot_loss=None, s=4,  n=5):
                         patch_plot = pickle.load((open(patch_plot, "rb")))
 
                         ax2.plot(np.arange(len(patch_plot)), patch_plot, color=COLORS[j], label=name)
+                        plt.annotate(f"{patch_plot[-1]:.2f}", (len(patch_plot) - 1, patch_plot[-1]), textcoords="offset points", xytext=(-2, 2), ha="center")
+
                         ax2.set_yscale('log')
-                        # ax2.set_yticks([np.log(x) for x in range(1,101,10)])
                         all_axs.append(ax2)
-                    all_axs[0].get_shared_x_axes().join(*all_axs)
+
+                    all_axs[0].get_shared_y_axes().join(*all_axs) # same y scale for all
+
+                    handles, labels = ax2.get_legend_handles_labels()
+                    fig.legend(handles, labels, loc='center', ncol=4, prop={'size': 10})
 
                 else:
+
                     ax2 = fig.add_subplot(gs[:, -1])
                     ax2.plot(np.arange(len(plot)), plot, color=COLORS[i], label=f"{name}")
+                    plt.annotate(f"{plot[-1]:.2f}", (len(plot)-1, plot[-1]), textcoords="offset points", xytext=(-2, 2), ha="center")
+                    ax2.legend()
 
-                ax2.legend()
                 ax2.set_ylabel(f"BatchW1")
 
         plt.tight_layout()
