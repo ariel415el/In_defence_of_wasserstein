@@ -45,6 +45,7 @@ def plot(root, titles_and_name_lists_dict, plot_loss=None, s=4,  n=5):
         # fig = plt.figure(figsize=(width * s, h*s))
         fig, axes = plt.subplots(h, width, figsize=(width * s, h*s), squeeze=False)
         # gs = fig.add_gridspec(h, width)
+        all_axs = []
         for i, (name, names_list, non_names) in enumerate(titles_and_name_lists):
             found_path = find_dir(root, names_list, non_names)
             if not found_path:
@@ -71,7 +72,6 @@ def plot(root, titles_and_name_lists_dict, plot_loss=None, s=4,  n=5):
                     ax2.plot(np.arange(len(plot)), plot, color=COLORS[0], label=f"Image W1")
                     ax2.annotate(f"{plot[-1]:.2f}", (len(plot)-1, plot[-1]), textcoords="offset points", xytext=(-2, 2), ha="center")
 
-                    all_axs = []
                     for j, (name, path) in enumerate([
                         ("Patch-11-W1", "MiniBatchPatchLoss-dist=w1-p=11-s=4-n_samples=1024_fixed_noise_gen_to_train.pkl"),
                         ("Patch-22-W1", "MiniBatchPatchLoss-dist=w1-p=22-s=8-n_samples=1024_fixed_noise_gen_to_train.pkl"),
@@ -83,10 +83,11 @@ def plot(root, titles_and_name_lists_dict, plot_loss=None, s=4,  n=5):
                         ax2.plot(np.arange(len(patch_plot)), patch_plot, color=COLORS[j], label=name)
                         ax2.annotate(f"{patch_plot[-1]:.2f}", (len(patch_plot) - 1, patch_plot[-1]), textcoords="offset points", xytext=(-2, 2), ha="center")
 
-                        ax2.set_yscale('log')
-                        all_axs.append(ax2)
+                    ax2.set_yscale('log')
+                    all_axs.append(ax2)
+                    if i > 0:
+                        all_axs[0].sharey(all_axs[i])  # same y scale for all
 
-                    all_axs[0].get_shared_y_axes().join(*all_axs) # same y scale for all
                     handles, labels = ax2.get_legend_handles_labels()
                     fig.legend(handles, labels, loc='center', ncol=4, prop={'size': 10})
 
