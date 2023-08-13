@@ -43,7 +43,7 @@ def plot(root, titles_and_name_lists_dict, plot_loss=None, s=4,  n=5):
             width += 1
         h=2 if plot_loss == "separate" else 1
         # fig = plt.figure(figsize=(width * s, h*s))
-        fig, axes = plt.subplots(h, width, figsize=(width * s, h*s), squeeze=False)
+        fig, axes = plt.subplots(h, width, figsize=(width * s, h*s), squeeze=False, sharey='row')
         # gs = fig.add_gridspec(h, width)
         all_axs = []
         for i, (name, names_list, non_names) in enumerate(titles_and_name_lists):
@@ -85,8 +85,6 @@ def plot(root, titles_and_name_lists_dict, plot_loss=None, s=4,  n=5):
 
                     ax2.set_yscale('log')
                     all_axs.append(ax2)
-                    if i > 0:
-                        all_axs[0].sharey(all_axs[i])  # same y scale for all
 
                     handles, labels = ax2.get_legend_handles_labels()
                     fig.legend(handles, labels, loc='center', ncol=4, prop={'size': 10})
@@ -101,5 +99,4 @@ def plot(root, titles_and_name_lists_dict, plot_loss=None, s=4,  n=5):
 
         plt.tight_layout()
         plt.savefig(os.path.join(root, plot_name))
-        plt.clf()
         plt.cla()
