@@ -42,8 +42,9 @@ def plot(root, titles_and_name_lists_dict, plot_loss=None, s=4,  n=5):
         if plot_loss == "common":
             width += 1
         h=2 if plot_loss == "separate" else 1
-        fig = plt.figure(figsize=(width * s, h*s))
-        gs = fig.add_gridspec(h, width)
+        # fig = plt.figure(figsize=(width * s, h*s))
+        fig, axes = plt.subplots(h, width, figsize=(width * s, h*s), squeeze=False)
+        # gs = fig.add_gridspec(h, width)
         for i, (name, names_list, non_names) in enumerate(titles_and_name_lists):
             found_path = find_dir(root, names_list, non_names)
             if not found_path:
@@ -56,7 +57,7 @@ def plot(root, titles_and_name_lists_dict, plot_loss=None, s=4,  n=5):
             f = n * d // 2
             images = images[d - f:d + f, d - f:d + f]
 
-            ax = fig.add_subplot(gs[0, i])
+            ax = axes[0, i]
             ax.imshow(images)
             ax.axis('off')
 
@@ -65,12 +66,12 @@ def plot(root, titles_and_name_lists_dict, plot_loss=None, s=4,  n=5):
             ax.set_title(f"{name}  W1: {plot[-1]:.3f}", fontsize=4 * s)
 
             if plot_loss is not None:
-                all_axs = []
                 if plot_loss == "separate":
-                    ax2 = fig.add_subplot(gs[-1, i])
+                    ax2 = axes[-1, i]
                     ax2.plot(np.arange(len(plot)), plot, color=COLORS[0], label=f"Image W1")
-                    plt.annotate(f"{plot[-1]:.2f}", (len(plot)-1, plot[-1]), textcoords="offset points", xytext=(-2, 2), ha="center")
+                    ax2.annotate(f"{plot[-1]:.2f}", (len(plot)-1, plot[-1]), textcoords="offset points", xytext=(-2, 2), ha="center")
 
+                    all_axs = []
                     for j, (name, path) in enumerate([
                         ("Patch-11-W1", "MiniBatchPatchLoss-dist=w1-p=11-s=4-n_samples=1024_fixed_noise_gen_to_train.pkl"),
                         ("Patch-22-W1", "MiniBatchPatchLoss-dist=w1-p=22-s=8-n_samples=1024_fixed_noise_gen_to_train.pkl"),
@@ -80,19 +81,17 @@ def plot(root, titles_and_name_lists_dict, plot_loss=None, s=4,  n=5):
                         patch_plot = pickle.load((open(patch_plot, "rb")))
 
                         ax2.plot(np.arange(len(patch_plot)), patch_plot, color=COLORS[j], label=name)
-                        plt.annotate(f"{patch_plot[-1]:.2f}", (len(patch_plot) - 1, patch_plot[-1]), textcoords="offset points", xytext=(-2, 2), ha="center")
+                        ax2.annotate(f"{patch_plot[-1]:.2f}", (len(patch_plot) - 1, patch_plot[-1]), textcoords="offset points", xytext=(-2, 2), ha="center")
 
                         ax2.set_yscale('log')
                         all_axs.append(ax2)
 
                     all_axs[0].get_shared_y_axes().join(*all_axs) # same y scale for all
-
                     handles, labels = ax2.get_legend_handles_labels()
                     fig.legend(handles, labels, loc='center', ncol=4, prop={'size': 10})
 
                 else:
-
-                    ax2 = fig.add_subplot(gs[:, -1])
+                    ax2 = axes[:, -1]
                     ax2.plot(np.arange(len(plot)), plot, color=COLORS[i], label=f"{name}")
                     plt.annotate(f"{plot[-1]:.2f}", (len(plot)-1, plot[-1]), textcoords="offset points", xytext=(-2, 2), ha="center")
                     ax2.legend()
