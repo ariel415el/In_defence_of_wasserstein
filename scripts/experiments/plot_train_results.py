@@ -43,7 +43,7 @@ def plot(root, titles_and_name_lists_dict, plot_loss=None, s=4,  n=5):
             width += 1
         h=2 if plot_loss == "separate" else 1
         # fig = plt.figure(figsize=(width * s, h*s))
-        fig, axes = plt.subplots(h, width, figsize=(width * s, h*s), squeeze=False, sharey='row')
+        fig, axes = plt.subplots(h, width, figsize=(width * s, h*s), squeeze=False, sharey='row' if plot_loss == "separate" else 'none')
         # gs = fig.add_gridspec(h, width)
         all_axs = []
         for i, (name, names_list, non_names) in enumerate(titles_and_name_lists):
@@ -83,18 +83,18 @@ def plot(root, titles_and_name_lists_dict, plot_loss=None, s=4,  n=5):
                         ax2.plot(np.arange(len(patch_plot)), patch_plot, color=COLORS[j], label=name)
                         ax2.annotate(f"{patch_plot[-1]:.2f}", (len(patch_plot) - 1, patch_plot[-1]), textcoords="offset points", xytext=(-2, 2), ha="center")
 
-                    ax2.set_yscale('log')
                     all_axs.append(ax2)
 
                     handles, labels = ax2.get_legend_handles_labels()
                     fig.legend(handles, labels, loc='center', ncol=4, prop={'size': 10})
 
                 else:
-                    ax2 = axes[:, -1]
+                    ax2 = axes[0, -1]
                     ax2.plot(np.arange(len(plot)), plot, color=COLORS[i], label=f"{name}")
                     plt.annotate(f"{plot[-1]:.2f}", (len(plot)-1, plot[-1]), textcoords="offset points", xytext=(-2, 2), ha="center")
                     ax2.legend()
-
+                    
+                ax2.set_yscale('log')
                 ax2.set_ylabel(f"BatchW1")
 
         plt.tight_layout()

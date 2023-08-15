@@ -57,7 +57,7 @@ def swd(x, y, num_proj=512, **kwargs):
 def sinkhorn(x, y, epsilon=1, **kwargs):
     from geomloss import SamplesLoss
     sinkhorn_loss = SamplesLoss(loss="sinkhorn", p=1, blur=int(epsilon))
-    SH = sinkhorn_loss(x.reshape(len(x), -1), y.reshape(len(x), -1))
+    SH = sinkhorn_loss(x.reshape(len(x), -1), y.reshape(len(y), -1))
     return SH, {"Sinkhorm-eps=1": SH}
 
 class MiniBatchLoss:
