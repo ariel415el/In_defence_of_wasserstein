@@ -24,7 +24,8 @@ def get_models_and_optimizers(args):
     optimizerG = optim.Adam(netG.parameters(), lr=args.lrG, betas=(0.5, 0.9))
     optimizerD = optim.Adam(netD.parameters(), lr=args.lrD, betas=(0.5, 0.9))
 
-    # netG.load_state_dict(torch.load('path')['netG'])
+    if args.loadG is not None:
+        netG.load_state_dict(torch.load(args.loadG)['netG'])
     start_iteration = 0
     if args.resume_last_ckpt:
         ckpts = glob.glob(f'{saved_model_folder}/*.pth')
@@ -50,9 +51,9 @@ def train_GAN(args):
     inception_metrics = InceptionMetrics([next(iter(train_loader)) for _ in range(args.fid_n_batches)], torch.device("cpu"))
     other_metrics = [
                 get_loss_function("MiniBatchLoss-dist=w1"),
-                get_loss_function("MiniBatchPatchLoss-dist=w1-p=11-s=4-n_samples=1024"),
-                get_loss_function("MiniBatchPatchLoss-dist=w1-p=22-s=8-n_samples=1024"),
-                get_loss_function("MiniBatchPatchLoss-dist=w1-p=48-s=16-n_samples=1024"),
+                # get_loss_function("MiniBatchPatchLoss-dist=w1-epsilon=10-p=11-s=4"),
+                get_loss_function("MiniBatchPatchLoss-dist=w1-epsilon=10-p=16-s=8"),
+                # get_loss_function("MiniBatchPatchLoss-dist=w1-epsilon=10-p=48-s=16"),
                 # LapSWD()
               ]
 
@@ -151,7 +152,7 @@ def evaluate(netG, netD, inception_metrics, other_metrics, fixed_noise, debug_fi
 
         for metric in other_metrics:
             logger.log({
-                f'{metric.name}_fixed_noise_gen_to_train': metric(fixed_noise_fake_images, debug_all_reals),
+                f'{metric.name}_fixed_noise_gen_to_train': metric(fixed_noise_fake_images.cpu(), debug_all_reals.cpu()),
             }, step=iteration)
 
         dump_images(fixed_noise_fake_images,  f'{saved_image_folder}/{iteration}.png')
@@ -211,6 +212,7 @@ if __name__ == "__main__":
     parser.add_argument('--project_name', default='GANs')
     parser.add_argument('--tag', default='test')
     parser.add_argument('--n_workers', default=4, type=int)
+    parser.add_argument('--loadG', default=None, type=str)
     parser.add_argument('--resume_last_ckpt', action='store_true', default=False,
                         help="Search for the latest ckpt in the same folder to resume training")
     parser.add_argument('--load_data_to_memory', action='store_true', default=False)

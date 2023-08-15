@@ -15,6 +15,11 @@ def load_params(model, new_param):
         p.data.copy_(new_p)
 
 
+def compose_experiment_name(args):
+    return f"{os.path.basename(args.data_path)}_I-{args.im_size}x{args.im_size}_G-{args.gen_arch}_D-{args.disc_arch}" \
+                f"{'_GS' if args.gray_scale else ''}{f'_CC-{args.center_crop}' if args.center_crop else ''}" \
+                f"_L-{args.loss_function}_Z-{args.z_dim}x{args.z_prior}_B-{args.r_bs}-{args.f_bs}_{args.tag}"
+
 def parse_classnames_and_kwargs(string, kwargs=None):
     """Import a class and and create an instance with kwargs from strings in format
     '<class_name>_<kwarg_1_name>=<kwarg_1_value>_<kwarg_2_name>=<kwarg_2_value>"""
@@ -57,7 +62,6 @@ class Prior:
         else:
             z = torch.randn((b, self.z_dim))
         return z
-
 
 
 def find_nth_decimal(x, first, size=2):
