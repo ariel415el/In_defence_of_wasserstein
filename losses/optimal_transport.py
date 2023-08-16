@@ -6,12 +6,12 @@ import torch.nn.functional as F
 from losses.loss_utils import get_dist_metric
 
 
-def get_ot_plan(C, sinkhorn=0):
+def get_ot_plan(C, epsilon=0):
     """Use POT to compute optimal transport between two emprical (uniforms) distriutaion with distance matrix C"""
     uniform_x = np.ones(C.shape[0]) / C.shape[0]
     uniform_y = np.ones(C.shape[1]) / C.shape[1]
-    if sinkhorn > 0:
-        OTplan = ot.sinkhorn(uniform_x, uniform_y, C, reg=sinkhorn)
+    if epsilon > 0:
+        OTplan = ot.sinkhorn(uniform_x, uniform_y, C, reg=epsilon)
     else:
         OTplan = ot.emd(uniform_x, uniform_y, C)
     return OTplan
@@ -27,10 +27,10 @@ def to_patches(x, p=8, s=4, sample_patches=None):
     return patches
 
 
-def w1(x, y, **kwargs):
+def w1(x, y, epsilon=0, **kwargs):
     base_metric = get_dist_metric("L2")
     C = base_metric(x.reshape(len(x), -1), y.reshape(len(y), -1))
-    OTPlan = get_ot_plan(C.detach().cpu().numpy())
+    OTPlan = get_ot_plan(C.detach().cpu().numpy(), int(epsilon))
     OTPlan = torch.from_numpy(OTPlan).to(C.device)
     W1 = torch.sum(OTPlan * C)
     return W1, {"W1-L1": W1}

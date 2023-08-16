@@ -61,6 +61,9 @@ def parse_train_args(arguments_string=None):
     parser.add_argument('--load_data_to_memory', action='store_true', default=False)
     parser.add_argument('--device', default="cuda:0")
 
+    if arguments_string is not None:
+        arguments_string = arguments_string.split()
+
     return parser.parse_args(arguments_string)
 
 def copy_G_params(model):
