@@ -11,7 +11,7 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "utils"))
 from data import get_transforms
 
-def get_data(data_path, im_size=None, c=3, center_crop=None, gray_scale=False, flatten=True, limit_data=10000):
+def get_data(data_path, im_size=None, c=3, center_crop=None, gray_scale=False, flatten=True, limit_data=None):
     if os.path.isdir(data_path):
         image_paths = sorted([os.path.join(data_path, x) for x in os.listdir(data_path)])[:limit_data]
     else:
@@ -52,10 +52,12 @@ def get_centroids(data, n_centroids, use_faiss=False):
     return centroids
 
 
-def read_grid_batch(path, d, c):
+def read_grid_batch(path, d, c, flatten=True):
     img = get_data(path, None, c, flatten=False)[0].unsqueeze(0)
     batch = F.unfold(img[..., 2:,2:], kernel_size=d, stride=d+2)  # shape (b, c*p*p, N_patches)
-    batch = batch[0].permute(1,0).reshape(-1, c, d, d).reshape(-1, c*d*d)
+    batch = batch[0].permute(1,0).reshape(-1, c, d, d)
+    if flatten:
+        batch = batch.reshape(-1, c*d*d)
     return batch
 
 

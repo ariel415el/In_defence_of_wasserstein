@@ -78,12 +78,13 @@ def find_patch_nns(fake_images, data, patch_size, search_margin, outputs_dir, n_
                 axs = ax[1] if len(centers) == 1 else ax[i, 1]
                 axs.imshow((rgb_nn_patch.permute(1,2,0).numpy() + 1)/2, cmap=cmap)
                 axs.axis('off')
-                axs.set_title('RGB NN')
+                axs.set_title(f'RGB NN: {(rgb_nn_patch - query_patch).pow(2).sum():.2f}')
 
                 # axs = ax[2] if len(centers) == 1 else ax[i, 2]
-                # axs.imshow((rgb_nn_patch - query_patch).abs()[0].permute(1,2,0).numpy(), cmap=cmap)
+                # axs.imshow((edge_nn_patch.permute(1,2,0).numpy() + 1)/2, cmap=cmap)
                 # axs.axis('off')
-                # axs.set_title('diff NN')
+                # axs.set_title(f'Edge NN: {(edge_nn_patch - query_patch).pow(2).sum():.2f}')
+
 
             plt.tight_layout()
             fig.savefig(f'{out_dir}/patches-{j}.png')

@@ -46,7 +46,7 @@ def get_score_gradient_map(classifier, images, mean=False):
     for i in range(len(images)):
         image = images[i].unsqueeze(0)
         image.requires_grad = True
-        score = classifier(image)
+        score = classifier(image)[0]
         score.backward()
         saliency_maps.append(image.grad)
 
