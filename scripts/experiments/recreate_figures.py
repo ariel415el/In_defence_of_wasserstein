@@ -1,197 +1,93 @@
 import os
 import sys
 import argparse
-import subprocess
-from time import sleep, strftime
+
+from utils.common import compose_experiment_name
+from utils.train_utils import parse_train_args
+
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from sbatch_python import run_sbatch
-from plot_train_results import find_dir, find_last_image, plot
+from plot_train_results import plot
 
 
-class Figure1:
+class Figure:
+    @staticmethod
+    def get_run_commands(project_name, dataset, additional_params):
+        raise NotImplemented
+
+    @staticmethod
+    def plot_fig(names_and_commands, dataset_name):
+        plot(f'{out_root}/{project_name}', f"Exp1-{dataset_name}.png", names_and_commands,
+             plot_loss=None, n=args.n
+             )
+class Figure_1(Figure):
     """Figure 1 in the papers compares the outputs of the OT-means algorithm to that of CTransformLoss"""
     @staticmethod
-    def send_tasks(project_name, dataset, additional_params):
+    def get_run_commands(project_name, dataset, additional_params):
         gen_arch = "Pixels --lrG 0.001"
         base = f"python3 train.py  --data_path {dataset}  {additional_params}" \
                f" --load_data_to_memory --n_workers 0 --project_name {project_name}" \
                f" --n_iterations 25000 --gen_arch {gen_arch}"
 
-        run_sbatch(base + f" --loss_function CtransformLoss ",
-                   f"Exp1-PixelCTGAN-{os.path.basename(dataset)}",
-                   args.hours, args.killable, args.gpu_memory)
+        names_and_commands = [
+            ("Exp1-PixelCTGAN", base + f" --loss_function CtransformLoss "),
+            ("Exp1-Pixel-W1", base + f" --loss_function MiniBatchLoss-dist=w1 --D_step_every -1 --r_bs -1 "),
+            ("Exp1-OTmeans", f"python3 scripts/EMD/ot_means.py {additional_params} --data_path {dataset}"
+                              f" --project_name {project_name}",  f"Exp1-OTmeans-{os.path.basename(dataset)}")
+        ]
+        return names_and_commands
 
-        run_sbatch(base + f" --loss_function MiniBatchLoss-dist=w1 --D_step_every -1 --r_bs -1 ",
-                 f"Exp1-Pixel-W1-{os.path.basename(dataset)}",
-                 args.hours, args.killable, args.gpu_memory)
-
-        run_sbatch(f"python3 scripts/EMD/ot_means.py {additional_params} --data_path {dataset} "
-                   f"--project_name {project_name}",  f"Exp1-OTmeans-{os.path.basename(dataset)}",
-                   args.hours, args.killable, args.gpu_memory)
 
     @staticmethod
-    def plot_fig(project_name, dataset):
-        plot(f'{out_root}/{project_name}',
-             {
-                 f"Exp1-{dataset}.png": [
-                     (f"OTmeans", [f"{dataset}_I", "K-64"], []),
-                     # (f"MBOT", [f"{dataset}_I", "L-MiniBatch"], []),
-                     (f"CTGAN", [f"{dataset}_I", "L-CtransformLoss"], []),
-                 ]
-            },
-             plot_loss=None, n=args.n, h=5
+    def plot_fig(names_and_commands, dataset_name):
+        names_and_commands = [(name, compose_experiment_name(parse_train_args(command))) for name, command in names_and_commands[:-1]]
+        names_and_commands += ["OTmeans"]
+        plot(f'{out_root}/{project_name}', f"Exp1-{dataset_name}.png", names_and_commands,
+             plot_loss=None, n=args.n
              )
 
 
-class Figure2:
+class Figure_2(Figure):
     """Figure 2 in the Shows that Discrete GANS behave like CTransformLoss"""
-    @staticmethod
-    def send_tasks(project_name, dataset, additional_params):
-        for gen_arch in ["Pixels --lrG 0.001", "FC --lrG 0.0001"]:
-            base = f"python3 train.py  --data_path {dataset}  {additional_params}" \
-                   f" --load_data_to_memory --n_workers 0 --project_name {project_name} --z_prior const=64" \
-                   f"  --n_iterations 25000 " \
-                   f"--gen_arch {gen_arch} "
-
-            run_sbatch(base + f" --loss_function WGANLoss --gp_weight 10 --lrD 0.001 --G_step_every 5 --disc_arch FC-nf=1024",
-                       f"Exp2-PixelWGAN-FC-1024", *sbatch_params)
-
-            run_sbatch(base + f" --loss_function CtransformLoss --lrD 0.001 --disc_arch FC-nf=1024",
-                       f"Exp2-PixelCTGAN-FC-1024", *sbatch_params)
-
-            # run_sbatch(base + f" --loss_function MiniBatchLoss-dist=w1 --D_step_every -1",
-            #            f"Exp2-Pixel-W1", hours, killable)
-
-            # run_sbatch(base + f" --loss_function MiniBatchLoss-dist=sinkhorn-epsilon=100 --D_step_every -1",
-            #            f"Exp2-Pixel-sinkhorn100", hours, killable)
 
     @staticmethod
-    def plot_fig(project_name, dataset):
-        plot(f'{out_root}/{project_name}',
-             {
-                 f"{dataset}-{gen_arch}.png": [
-                     (f"DiscreteWGAN", [dataset, "L-WGANLoss", f"G-{gen_arch}", "D-FC-nf=1024"], []),
-                     (f"DiscreteCTGAN", [dataset, "L-CtransformLoss", f"G-{gen_arch}"], []),
-                     # (f"W1", [dataset, "L-MiniBatchLoss-dist=w1", f"G-{gen_arch}"], []),
-                     #(f"Sinkhorn-100-FC", ["L-MiniBatchLoss-dist=sinkhorn-epsilon=100", f"G-{gen_arch}"], []),
-                 ]
-                 for gen_arch in ["Pixels", "FC"]
-             },
-             plot_loss="common", n=args.n
-        )
+    def get_run_commands(project_name, dataset, additional_params):
+        gen_arch = "Pixels --lrG 0.001"
+        base = f"python3 train.py  --data_path {dataset}  {additional_params}" \
+               f" --load_data_to_memory --n_workers 0 --project_name {project_name} --z_prior const=64" \
+               f"  --n_iterations 25000 " \
+               f"--gen_arch {gen_arch} "
+
+        names_and_commands = [
+            ("Exp2-PixelWGAN-FC", base + f" --loss_function WGANLoss --gp_weight 10 --lrD 0.001 --G_step_every 5 --disc_arch FC-nf=1024"),
+            ("Exp2-PixelCTGAN-FC", base + f" --loss_function CtransformLoss --lrD 0.001 --disc_arch FC-nf=1024"),
+
+        ]
+        return names_and_commands
 
 
 class Figure3:
     """Compare DiscreteWGAN with CNN discriminator to direct patch ot minimization of patches of the same size"""
     @staticmethod
-    def send_tasks(project_name, dataset, additional_params):
+    def get_run_commands(project_name, dataset, additional_params):
         n_iterations = 100000
         gen_arch = "FC"
-        # gen_arch = "FC-nf=1024"
         base = f"python3 train.py  --data_path {dataset}  {additional_params}" \
                f" --load_data_to_memory --n_workers 0 --project_name {project_name}" \
                f" --n_iterations {n_iterations} " \
                f"--gen_arch {gen_arch} --lrG 0.0001 --z_prior const=64"
 
-        # WGANs
-        run_sbatch(
-            base + f" --loss_function WGANLoss --gp_weight 10 --lrD 0.001 --G_step_every 5"
-                   f" --disc_arch FC-nf=1024",
-            f"Exp3-DiscreteWGAN-FC", *sbatch_params)
-        run_sbatch(
-            base + f" --loss_function WGANLoss --gp_weight 10 --lrD 0.001 --G_step_every 5"
-                   f" --disc_arch PatchGAN-normalize=none-k=4",
-            f"Exp3-DiscreteWGAN-GAP-22", *sbatch_params)
-        # run_sbatch(
-        #     base + f" --loss_function WGANLoss --gp_weight 10 --lrD 0.001 --G_step_every 5"
-        #            f" --disc_arch PatchGAN-normalize=none-depth=4-k=4",
-        #     f"Exp3-DiscreteWGAN-GAP-48", *sbatch_params)
-        # run_sbatch(
-        #     base + f" --loss_function WGANLoss --gp_weight 10 --lrD 0.001 --G_step_every 5"
-        #            f" --disc_arch DCGAN-normalize=none",
-        #     f"Exp3-DiscreteWGAN-DC", *sbatch_params)
+        names_and_commands = [
+            ("Exp3-DiscreteWGAN-FC", base + f" --loss_function WGANLoss --gp_weight 10 --lrD 0.001 --G_step_every 5"
+                                            f" --disc_arch FC-nf=1024"),
+            ("Exp3-DiscreteWGAN-GAP-16", base + f" --loss_function WGANLoss --gp_weight 10 --lrD 0.001 --G_step_every 5"
+                                                f" --disc_arch PatchGAN-normalize=in-k=3"),
+            ("Exp3-Discrete-W1", base + f" --loss_function MiniBatchLoss-dist=w1 --D_step_every -1"),
+            ("Exp3-Discrete-W1_p=16-s=8", base + f" --loss_function MiniBatchPatchLoss-dist=w1-p=16-s=8-n_samples=1024"
+                                                 f" --D_step_every -1")
+        ]
+        return names_and_commands
 
-        # Direct W1
-        run_sbatch(base + f" --loss_function MiniBatchLoss-dist=w1 --D_step_every -1",
-                   f"Exp3-Discrete-W1", *sbatch_params)
-        run_sbatch(base + f" --loss_function MiniBatchPatchLoss-dist=w1-p=22-s=8-n_samples=1024 --D_step_every -1",
-                   f"Exp3-Discrete-W1-22", *sbatch_params)
-        # run_sbatch(base + f" --loss_function MiniBatchPatchLoss-dist=w1-p=48-s=16 --D_step_every -1",
-        #            f"Exp3-Discrete-W1-48", *sbatch_params)
-    
-    @staticmethod
-    def plot_fig(project_name, dataset):
-        plot(f'{out_root}/{project_name}',
-             {
-                 f"Evidence-{dataset}.png": [
-                     (f"DiscreteWGAN-FC", [dataset, "L-WGANLoss", "D-FC"], []),
-                     (f"DiscreteWGAN-GAP-22", [dataset, "L-WGANLoss", "D-PatchGAN-normalize=none-k=4"], ["PatchGAN-depth=4-normalize=none-k=4"]),
-                     # (f"{dataset}-DiscreteWGAN-GAP-48", [dataset, "L-WGANLoss", "PatchGAN-depth=4-normalize=none-k=4"], []),
-                     # (f"{dataset}-DiscreteWGAN-DCGAN", [dataset, "L-WGANLoss", "D-DCGAN"], []),
-
-                     (f"Discrete-W1", [dataset, "MiniBatchLoss-dist=w1"], []),
-                     (f"Discrete-W1-p=22-s=8", [dataset, "MiniBatchPatchLoss-dist=w1-p=22-s=8"], []),
-                     # (f"{dataset}-Discrete-W1-p=48-s=16", [dataset, "MiniBatchPatchLoss-dist=w1-p=48-s=16"], []),
-
-                     # (f"Discrete-sinkhorn-epsilon={eps}", [f"MiniBatchLoss-dist=sinkhorn-epsilon={eps}"], []),
-                     # (f"Discrete-sinkhorn-epsilon={eps}-p=22-s=8", [f"MiniBatchPatchLoss-dist=sinkhorn-epsilon={eps}-p=22-s=8"], []),
-                     # (f"Discrete-sinkhorn-epsilon={eps}-p=48-s=16", [f"MiniBatchPatchLoss-dist=sinkhorn-epsilon={eps}-p=48-s=16"], []),
-                 ]
-             },
-             plot_loss="separate"
-        )
-
-
-class Figure4:
-    """Effect of generator prior size"""
-    @staticmethod
-    def send_tasks(project_name, dataset, additional_params):
-        n_iterations = 250000
-        for gen_arch in [
-            # "FC",
-            "FC-nf=1024",
-            "DCGAN-normalize=in-nf=128",
-            # "ResNet"
-        ]:
-            for disc_arch in [
-                "DCGAN-normalize=in-nf=128",
-                # "PatchGAN-normalize=in-k=4-nf=128",
-                # "ResNet"
-            ]:
-                for z_prior in [
-                    "const=64",
-                    "const=256",
-                    "const=1024",
-                    "normal"
-                ]:
-                    base = f"python3 train.py  --data_path {dataset}  {additional_params}" \
-                           f" --load_data_to_memory --n_workers 0 --project_name {project_name}" \
-                           f"  --n_iterations {n_iterations} --gen_arch {gen_arch} --lrG 0.0001 " \
-                           f" --loss_function WGANLoss --gp_weight 10 --z_prior {z_prior} "
-
-                    run_sbatch(base + f" --disc_arch {disc_arch} --lrD 0.001 --G_step_every 5 ",
-                               f"Exp4-{gen_arch}-Z-{z_prior}-{disc_arch}",  *sbatch_params)
-
-    @staticmethod
-    def plot_fig(project_name, dataset):
-        plot(f'{out_root}/{project_name}',
-             {
-                 f"{dataset}-Effect-Gen-{z_prior}.png": [
-                     (f"Z-{z_prior}_G-FC", [dataset, "L-WGANLoss", f"64x{z_prior}", "L-WGANLoss", "G-FC"], []),
-                     (f"Z-{z_prior}_G-DCGAN", [dataset, "L-WGANLoss", f"64x{z_prior}", "L-WGANLoss", "G-DCGAN"], [])
-                ]
-             for z_prior in ["const=64", "const=256", "const=1024", "normal"]},
-             plot_loss="common"
-             )
-        plot(f'{out_root}/{project_name}',
-             {
-                 f"{dataset}-Effect-prior-{gen_arch}.png": [
-                     (f"Z-{z_prior}_G-FC", [dataset, "L-WGANLoss", f"64x{z_prior}", "L-WGANLoss", f"G-{gen_arch}"], [])
-                     for z_prior in ["const=64", "const=256", "const=1024", "normal"]
-                ]
-             for gen_arch in ["FC", "DCGAN"]},
-             plot_loss="common"
-             )
 
 if __name__ == '__main__':
     data_root = '/cs/labs/yweiss/ariel1/data/'
@@ -214,17 +110,19 @@ if __name__ == '__main__':
     parser.add_argument('--plot', default=False, action='store_true')
     parser.add_argument('--n', default=8, type=int)
     args = parser.parse_args()
-    project_name = f"Figure{args.figure_idx}"
+    project_name = f"Figure_Exp{args.figure_idx}"
 
-    figure_generator = globals()[f"Figure{args.figure_idx}"]
-    if args.run:
-        sbatch_params = args.hours, args.killable, args.gpu_memory
+    sbatch_params = args.hours, args.killable, args.gpu_memory
+    figure_command_generator = globals()[f"Figure_{args.figure_idx}"]
 
-        for data_path, data_args in [data_map[k] for k in args.datasets]:
-            figure_generator.send_tasks(project_name, dataset=data_path, additional_params=data_args)
+    for dataset_name, (data_path, data_args) in args.datasets.items():
+        names_and_commands = figure_command_generator.get_run_commands(project_name, data_path, additional_params=data_args)
+        if args.run:
+            for name, command in names_and_commands:
+                run_sbatch(command, f"{name}-{os.path.basename(data_path)}", *sbatch_params)
 
-    elif args.plot:
-        for data_path, _ in [data_map[k] for k in args.datasets]:
-            figure_generator.plot_fig(project_name=project_name, dataset=os.path.basename(data_path))
+        elif args.plot:
+            figure_command_generator.plot_fig(names_and_commands, dataset_name)
+
     else:
         raise ValueError("Please supply at least one task (run, plot)")
