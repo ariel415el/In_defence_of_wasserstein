@@ -80,8 +80,8 @@ class Prior:
     def __init__(self, prior_type, z_dim):
         self.prior_type = prior_type
         self.z_dim = z_dim
+        self.z = None
         if "const" in self.prior_type:
-            self.z = None
             self.b = int(self.prior_type.split("=")[1])
 
     def sample(self, b):
@@ -101,7 +101,20 @@ class Prior:
         return z
 
 
+def save_model(prior, netG, netD, optimizerG, optimizerD, saved_model_folder, iteration, args):
+    fname = f"{saved_model_folder}/{'last' if not args.save_every else iteration}.pth"
+    torch.save({"iteration": iteration,
+                'prior': prior.z,
+                'netG': netG.state_dict(),
+                'netD': netD.state_dict(),
+                "optimizerG": optimizerG.state_dict(),
+                "optimizerD": optimizerD.state_dict()
+                },
+               fname)
+
 def get_models_and_optimizers(args, device, saved_model_folder):
+    prior = Prior(args.z_prior, args.z_dim)
+
     netG, netD = get_models(args, device)
     netG.train()
     netD.train()
@@ -109,19 +122,22 @@ def get_models_and_optimizers(args, device, saved_model_folder):
     optimizerG = optim.Adam(netG.parameters(), lr=args.lrG, betas=(0.5, 0.9))
     optimizerD = optim.Adam(netD.parameters(), lr=args.lrD, betas=(0.5, 0.9))
 
+
     if args.loadG is not None:
         netG.load_state_dict(torch.load(args.loadG)['netG'])
+        piror.z = torch.load(args.loadG)['prior']
     start_iteration = 0
     if args.resume_last_ckpt:
         ckpts = glob.glob(f'{saved_model_folder}/*.pth')
         if ckpts:
             latest_ckpt = max(ckpts, key = os.path.getctime)
             ckpt = torch.load(latest_ckpt)
+            piror.z.load_state_dict(ckpt['prior'])
             netG.load_state_dict(ckpt['netG'])
             netD.load_state_dict(ckpt['netD'])
             optimizerG.load_state_dict(ckpt['optimizerG'])
             optimizerD.load_state_dict(ckpt['optimizerD'])
             start_iteration = ckpt['iteration']
             print(f"Loaded ckpt of iteration: {start_iteration}")
-    return netG, netD, optimizerG, optimizerD, start_iteration
+    return prior, netG, netD, optimizerG, optimizerD, start_iteration
 

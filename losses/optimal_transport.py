@@ -35,11 +35,14 @@ def w1(x, y, epsilon=0, **kwargs):
     W1 = torch.sum(OTPlan * C)
     return W1, {"W1-L2": W1}
 
+
 def nn(x, y, **kwargs):
     base_metric = get_dist_metric("L2")
     C = base_metric(x.reshape(len(x), -1), y.reshape(len(y), -1))
-    nn_loss = C.min(dim=1)[0].mean()
+    # nn_loss = C.min(dim=1)[0].mean()
+    nn_loss = max(C.min(dim=1)[0].mean(), C.min(dim=1)[0].mean())
     return nn_loss, {"nn_loss": nn_loss}
+
 
 def swd(x, y, num_proj=512, **kwargs):
     num_proj = int(num_proj)

@@ -1,5 +1,4 @@
 import argparse
-
 from time import time
 
 import torch
@@ -7,7 +6,7 @@ import torch
 from benchmarking.neural_metrics import InceptionMetrics
 from utils.diffaug import DiffAugment
 from utils.common import dump_images, compose_experiment_name
-from utils.train_utils import copy_G_params, load_params, Prior, get_models_and_optimizers, parse_train_args
+from utils.train_utils import copy_G_params, load_params, Prior, get_models_and_optimizers, parse_train_args, save_model
 from losses import get_loss_function, calc_gradient_penalty
 from utils.data import get_dataloader
 from utils.logger import get_dir, PLTLogger, WandbLogger
@@ -15,7 +14,9 @@ from utils.logger import get_dir, PLTLogger, WandbLogger
 
 def train_GAN(args):
     logger = (WandbLogger if args.wandb else PLTLogger)(args, plots_image_folder)
-    prior = Prior(args.z_prior, args.z_dim)
+
+    prior, netG, netD, optimizerG, optimizerD, start_iteration = get_models_and_optimizers(args, device, saved_model_folder)
+
     debug_fixed_noise = prior.sample(args.f_bs).to(device)
     debug_fixed_reals = next(iter(train_loader)).to(device)
     debug_all_reals = next(iter(full_batch_loader)).to(device)
@@ -23,15 +24,15 @@ def train_GAN(args):
     inception_metrics = InceptionMetrics([next(iter(train_loader)) for _ in range(args.fid_n_batches)], torch.device("cpu"))
     other_metrics = [
                 get_loss_function("MiniBatchLoss-dist=w1"),
-                # get_loss_function("MiniBatchPatchLoss-dist=w1-epsilon=10-p=11-s=4"),
+                get_loss_function("MiniBatchLoss-dist=nn"),
+                get_loss_function("MiniBatchPatchLoss-dist=w1-p=16-s=8"),
                 # get_loss_function("MiniBatchPatchLoss-dist=w1-epsilon=10-p=16-s=8"),
-                # get_loss_function("MiniBatchPatchLoss-dist=w1-epsilon=10-p=48-s=16"),
+                get_loss_function("MiniBatchPatchLoss-dist=nn-p=16-s=8"),
                 # LapSWD()
               ]
 
     loss_function = get_loss_function(args.loss_function)
 
-    netG, netD, optimizerG, optimizerD, start_iteration = get_models_and_optimizers(args, device, saved_model_folder)
 
     avg_param_G = copy_G_params(netG)
 
@@ -94,10 +95,8 @@ def train_GAN(args):
 
                 evaluate(netG, netD, inception_metrics, other_metrics, debug_fixed_noise,
                          debug_fixed_reals, debug_all_reals, saved_image_folder, iteration, logger, args)
-                fname = f"{saved_model_folder}/{'last' if not args.save_every else iteration}.pth"
-                torch.save({"iteration": iteration, 'netG': netG.state_dict(), 'netD': netD.state_dict(),
-                            "optimizerG":optimizerG.state_dict(), "optimizerD": optimizerD.state_dict()},
-                           fname)
+
+                save_model(prior, netG, netD, optimizerG, optimizerD, saved_model_folder, iteration, args)
 
                 load_params(netG, backup_para)
 
