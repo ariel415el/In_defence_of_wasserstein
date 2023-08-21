@@ -13,9 +13,8 @@ class CtransformLoss:
         self.epsilon = float(epsilon)
 
     def compute_ot(self, critic, batch, gen_batch):
-        fs = critic(batch)
         C = self.base_metric(batch.reshape(len(batch), -1), gen_batch.reshape(len(gen_batch), -1))
-
+        fs = critic(batch)
         c_m_f = C - fs[:, None]
         if self.epsilon <= 0:
             f_cs = torch.min(c_m_f, dim=0)[0]

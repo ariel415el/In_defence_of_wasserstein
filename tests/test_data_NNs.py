@@ -11,79 +11,65 @@ from torchvision import utils as vutils
 import torch.nn.functional as F
 
 from losses.loss_utils import vgg_dist_calculator
+from tests.test_utils import cut_around_center, compute_dists, sample_patch_centers
 
 
-def search_for_nn_patches_in_locality(img, data, center, p, s, search_margin):
+def imshow(img, axs, title="img"):
+    cmap = 'gray' if img.shape[1] == 1 else None
+    axs.imshow((img.permute(1, 2, 0).numpy() + 1) / 2, cmap=cmap)
+    axs.axis('off')
+    axs.set_title(title)
+
+
+def search_for_nn_patches_in_locality(img, data, center, p, search_margin, dist="edge"):
     """
     for a given patch location and size, search the nearest patch from data (only in the same patch location) to
     the patch in img in that location"""
-    h = p // 2
-    d = img.shape[-1]
-    c = img.shape[1]
-    query_patch = img[..., center[0]-h:center[0]+h, center[1]-h:center[1]+h]
+    query_patch = cut_around_center(img, center, p, margin=0)
     # Cut a larger area around the center and  split to patches
-    refs = data[..., max(0 ,center[0]-h-search_margin):min(d, center[0]+h+search_margin), max(0, center[1]-h-search_margin):min(d, center[1]+h+search_margin)]
-    refs = F.unfold(refs, kernel_size=p, stride=s) # shape (b, 3*p*p, N_patches)
+    refs = cut_around_center(data, center, p, margin=search_margin)
+    refs = F.unfold(refs, kernel_size=p, stride=1)  # shape (b, c*p*p, N_patches)
+    n_patches = refs.shape[-1]
+    c = img.shape[1]
     refs = refs.permute(0, 2, 1).reshape(-1, c, p, p)
 
     # Search in RGB values
     print(f"Searching for NN patch in {len(refs)} patches at center {center}:")
-    dists = (refs - query_patch).reshape(refs.shape[0], -1)
-    rgb_nn_index = torch.sort(torch.norm(dists, dim=1, p=1))[1][0]
 
-    # Search in gray level values
-    dists = (refs.mean(1) - query_patch.mean(1)).reshape(refs.shape[0], -1) # Compare gray scale images
-    gs_nn_index = torch.sort(torch.norm(dists, dim=1, p=1))[1][0]
+    dists = compute_dists(refs, query_patch, dist)
+    patch_index = torch.sort(torch.norm(dists, dim=1, p=1))[1][0]
 
-    # Search in edge values
-    a = torch.Tensor([[1, 0, -1],
-                      [2, 0, -2],
-                      [1, 0, -1]]).view((1,1,3,3))
-    dists = (F.conv2d(torch.mean(refs, dim=1, keepdim=True), a) - F.conv2d(torch.mean(query_patch, dim=1, keepdim=True), a)).reshape(refs.shape[0], -1)
-    edge_nn_index = torch.sort(torch.norm(dists, dim=1, p=1))[1][0]
-
-    return query_patch, refs[rgb_nn_index].clone(), refs[gs_nn_index].clone(), refs[edge_nn_index].clone()
+    img_index = patch_index // n_patches
+    return img_index
 
 
-def find_patch_nns(fake_images, data, patch_size, search_margin, outputs_dir, n_centers=10):
+def find_patch_nns(fake_images, data, patch_size, search_margin, outputs_dir, n_centers=10, dist="edges"):
     """
     Search for nearest patch in data to patches from generated images.
     Search is performed in a constrained locality of the query patch location
     @parm: search_margin: how many big will the search area be (in pixels)
     """
     with torch.no_grad():
+        s = 3
         out_dir = f'{outputs_dir}/patch_nns(p-{patch_size}_s-{search_margin})'
         os.makedirs(out_dir, exist_ok=True)
-        h = patch_size // 2
-        img_dim = data.shape[-1]
-        centers = np.arange(h, img_dim - h + 1, 1)
-        centers = list(itertools.product(centers, repeat=2))
-        shuffle(centers)
-        centers = centers[:n_centers]
+
+        centers = sample_patch_centers(data.shape[-1], patch_size, n_centers)
 
         for j in range(len(fake_images)):
-            query_image = fake_images[j].unsqueeze(0)
-
-            s = 3
-            fig, ax = plt.subplots(nrows=len(centers), ncols=2, figsize=(s * 3, s * len(centers)))
+            query_image = fake_images[j]
+            fig, ax = plt.subplots(nrows=len(centers), ncols=4, figsize=(s * 3, s * len(centers)))
             for i, center in enumerate(tqdm(centers)):
-                query_patch, rgb_nn_patch, gs_nn_patch, edge_nn_patch = search_for_nn_patches_in_locality(query_image, data, center, p=patch_size, s=1, search_margin=search_margin)
+                ref_nn_index = search_for_nn_patches_in_locality(query_image.unsqueeze(0),
+                                                                  data, center,
+                                                                  p=patch_size,
+                                                                  search_margin=search_margin,
+                                                                 dist=dist)
 
-                cmap = 'gray' if query_patch.shape[1] == 1 else None
-                axs = ax[0] if len(centers) == 1 else ax[i, 0]
-                axs.imshow((query_patch[0].permute(1, 2,0).numpy() + 1)/2, cmap=cmap)
-                axs.axis('off')
-                axs.set_title('Query patch')
-
-                axs = ax[1] if len(centers) == 1 else ax[i, 1]
-                axs.imshow((rgb_nn_patch.permute(1,2,0).numpy() + 1)/2, cmap=cmap)
-                axs.axis('off')
-                axs.set_title(f'RGB NN: {(rgb_nn_patch - query_patch).pow(2).sum():.2f}')
-
-                # axs = ax[2] if len(centers) == 1 else ax[i, 2]
-                # axs.imshow((edge_nn_patch.permute(1,2,0).numpy() + 1)/2, cmap=cmap)
-                # axs.axis('off')
-                # axs.set_title(f'Edge NN: {(edge_nn_patch - query_patch).pow(2).sum():.2f}')
+                imshow(cut_around_center(query_image, center, patch_size), ax[i, 0], "Query-Patch")
+                imshow(cut_around_center(data[ref_nn_index], center, patch_size), ax[i, 1], f"{dist}-NN-Patch")
+                imshow(query_image, ax[i, 2], "Query-Image")
+                imshow(data[ref_nn_index], ax[i, 3], f"{dist}-NN-Image")
 
 
             plt.tight_layout()
@@ -101,13 +87,15 @@ def find_nns_percept(fake_images, data, outputs_dir, device):
         for i in range(8):
             fake_image = fake_images[i]
             # dists = [percept(fake_image, data[i].unsqueeze(0)).sum().item() for i in range(len(data))]
-            dists = [(vgg_fe.extract(fake_image) - vgg_fe.extract(data[i].unsqueeze(0))).pow(2).sum().item() for i in range(len(data))]
+            dists = [(vgg_fe.extract(fake_image) - vgg_fe.extract(data[i].unsqueeze(0))).pow(2).sum().item() for i in
+                     range(len(data))]
             nn_indices = np.argsort(dists)
             nns = data[nn_indices[:4]]
 
             results.append(torch.cat([fake_image, nns]))
 
-        vutils.save_image(torch.cat(results, dim=0).add(1).mul(0.5), f'{outputs_dir}/nns/im.png', normalize=False, nrow=5)
+        vutils.save_image(torch.cat(results, dim=0).add(1).mul(0.5), f'{outputs_dir}/nns/im.png', normalize=False,
+                          nrow=5)
 
 
 def find_nns(fake_images, data, outputs_dir, show_first_n=2):
@@ -123,6 +111,5 @@ def find_nns(fake_images, data, outputs_dir, show_first_n=2):
             nns = data[nn_indices[:show_first_n]]
             results.append(torch.cat([fake_image.unsqueeze(0), nns]))
 
-        vutils.save_image(torch.cat(results, dim=0).add(1).mul(0.5), f'{outputs_dir}/nns/im.png', normalize=False, nrow=1+show_first_n)
-
-
+        vutils.save_image(torch.cat(results, dim=0).add(1).mul(0.5), f'{outputs_dir}/nns/im.png', normalize=False,
+                          nrow=1 + show_first_n)

@@ -44,6 +44,6 @@ if __name__ == '__main__':
     print(compute_receptive_field(3, 1))
     print(compute_receptive_field(3, 3))
     x = torch.ones(5,3,23,15)
-    D = Discriminator(None, depth=3, k=3, normalize='none')
+    D = Discriminator(None, depth=4, k=3, normalize='none')
 
     print(D(x).shape)

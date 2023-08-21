@@ -171,3 +171,11 @@ class ResNetBlock(nn.Module):
         else:
             x_s = x
         return x_s
+
+
+
+if __name__ == '__main__':
+    x = torch.ones(5,3,64,64)
+    D = Discriminator(64, depth=4, k=3, normalize='none')
+
+    print(D(x).shape)
