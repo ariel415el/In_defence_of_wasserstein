@@ -54,10 +54,10 @@ class Discriminator(nn.Module):
     """ DC-discriminator receptive field by layer (4, 10, 22, 46, 94)"""
     def __init__(self, input_dim=64, nf='64', normalize='in', num_outputs=1, channels=3, **kwargs):
         super(Discriminator, self).__init__()
-
         nf = int(nf)
         normalize = str(normalize)
         input_dim = int(input_dim)
+        num_outputs = int(num_outputs)
         layer_depth = [channels, nf, nf*2, nf*4, nf*8]
         if input_dim == 128:
             layer_depth += [nf*16]
