@@ -30,6 +30,7 @@ def to_patches(x, p=8, s=4, sample_patches=None):
 def w1(x, y, epsilon=0, **kwargs):
     base_metric = get_dist_metric("L2")
     C = base_metric(x.reshape(len(x), -1), y.reshape(len(y), -1))
+    # C = batch_dist_matrix(x.reshape(len(x), -1), y.reshape(len(y), -1), 256, base_metric)
     OTPlan = get_ot_plan(C.detach().cpu().numpy(), int(epsilon))
     OTPlan = torch.from_numpy(OTPlan).to(C.device)
     W1 = torch.sum(OTPlan * C)
@@ -39,12 +40,37 @@ def w1(x, y, epsilon=0, **kwargs):
 def nn(x, y, alpha=None, **kwargs):
     base_metric = get_dist_metric("L2")
     C = base_metric(x.reshape(len(x), -1), y.reshape(len(y), -1))
+    # C = batch_dist_matrix(x.reshape(len(x), -1), y.reshape(len(y), -1), 256, base_metric)
     if alpha is not None:
         C = C / (C.min(dim=0)[0] + float(alpha))  # compute_normalized_scores
     nn_loss = C.min(dim=1)[0].mean()
+    # NN_dists = batch_NN(x.reshape(len(x), -1), y.reshape(len(y), -1), 256, base_metric)
+    # nn_loss = NN_dists.mean()
     # nn_loss = max(C.min(dim=1)[0].mean(), C.min(dim=1)[0].mean())
     return nn_loss, {"nn_loss": nn_loss}
 
+
+def duplicate_to_match_lengths(arr1, arr2):
+    """
+    Duplicates randomly selected entries from the smaller array to match its size to the bigger one
+    :param arr1: (r, n) torch tensor
+    :param arr2: (r, m) torch tensor
+    :return: (r,max(n,m)) torch tensor
+    """
+    if arr1.shape[1] == arr2.shape[1]:
+        return arr1, arr2
+    elif arr1.shape[1] < arr2.shape[1]:
+        tmp = arr1
+        arr1 = arr2
+        arr2 = tmp
+
+    b = arr1.shape[1] // arr2.shape[1]
+    arr2 = torch.cat([arr2] * b, dim=1)
+    if arr1.shape[1] > arr2.shape[1]:
+        indices = torch.randperm(arr2.shape[1])[:arr1.shape[1] - arr2.shape[1]]
+        arr2 = torch.cat([arr2, arr2[:, indices]], dim=1)
+
+    return arr1, arr2
 
 def swd(x, y, num_proj=512, **kwargs):
     num_proj = int(num_proj)
@@ -55,21 +81,27 @@ def swd(x, y, num_proj=512, **kwargs):
     rand = rand / torch.norm(rand, dim=1, keepdim=True)  # noramlize to unit directions
 
     # Project images
-    projx = torch.mm(x.reshape(b, c * h * w), rand.T)
-    projy = torch.mm(y.reshape(b, c * h * w), rand.T)
+    projx = torch.mm(x.reshape(-1, c * h * w), rand.T).T
+    projy = torch.mm(y.reshape(-1, c * h * w), rand.T).T
+
+    projx, projy = duplicate_to_match_lengths(projx, projy)
 
     # Sort and compute L1 loss
     projx, _ = torch.sort(projx, dim=1)
     projy, _ = torch.sort(projy, dim=1)
 
-    SWD = torch.abs(projx - projy).mean()
+    SWD = (projx - projy).pow(2).sum(1).sqrt().mean()
+    # SWD = (projx - projy).pow(2).mean()
+
     return SWD, {"SWD": SWD}
+
 
 def sinkhorn(x, y, epsilon=1, **kwargs):
     from geomloss import SamplesLoss
     sinkhorn_loss = SamplesLoss(loss="sinkhorn", p=1, blur=int(epsilon))
     SH = sinkhorn_loss(x.reshape(len(x), -1), y.reshape(len(y), -1))
     return SH, {"Sinkhorm-eps=1": SH}
+
 
 class MiniBatchLoss:
     def __init__(self, dist='w1', **kwargs):
@@ -87,7 +119,7 @@ class MiniBatchLoss:
         raise NotImplemented("MiniBatchLosses should be run with --n_D_steps 0")
 
     def trainG(self, netD, real_data, fake_data):
-        return self.compute(fake_data, real_data)
+        return self.compute(real_data, fake_data)
 
 
 class MiniBatchPatchLoss(MiniBatchLoss):

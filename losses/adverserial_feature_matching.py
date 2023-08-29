@@ -1,51 +1,41 @@
 import torch
 from torch.nn import functional as F
 
-from losses import get_ot_plan
+from losses import get_ot_plan, w1, SoftHingeLoss
 
-class AdverserialFeatureMatchingLoss:
-    def trainD(self, netD, real_data, fake_data):
-        """Train discriminator with regular GAN loss"""
-        # Regular NS gan loss
-        preds = torch.cat([netD(real_data), netD(fake_data.detach())], dim=0).to(real_data.device).unsqueeze(1)
-        labels = torch.cat([torch.ones(len(real_data), 1), torch.zeros(len(fake_data), 1)], dim=0).to(real_data.device)
-        Dloss = F.binary_cross_entropy_with_logits(preds, labels)
-        return Dloss, {"Dloss": Dloss.item()}
 
+def get_features(net, img, patch_wise=False):
+    feature_maps = net.convs(img)
+    if patch_wise:
+        nc = feature_maps.shape[1]
+        return feature_maps.permuete(0,2,3,1).reshape(-1, nc)
+    else:
+        return feature_maps.reshape(len(feature_maps), -1)
+
+
+class AdverserialFeatureMatchingLoss(SoftHingeLoss):
     def trainG(self, netD, real_data, fake_data):
         """Train generator to minimize OT in discriminator features"""
-        # OT in features space
-        real_features = netD.features(real_data).reshape(len(real_data), -1)
-        fake_features = netD.features(fake_data).reshape(len(fake_data), -1)
+        real_features = get_features(netD, real_data)
+        fake_features = get_features(netD, fake_data)
+        return w1(real_features, fake_features)
 
-        C = torch.mean((real_features[:, None] - fake_features[None, :]) ** 2, dim=-1)
 
-        OTPlan = get_ot_plan(C.detach().cpu().numpy())
-        OTPlan = torch.from_numpy(OTPlan).to(C.device)
-
-        OT = torch.sum(OTPlan * C)
-
-        return OT, {"OT": OT.item()}
-
-class FullAdverserialFeatureMatchingLoss:
+class FullAdverserialFeatureMatchingLoss(AdverserialFeatureMatchingLoss):
     def trainD(self, netD, real_data, fake_data):
-        Dloss = -1* self.compute_ot(netD, real_data, fake_data)
-        return Dloss, {"Dloss": Dloss.item()}
+        Dloss, debug = self.trainG(netD, real_data, fake_data)
+        return -1*Dloss, debug
 
+
+class AdverserialPatchFeatureMatchingLoss(SoftHingeLoss):
     def trainG(self, netD, real_data, fake_data):
-        OT = self.compute_ot(netD, real_data, fake_data)
-        return OT, {"OT": OT.item()}
+        """Train generator to minimize OT in discriminator features"""
+        real_features = get_features(netD, real_data, patch_wise=True)
+        fake_features = get_features(netD, fake_data, patch_wise=True)
+        return w1(real_features, fake_features)
 
-    def compute_ot(self, netD, real_data, fake_data):
-        # OT in features space
-        real_features = netD.features(real_data).reshape(len(real_data), -1)
-        fake_features = netD.features(fake_data).reshape(len(fake_data), -1)
 
-        C = torch.mean((real_features[:, None] - fake_features[None, :]) ** 2, dim=-1)
-
-        OTPlan = get_ot_plan(C.detach().cpu().numpy())
-        OTPlan = torch.from_numpy(OTPlan).to(C.device)
-
-        OT = torch.sum(OTPlan * C)
-
-        return OT
+class FullAdverserialPatchFeatureMatchingLoss(AdverserialPatchFeatureMatchingLoss):
+    def trainD(self, netD, real_data, fake_data):
+        Dloss, debug = self.trainG(netD, real_data, fake_data)
+        return -1*Dloss, debug

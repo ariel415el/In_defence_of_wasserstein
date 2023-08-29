@@ -6,7 +6,9 @@ import numpy as np
 from PIL import Image
 from matplotlib import pyplot as plt
 
+
 COLORS=['r', 'g', 'b', 'c', 'm', 'y', 'k']
+
 
 def find_dir(root, names, disallowed_names=[]):
     valid_dirs = []
@@ -22,8 +24,12 @@ def find_dir(root, names, disallowed_names=[]):
         if is_good:
             valid_dirs.append(dname)
 
-    assert len(valid_dirs) == 1, f"Dir description is not unique {len(valid_dirs)}, {valid_dirs}, {names}, {disallowed_names}"
+    assert len(valid_dirs) == 1, (f"Dir description is not unique:)"
+                                  f"\t-\nValid dirs: {valid_dirs}"
+                                  f"\t-\nnames: {names}"
+                                  f"\t-\ndisallowed_names: {disallowed_names}")
     return valid_dirs[0]
+
 
 def find_last_image(dir):
     files = glob.glob(f'{dir}/*.png')
@@ -41,9 +47,7 @@ def plot(root, plot_name, titles_and_name_lists, plot_loss=None, s=4,  n=5):
     if plot_loss == "common":
         width += 1
     h=2 if plot_loss == "separate" else 1
-    # fig = plt.figure(figsize=(width * s, h*s))
     fig, axes = plt.subplots(h, width, figsize=(width * s, h*s), squeeze=False, sharey='row' if plot_loss == "separate" else 'none')
-    # gs = fig.add_gridspec(h, width)
     all_axs = []
     for i, (name, names_list, non_names) in enumerate(titles_and_name_lists):
         found_path = find_dir(root, names_list, non_names)
@@ -63,29 +67,34 @@ def plot(root, plot_name, titles_and_name_lists, plot_loss=None, s=4,  n=5):
 
         plot = os.path.join(dir, "plots", "MiniBatchLoss-dist=w1_fixed_noise_gen_to_train.pkl")
         plot = pickle.load((open(plot, "rb")))
-        ax.set_title(f"{name}  W1: {plot[-1]:.3f}", fontsize=4 * s)
 
         if plot_loss is not None:
+            ax.set_title(f"{name}", fontsize=4 * s)
             if plot_loss == "separate":
                 ax2 = axes[-1, i]
                 ax2.plot(np.arange(len(plot)), plot, color=COLORS[0], label=f"Image W1")
                 ax2.annotate(f"{plot[-1]:.2f}", (len(plot)-1, plot[-1]), textcoords="offset points", xytext=(-2, 2), ha="center")
 
-                for j, (name, path) in enumerate([
-                    ("Patch-11-W1", "MiniBatchPatchLoss-dist=w1-p=11-s=4-n_samples=1024_fixed_noise_gen_to_train.pkl"),
-                    ("Patch-22-W1", "MiniBatchPatchLoss-dist=w1-p=22-s=8-n_samples=1024_fixed_noise_gen_to_train.pkl"),
-                    ("Patch-48-W1", "MiniBatchPatchLoss-dist=w1-p=48-s=16-n_samples=1024_fixed_noise_gen_to_train.pkl"),
-                ]):
+                names_and_plot_paths = [
+                    ("Image-NN", "MiniBatchLoss-dist=nn_fixed_noise_gen_to_train.pkl", COLORS[0], '--'),
+                    # ("Patch-16-W1", "MiniBatchPatchLoss-dist=w1-p=16-s=8_fixed_noise_gen_to_train.pkl", COLORS[1], '-'),
+                    # ("Patch-8-W1", "MiniBatchPatchLoss-dist=w1-p=8-s=4_fixed_noise_gen_to_train.pkl", COLORS[1], '-'),
+                    ("Patch-8-NN", "MiniBatchPatchLoss-dist=nn-p=8-s=4_fixed_noise_gen_to_train.pkl", COLORS[1], '--'),
+                    # ("Patch-16-NN", "MiniBatchPatchLoss-dist=nn-p=16-s=8_fixed_noise_gen_to_train.pkl", COLORS[1], '--'),
+                    # ("Patch-16-W1-eps=10", "MiniBatchPatchLoss-dist=w1-epsilon=10-p=16-s=8_fixed_noise_gen_to_train.pkl", COLORS[2], '-'),
+                ]
+
+                for j, (name, path, color, line_type) in enumerate(names_and_plot_paths):
                     patch_plot = os.path.join(dir, "plots", path)
                     patch_plot = pickle.load((open(patch_plot, "rb")))
 
-                    ax2.plot(np.arange(len(patch_plot)), patch_plot, color=COLORS[j], label=name)
+                    ax2.plot(np.arange(len(patch_plot)), patch_plot, line_type, color=color, label=name)
                     ax2.annotate(f"{patch_plot[-1]:.2f}", (len(patch_plot) - 1, patch_plot[-1]), textcoords="offset points", xytext=(-2, 2), ha="center")
 
                 all_axs.append(ax2)
 
                 handles, labels = ax2.get_legend_handles_labels()
-                fig.legend(handles, labels, loc='center', ncol=4, prop={'size': 10})
+                fig.legend(handles, labels, loc='center', ncol=1+len(names_and_plot_paths), prop={'size': 10})
 
             else:
                 ax2 = axes[0, -1]
@@ -95,6 +104,9 @@ def plot(root, plot_name, titles_and_name_lists, plot_loss=None, s=4,  n=5):
 
             ax2.set_yscale('log')
             ax2.set_ylabel(f"BatchW1")
+        else:
+            ax.set_title(f"{name}  W1: {plot[-1]:.3f}", fontsize=4 * s)
+
 
         plt.tight_layout()
         plt.savefig(os.path.join(root, plot_name))
