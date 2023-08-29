@@ -25,9 +25,9 @@ def train_GAN(args):
     other_metrics = [
                 get_loss_function("MiniBatchLoss-dist=w1"),
                 get_loss_function("MiniBatchLoss-dist=nn"),
-                get_loss_function("MiniBatchPatchLoss-dist=w1-p=16-s=8"),
+                # get_loss_function("MiniBatchPatchLoss-dist=w1-p=8-s=4"),
                 # get_loss_function("MiniBatchPatchLoss-dist=w1-epsilon=10-p=16-s=8"),
-                get_loss_function("MiniBatchPatchLoss-dist=nn-p=16-s=8"),
+                # get_loss_function("MiniBatchPatchLoss-dist=nn-p=8-s=4"),
                 # LapSWD()
               ]
 

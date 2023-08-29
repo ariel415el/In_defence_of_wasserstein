@@ -2,9 +2,9 @@ import os
 import sys
 import argparse
 
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 from utils.common import compose_experiment_name
 from utils.train_utils import parse_train_args
-
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from sbatch_python import run_sbatch
 from plot_train_results import plot
@@ -17,9 +17,12 @@ class Figure:
 
     @staticmethod
     def plot_fig(names_and_commands, dataset_name):
-        plot(f'{out_root}/{project_name}', f"Exp1-{dataset_name}.png", names_and_commands,
+        plot(f'{out_root}/{project_name}', f"Exp-{dataset_name}.png",
+             [(name, [compose_experiment_name(parse_train_args(command)).replace("_test", "")], [])
+              for name,command in names_and_commands],
              plot_loss=None, n=args.n
              )
+
 class Figure_1(Figure):
     """Figure 1 in the papers compares the outputs of the OT-means algorithm to that of CTransformLoss"""
     @staticmethod
@@ -42,7 +45,9 @@ class Figure_1(Figure):
     def plot_fig(names_and_commands, dataset_name):
         names_and_commands = [(name, compose_experiment_name(parse_train_args(command))) for name, command in names_and_commands[:-1]]
         names_and_commands += ["OTmeans"]
-        plot(f'{out_root}/{project_name}', f"Exp1-{dataset_name}.png", names_and_commands,
+        plot(f'{out_root}/{project_name}', f"Exp-{dataset_name}.png",
+             [(name, [compose_experiment_name(parse_train_args(command)).replace("_test", "")], [])
+              for name,command in names_and_commands],
              plot_loss=None, n=args.n
              )
 
@@ -66,7 +71,7 @@ class Figure_2(Figure):
         return names_and_commands
 
 
-class Figure3:
+class Figure_3:
     """Compare DiscreteWGAN with CNN discriminator to direct patch ot minimization of patches of the same size"""
     @staticmethod
     def get_run_commands(project_name, dataset, additional_params):
@@ -115,14 +120,15 @@ if __name__ == '__main__':
     sbatch_params = args.hours, args.killable, args.gpu_memory
     figure_command_generator = globals()[f"Figure_{args.figure_idx}"]
 
-    for dataset_name, (data_path, data_args) in args.datasets.items():
+    for dataset_name in args.datasets:
+        data_path, data_args = data_map[dataset_name]
         names_and_commands = figure_command_generator.get_run_commands(project_name, data_path, additional_params=data_args)
         if args.run:
             for name, command in names_and_commands:
-                run_sbatch(command, f"{name}-{os.path.basename(data_path)}", *sbatch_params)
+                run_sbatch("python3 train.py " + command, f"{name}-{os.path.basename(data_path)}", *sbatch_params)
 
         elif args.plot:
             figure_command_generator.plot_fig(names_and_commands, dataset_name)
 
-    else:
-        raise ValueError("Please supply at least one task (run, plot)")
+        else:
+            raise ValueError("Please supply at least one task (run, plot)")

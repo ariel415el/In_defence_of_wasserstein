@@ -8,7 +8,7 @@ def get_features(net, img, patch_wise=False):
     feature_maps = net.convs(img)
     if patch_wise:
         nc = feature_maps.shape[1]
-        return feature_maps.permuete(0,2,3,1).reshape(-1, nc)
+        return feature_maps.permute(0,2,3,1).reshape(-1, nc)
     else:
         return feature_maps.reshape(len(feature_maps), -1)
 
