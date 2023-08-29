@@ -15,7 +15,7 @@ from tests.test_utils import cut_around_center, compute_dists, sample_patch_cent
 
 
 def imshow(img, axs, title="img"):
-    cmap = 'gray' if img.shape[1] == 1 else None
+    cmap = 'gray' if img.shape[0] == 1 else None
     axs.imshow((img.permute(1, 2, 0).numpy() + 1) / 2, cmap=cmap)
     axs.axis('off')
     axs.set_title(title)
@@ -43,7 +43,7 @@ def search_for_nn_patches_in_locality(img, data, center, p, search_margin, dist=
     return img_index
 
 
-def find_patch_nns(fake_images, data, patch_size, search_margin, outputs_dir, n_centers=10, dist="edges"):
+def find_patch_nns(fake_images, data, patch_size, search_margin, outputs_dir, n_centers=10, dist="rgb"):
     """
     Search for nearest patch in data to patches from generated images.
     Search is performed in a constrained locality of the query patch location
@@ -65,9 +65,10 @@ def find_patch_nns(fake_images, data, patch_size, search_margin, outputs_dir, n_
                                                                   p=patch_size,
                                                                   search_margin=search_margin,
                                                                  dist=dist)
-
-                imshow(cut_around_center(query_image, center, patch_size), ax[i, 0], "Query-Patch")
-                imshow(cut_around_center(data[ref_nn_index], center, patch_size), ax[i, 1], f"{dist}-NN-Patch")
+                q_patch = cut_around_center(query_image, center, patch_size)
+                r_patch = cut_around_center(data[ref_nn_index], center, patch_size)
+                imshow(q_patch, ax[i, 0], "Query-Patch")
+                imshow(r_patch, ax[i, 1], f"{dist}-NN-Patch: {(q_patch - r_patch).pow(2).sum().sqrt():.3f}")
                 imshow(query_image, ax[i, 2], "Query-Image")
                 imshow(data[ref_nn_index], ax[i, 3], f"{dist}-NN-Image")
 

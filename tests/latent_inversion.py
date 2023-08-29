@@ -10,8 +10,6 @@ from tests.test_utils import cut_around_center, compute_dists, sample_patch_cent
 
 
 def inverse_image(G, z_dim, real_images, outputs_dir, lr=0.01):
-    real_images = real_images.cuda()
-    G.cuda()
     os.makedirs(f"{outputs_dir}/inverse_z", exist_ok=True)
     p=22
     center = sample_patch_centers(real_images.shape[-1], p, 1)[0]
