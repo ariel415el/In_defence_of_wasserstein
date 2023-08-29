@@ -124,14 +124,15 @@ def get_models_and_optimizers(args, device, saved_model_folder):
 
 
     if args.loadG is not None:
-        netG.load_state_dict(torch.load(args.loadG)['netG'])
-        prior.z = torch.load(args.loadG)['prior']
+        ckpt = torch.load(args.loadG, map_location=args.device)
+        netG.load_state_dict(ckpt['netG'])
+        prior.z = ckpt['prior']
     start_iteration = 0
     if args.resume_last_ckpt:
         ckpts = glob.glob(f'{saved_model_folder}/*.pth')
         if ckpts:
             latest_ckpt = max(ckpts, key = os.path.getctime)
-            ckpt = torch.load(latest_ckpt)
+            ckpt = torch.load(latest_ckpt, map_location=args.device)
             prior.z = ckpt['prior']
             netG.load_state_dict(ckpt['netG'])
             netD.load_state_dict(ckpt['netD'])
