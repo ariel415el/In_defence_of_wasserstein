@@ -2,7 +2,7 @@ import os
 import sys
 import torch
 from matplotlib import pyplot as plt
-
+import numpy as np
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 from losses.optimal_transport import MiniBatchLoss, MiniBatchPatchLoss
 from scripts.EMD.utils import get_data, batch_to_image
@@ -22,19 +22,26 @@ def plot_images(names_and_batches):
     plt.savefig(f'blurred_batches.png')
     plt.clf()
 
-def plot_per_level(names_and_batches, dists, image_dists, patch_dists):
+def plot_per_level(names_and_batches, dists, image_dists, patch_dists, normalize=False):
     for dict, line_type in [(image_dists, '-'), (patch_dists, '--')]:
         plt.figure()
         for i, dist in enumerate(dists):
             n = len(dict[dist])
             label = dist if line_type == '-' else f"patch({p}-{s})-" + dist
-            plt.plot(range(len(dict[dist])),dict[dist], line_type, label=label, alpha=0.75, color=COLORS[i])
-            plt.annotate(f"{dict[dist][-1]:.2f}", (n - 1, dict[dist][-1]), textcoords="offset points", xytext=(-2, 2), ha="center")
+
+            vals = np.array(dict[dist])
+            if normalize:
+                vals -= vals.min()
+                vals /= vals.max()
+            # vals += desired_mean
+
+            plt.plot(range(len(dict[dist])), vals, line_type, label=label, alpha=0.75, color=COLORS[i])
+            # plt.annotate(f"{dict[dist][-1]:.2f}", (n - 1, dict[dist][-1]), textcoords="offset points", xytext=(-2, 2), ha="center")
 
         plt.xticks(range(n), [x[0] for x in names_and_batches], rotation=0)
         plt.legend()
         plt.title(f"Blurred_batch size {len(b1)}, Data size {len(data)}")
-        plt.savefig(f'blurred_plot{"" if line_type == "-" else f"-patch({p}-{s})"}.png')
+        plt.savefig(f'blurred_plot{"" if line_type == "-" else f"-patch({p}-{s})"}{"_normalize" if normalize else ""}.png')
         plt.clf()
 
 def plot_per_dist(names_and_batches, dists, image_dists, patch_dists):
@@ -58,13 +65,13 @@ if __name__ == '__main__':
         b = 64
         im_size=64
         size = 5
-        dists = ['w1', 'nn', "swd"]
+        dists = ["swd"]
         p = 7
-        s=3
+        s=2
 
         data_path = '/cs/labs/yweiss/ariel1/data/FFHQ/FFHQ'
         c=3; gray_scale=False; center_crop=80
-        data = get_data(data_path, im_size, c=c, center_crop=center_crop, gray_scale=gray_scale, flatten=False, limit_data=1064).to(device)
+        data = get_data(data_path, im_size, c=c, center_crop=center_crop, gray_scale=gray_scale, flatten=False, limit_data=10064).to(device)
 
         b1 = data[:b]
         data = data[b:]
@@ -88,4 +95,5 @@ if __name__ == '__main__':
                 patch_dists[dist].append(MiniBatchPatchLoss(dist, p=p, s=s)(batch, data))
 
         plot_per_level(names_and_batches, dists, image_dists, patch_dists)
-        plot_per_dist(names_and_batches, dists, image_dists, patch_dists)
+        plot_per_level(names_and_batches, dists, image_dists, patch_dists, normalize=True)
+        # plot_per_dist(names_and_batches, dists, image_dists, patch_dists)
