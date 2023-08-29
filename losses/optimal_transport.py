@@ -4,6 +4,7 @@ import torch
 import torch.nn.functional as F
 
 from losses.loss_utils import get_dist_metric
+from scripts.EMD.dists import batch_dist_matrix
 
 
 def get_ot_plan(C, epsilon=0):
@@ -40,14 +41,17 @@ def w1(x, y, epsilon=0, **kwargs):
 def nn(x, y, alpha=None, **kwargs):
     base_metric = get_dist_metric("L2")
     C = base_metric(x.reshape(len(x), -1), y.reshape(len(y), -1))
-    # C = batch_dist_matrix(x.reshape(len(x), -1), y.reshape(len(y), -1), 256, base_metric)
     if alpha is not None:
         C = C / (C.min(dim=0)[0] + float(alpha))  # compute_normalized_scores
     nn_loss = C.min(dim=1)[0].mean()
-    # NN_dists = batch_NN(x.reshape(len(x), -1), y.reshape(len(y), -1), 256, base_metric)
-    # nn_loss = NN_dists.mean()
-    # nn_loss = max(C.min(dim=1)[0].mean(), C.min(dim=1)[0].mean())
     return nn_loss, {"nn_loss": nn_loss}
+
+def remd(x, y, **kwargs):
+    base_metric = get_dist_metric("L2")
+    C = base_metric(x.reshape(len(x), -1), y.reshape(len(y), -1))
+    nn_loss = max(C.min(dim=0)[0].mean(), C.min(dim=1)[0].mean())
+    return nn_loss, {"remd_loss": nn_loss}
+
 
 
 def duplicate_to_match_lengths(arr1, arr2):
@@ -72,7 +76,7 @@ def duplicate_to_match_lengths(arr1, arr2):
 
     return arr1, arr2
 
-def swd(x, y, num_proj=512, **kwargs):
+def swd(x, y, num_proj=1024, **kwargs):
     num_proj = int(num_proj)
     b, c, h, w = x.shape
 
@@ -90,8 +94,9 @@ def swd(x, y, num_proj=512, **kwargs):
     projx, _ = torch.sort(projx, dim=1)
     projy, _ = torch.sort(projy, dim=1)
 
+    n = projx.shape[1]
     SWD = (projx - projy).pow(2).sum(1).sqrt().mean()
-    # SWD = (projx - projy).pow(2).mean()
+    # SWD = (projx - projy).abs().mean()
 
     return SWD, {"SWD": SWD}
 
