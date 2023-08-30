@@ -1,3 +1,4 @@
+import glob
 import os
 
 import torch
@@ -8,8 +9,8 @@ from torchvision.utils import make_grid
 import torch.nn.functional as F
 
 import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", "utils"))
-from data import get_transforms
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+from utils.data import get_transforms
 
 def get_data(data_path, im_size=None, c=3, center_crop=None, gray_scale=False, flatten=True, limit_data=None):
     if os.path.isdir(data_path):
@@ -77,3 +78,30 @@ def batch_to_image(batch, d, c, n=16):
     grid = make_grid(t_batch[:n], normalize=True, nrow=int(np.sqrt(n)))
     # Add 0.5 after unnormalizing to [0, 255] to round to nearest integer
     return grid.mul(255).add_(0.5).clamp_(0, 255).permute(1, 2, 0).to("cpu", torch.uint8).cpu().numpy()
+
+
+def find_dir(root, names, disallowed_names=[]):
+    valid_dirs = []
+    for dname in os.listdir(root):
+        is_good = True
+        for name in names:
+            if name not in dname:
+                is_good = False
+                break
+        for name in disallowed_names:
+            if name in dname:
+                is_good = False
+        if is_good:
+            valid_dirs.append(dname)
+
+    assert len(valid_dirs) == 1, (f"Dir description is not unique:)"
+                                  f"\t-\nValid dirs: {valid_dirs}"
+                                  f"\t-\nnames: {names}"
+                                  f"\t-\ndisallowed_names: {disallowed_names}")
+    return valid_dirs[0]
+
+
+def find_last_image(dir):
+    files = glob.glob(f'{dir}/*.png')
+    if files:
+        return os.path.basename(max(files, key=os.path.getctime))

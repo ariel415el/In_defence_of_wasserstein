@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 from losses.optimal_transport import MiniBatchLoss, MiniBatchPatchLoss
-from scripts.experiments.OT.utils import get_data, batch_to_image
+from scripts.experiments.experiment_utils import get_data, batch_to_image
 from torchvision.transforms import transforms
 
 COLORS =['r', 'g', 'b', 'k']
@@ -19,7 +19,7 @@ def main():
     with torch.no_grad():
         data = get_data(data_path, im_size, c=c, center_crop=center_crop, gray_scale=gray_scale, flatten=False, limit_data=b+n_images).to(device)
         b1 = data[:b]
-        data = data[b:]
+        data = data[-n_images:]
 
         names_and_batches = [
             ("sigma=0", b1),
@@ -98,13 +98,13 @@ def plot_per_dist(names_and_batches, dists, image_dists, patch_dists):
 
 if __name__ == '__main__':
     device = torch.device('cpu')
-    b = 64
-    n_images = 64
+    b = 1
+    n_images = 1
     im_size = 64
     size = 5
     dists = ["swd", "w1"]
     p = 7
-    s = 7
+    s = 1
 
     data_path = '/mnt/storage_ssd/datasets/FFHQ/FFHQ'
     c = 3

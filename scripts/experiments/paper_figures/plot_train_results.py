@@ -1,4 +1,3 @@
-import glob
 import os
 import pickle
 
@@ -6,35 +5,9 @@ import numpy as np
 from PIL import Image
 from matplotlib import pyplot as plt
 
+from scripts.experiments.OT.experiment_utils import find_dir, find_last_image
 
 COLORS=['r', 'g', 'b', 'c', 'm', 'y', 'k']
-
-
-def find_dir(root, names, disallowed_names=[]):
-    valid_dirs = []
-    for dname in os.listdir(root):
-        is_good = True
-        for name in names:
-            if name not in dname:
-                is_good = False
-                break
-        for name in disallowed_names:
-            if name in dname:
-                is_good = False
-        if is_good:
-            valid_dirs.append(dname)
-
-    assert len(valid_dirs) == 1, (f"Dir description is not unique:)"
-                                  f"\t-\nValid dirs: {valid_dirs}"
-                                  f"\t-\nnames: {names}"
-                                  f"\t-\ndisallowed_names: {disallowed_names}")
-    return valid_dirs[0]
-
-
-def find_last_image(dir):
-    files = glob.glob(f'{dir}/*.png')
-    if files:
-        return os.path.basename(max(files, key=os.path.getctime))
 
 
 def plot(root, plot_name, titles_and_name_lists, plot_loss=None, s=4,  n=5):
