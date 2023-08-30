@@ -49,12 +49,9 @@ def plot(root, plot_name, titles_and_name_lists, plot_loss=None, s=4,  n=5):
                 ax2.annotate(f"{plot[-1]:.2f}", (len(plot)-1, plot[-1]), textcoords="offset points", xytext=(-2, 2), ha="center")
 
                 names_and_plot_paths = [
-                    ("Image-NN", "MiniBatchLoss-dist=nn_fixed_noise_gen_to_train.pkl", COLORS[0], '--'),
-                    # ("Patch-16-W1", "MiniBatchPatchLoss-dist=w1-p=16-s=8_fixed_noise_gen_to_train.pkl", COLORS[1], '-'),
-                    # ("Patch-8-W1", "MiniBatchPatchLoss-dist=w1-p=8-s=4_fixed_noise_gen_to_train.pkl", COLORS[1], '-'),
-                    ("Patch-8-NN", "MiniBatchPatchLoss-dist=nn-p=8-s=4_fixed_noise_gen_to_train.pkl", COLORS[1], '--'),
-                    # ("Patch-16-NN", "MiniBatchPatchLoss-dist=nn-p=16-s=8_fixed_noise_gen_to_train.pkl", COLORS[1], '--'),
-                    # ("Patch-16-W1-eps=10", "MiniBatchPatchLoss-dist=w1-epsilon=10-p=16-s=8_fixed_noise_gen_to_train.pkl", COLORS[2], '-'),
+                    # ("Image-swd", "MiniBatchLoss-dist=w1_fixed_noise_gen_to_train.pkl", COLORS[0], '-'),
+                    ("Patch-8-swd", "MiniBatchPatchLoss-dist=swd-p=8-s=4_fixed_noise_gen_to_train.pkl", COLORS[1], '--'),
+                    ("Patch-16-swd", "MiniBatchPatchLoss-dist=swd-p=16-s=8_fixed_noise_gen_to_train.pkl", COLORS[2], '--'),
                 ]
 
                 for j, (name, path, color, line_type) in enumerate(names_and_plot_paths):
@@ -67,7 +64,7 @@ def plot(root, plot_name, titles_and_name_lists, plot_loss=None, s=4,  n=5):
                 all_axs.append(ax2)
 
                 handles, labels = ax2.get_legend_handles_labels()
-                fig.legend(handles, labels, loc='center', ncol=1+len(names_and_plot_paths), prop={'size': 10})
+                fig.legend(handles, labels, loc='center', ncol=1+len(names_and_plot_paths), prop={'size': s*width})
 
             else:
                 ax2 = axes[0, -1]

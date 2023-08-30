@@ -2,25 +2,26 @@ import os
 import sys
 import argparse
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
-from utils.common import compose_experiment_name
-from utils.train_utils import parse_train_args
+from plot_train_results import plot
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from sbatch_python import run_sbatch
-from plot_train_results import plot
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+from utils.common import compose_experiment_name
+from utils.train_utils import parse_train_args
 
 
 class Figure:
+    plot_type=None
     @staticmethod
     def get_run_commands(project_name, dataset, additional_params):
         raise NotImplemented
 
     @staticmethod
-    def plot_fig(names_and_commands, dataset_name):
+    def plot_fig(names_and_commands, dataset_name, plot_type):
         plot(f'{out_root}/{project_name}', f"Exp-{dataset_name}.png",
              [(name, [compose_experiment_name(parse_train_args(command)).replace("_test", "")], [])
               for name,command in names_and_commands],
-             plot_loss=None, n=args.n
+             plot_loss=plot_type, n=args.n, s=args.s
              )
 
 class Figure_1(Figure):
@@ -28,7 +29,7 @@ class Figure_1(Figure):
     @staticmethod
     def get_run_commands(project_name, dataset, additional_params):
         gen_arch = "Pixels --lrG 0.001"
-        base = f"python3 train.py  --data_path {dataset}  {additional_params}" \
+        base = f" --data_path {dataset}  {additional_params}" \
                f" --load_data_to_memory --n_workers 0 --project_name {project_name}" \
                f" --n_iterations 25000 --gen_arch {gen_arch}"
 
@@ -58,7 +59,7 @@ class Figure_2(Figure):
     @staticmethod
     def get_run_commands(project_name, dataset, additional_params):
         gen_arch = "Pixels --lrG 0.001"
-        base = f"python3 train.py  --data_path {dataset}  {additional_params}" \
+        base = f" --data_path {dataset}  {additional_params}" \
                f" --load_data_to_memory --n_workers 0 --project_name {project_name} --z_prior const=64" \
                f"  --n_iterations 25000 " \
                f"--gen_arch {gen_arch} "
@@ -71,13 +72,14 @@ class Figure_2(Figure):
         return names_and_commands
 
 
-class Figure_3:
+class Figure_3(Figure):
+    plot_type = "separate"
     """Compare DiscreteWGAN with CNN discriminator to direct patch ot minimization of patches of the same size"""
     @staticmethod
     def get_run_commands(project_name, dataset, additional_params):
-        n_iterations = 100000
+        n_iterations = 250000
         gen_arch = "FC"
-        base = f"python3 train.py  --data_path {dataset}  {additional_params}" \
+        base = f" --data_path {dataset}  {additional_params}" \
                f" --load_data_to_memory --n_workers 0 --project_name {project_name}" \
                f" --n_iterations {n_iterations} " \
                f"--gen_arch {gen_arch} --lrG 0.0001 --z_prior const=64"
@@ -85,11 +87,13 @@ class Figure_3:
         names_and_commands = [
             ("Exp3-DiscreteWGAN-FC", base + f" --loss_function WGANLoss --gp_weight 10 --lrD 0.001 --G_step_every 5"
                                             f" --disc_arch FC-nf=1024"),
+            ("Exp3-DiscreteWGAN-DC", base + f" --loss_function WGANLoss --gp_weight 10 --lrD 0.001 --G_step_every 5 "
+                                            f"--disc_arch DCGAN-normalize=none"),
             ("Exp3-DiscreteWGAN-GAP-16", base + f" --loss_function WGANLoss --gp_weight 10 --lrD 0.001 --G_step_every 5"
                                                 f" --disc_arch PatchGAN-normalize=in-k=3"),
             ("Exp3-Discrete-W1", base + f" --loss_function MiniBatchLoss-dist=w1 --D_step_every -1"),
-            ("Exp3-Discrete-W1_p=16-s=8", base + f" --loss_function MiniBatchPatchLoss-dist=w1-p=16-s=8-n_samples=1024"
-                                                 f" --D_step_every -1")
+            # ("Exp3-Discrete-W1_p=16-s=8", base + f" --loss_function MiniBatchPatchLoss-dist=w1-p=16-s=8-n_samples=1024"
+            #                                      f" --D_step_every -1")
         ]
         return names_and_commands
 
@@ -98,7 +102,7 @@ if __name__ == '__main__':
     data_root = '/cs/labs/yweiss/ariel1/data/'
     out_root = '/cs/labs/yweiss/ariel1/repos/DataEfficientGANs/outputs'
     data_map = {
-        "ffhq": (f'{data_root}/FFHQ/FFHQ', ' --center_crop 100 --limit_data 10000'),
+        "ffhq": (f'{data_root}/FFHQ/FFHQ', ' --center_crop 80 --limit_data 10000'),
         "squares": (f'{data_root}/square_data/black_S-10_O-1_S-1', ' --gray_scale'),
         "mnist": (f'{data_root}/MNIST/MNIST/jpgs/training', ' --gray_scale  --limit_data 10000' )
     }
@@ -114,6 +118,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--plot', default=False, action='store_true')
     parser.add_argument('--n', default=8, type=int)
+    parser.add_argument('--s', default=3, type=int)
+
     args = parser.parse_args()
     project_name = f"Figure_Exp{args.figure_idx}"
 
@@ -128,7 +134,7 @@ if __name__ == '__main__':
                 run_sbatch("python3 train.py " + command, f"{name}-{os.path.basename(data_path)}", *sbatch_params)
 
         elif args.plot:
-            figure_command_generator.plot_fig(names_and_commands, dataset_name)
+            figure_command_generator.plot_fig(names_and_commands, dataset_name, figure_command_generator.plot_type)
 
         else:
             raise ValueError("Please supply at least one task (run, plot)")
