@@ -2,9 +2,9 @@ import numpy as np
 import ot
 import torch
 import torch.nn.functional as F
+from tqdm import tqdm
 
-from losses.loss_utils import get_dist_metric
-from scripts.EMD.dists import batch_dist_matrix
+from utils.dists import get_dist_metric, batch_NN
 
 
 def get_ot_plan(C, epsilon=0):
@@ -31,7 +31,6 @@ def to_patches(x, p=8, s=4, sample_patches=None):
 def w1(x, y, epsilon=0, **kwargs):
     base_metric = get_dist_metric("L2")
     C = base_metric(x.reshape(len(x), -1), y.reshape(len(y), -1))
-    # C = batch_dist_matrix(x.reshape(len(x), -1), y.reshape(len(y), -1), 256, base_metric)
     OTPlan = get_ot_plan(C.detach().cpu().numpy(), int(epsilon))
     OTPlan = torch.from_numpy(OTPlan).to(C.device)
     W1 = torch.sum(OTPlan * C)
@@ -95,8 +94,8 @@ def swd(x, y, num_proj=1024, **kwargs):
     projy, _ = torch.sort(projy, dim=1)
 
     n = projx.shape[1]
-    SWD = (projx - projy).pow(2).sum(1).sqrt().mean()
-    # SWD = (projx - projy).abs().mean()
+    # SWD = (projx - projy).pow(2).sum(1).sqrt().mean() / n
+    SWD = (projx - projy).abs().mean()
 
     return SWD, {"SWD": SWD}
 
@@ -107,6 +106,37 @@ def sinkhorn(x, y, epsilon=1, **kwargs):
     SH = sinkhorn_loss(x.reshape(len(x), -1), y.reshape(len(y), -1))
     return SH, {"Sinkhorm-eps=1": SH}
 
+
+def discrete_dual(x, y, n_steps=500, batch_size=None, lr=0.001, verbose=False, nnb=256, dist="L2"):
+    pbar = range(n_steps)
+    if verbose:
+        print(f"Optimizing duals: {x.shape}, {y.shape}")
+        pbar = tqdm(pbar)
+
+    if batch_size is None:
+        batch_size = len(x)
+
+    loss_func = get_dist_metric(dist)
+    psi = torch.zeros(len(x), requires_grad=True, device=x.device)
+    opt_psi = torch.optim.Adam([psi], lr=lr)
+    # scheduler = ReduceLROnPlateau(opt_psi, 'min', threshold=0.0001, patience=200)
+    for _ in pbar:
+        opt_psi.zero_grad()
+
+        mini_batch = y[torch.randperm(len(y))[:batch_size]]
+
+        phi, outputs_idx = batch_NN(mini_batch, x, psi, nnb, loss_func)
+
+        dual_estimate = torch.mean(phi) + torch.mean(psi)
+
+        loss = -1 * dual_estimate  # maximize over psi
+        loss.backward()
+        opt_psi.step()
+        # scheduler.step(dual_estimate)
+        if verbose:
+            pbar.set_description(f"dual estimate: {dual_estimate.item()}, LR: {opt_psi.param_groups[0]['lr']}")
+
+    return dual_estimate.item()
 
 class MiniBatchLoss:
     def __init__(self, dist='w1', **kwargs):

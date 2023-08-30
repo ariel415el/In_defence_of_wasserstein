@@ -108,7 +108,6 @@ def block(in_feat, out_feat, normalize='in'):
     layers.append(nn.LeakyReLU(0.2, inplace=True))
     return layers
 
-
 class Generator(nn.Module):
     def __init__(self, z_dim, output_dim=64, nf=128, depth=4, normalize='none', **kwargs):
         super(Generator, self).__init__()
@@ -186,14 +185,8 @@ if __name__ == "__main__":
     data = get_data(args.data_path, args.im_size, c=1 if args.gray_scale else 3,
                     limit_data=args.limit_data, center_crop=args.center_crop)
 
-    # losses_pixel_ot = pixel_ot(data, args.k, 250)
-    # losses_generator_ot_means = generator_ot_means(data, args.k, 100, 1000)
     losses_ot_weisfeld_means = ot_means_weisfeld(data, args.k, 25, 15)
-    # losses_ot_means = ot_means(data, args.k, 10)
 
-    # plt.plot(np.arange(len(losses_pixel_ot)), losses_pixel_ot, label="PixelOT", color="r")
-    # plt.plot(np.arange(len(losses_generator_ot_means)), losses_generator_ot_means, label="GenOTMeans", color="y")
-    # plt.plot(np.arange(len(losses_ot_means)), losses_ot_means, label="OTMeans", color="b")
     plt.plot(np.arange(len(losses_ot_weisfeld_means)), losses_ot_weisfeld_means, label="OTMeansWeisfeld", color="g")
     pickle.dump(losses_ot_weisfeld_means, open(f'{out_dir}/plots/MiniBatchLoss-dist=w1_fixed_noise_gen_to_train.pkl', 'wb'))
     plt.legend()

@@ -8,7 +8,7 @@ from torchvision.utils import make_grid
 import torch.nn.functional as F
 
 import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "utils"))
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", "utils"))
 from data import get_transforms
 
 def get_data(data_path, im_size=None, c=3, center_crop=None, gray_scale=False, flatten=True, limit_data=None):

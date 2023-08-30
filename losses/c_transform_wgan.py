@@ -1,6 +1,6 @@
 import torch
 
-from losses.loss_utils import get_dist_metric
+from utils.dists import get_dist_metric
 
 
 class CtransformLoss:

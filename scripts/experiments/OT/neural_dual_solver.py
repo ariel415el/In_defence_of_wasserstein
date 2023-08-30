@@ -9,9 +9,16 @@ import torch.optim as optim
 from tqdm import tqdm
 
 from models import get_models
-from losses import get_loss_function, calc_gradient_penalty
+from losses import get_loss_function
+from utils.train_utils import calc_gradient_penalty
 from utils.data import get_dataloader
 from utils.logger import get_dir, PLTLogger, WandbLogger
+
+
+"""Train a neural discriminator to optimal differentiation between two splits of a dataset
+    The final dual W1 distance can be then compared to the primal distance to test the efficacy
+    of the neural dual solver.
+    See 'Wasserstein GANs Work Because They Fail' Stanczuk et. al 2021 """
 
 def get_models_and_optimizers(args):
     args.gen_arch = "FC"
@@ -131,8 +138,7 @@ if __name__ == "__main__":
 
     loader_1, loader_2 = get_dataloader(args.data_path, args.im_size, args.batch_size, args.n_workers,
                                                val_percentage=0.5,
-                                               load_to_memory=args.load_data_to_memory,
-                                               drop_last=True)
+                                               load_to_memory=args.load_data_to_memory)
 
     train_dual_function(args)
 

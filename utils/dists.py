@@ -1,35 +1,6 @@
 import torch
 
 
-def calc_gradient_penalty(netD, real_data, fake_data, one_sided=False):
-    """Ensure the netD is smooth by forcing the gradient between real and fake data to ahve norm of 1"""
-    device = real_data.device
-    alpha = torch.rand(1, 1)
-    alpha = alpha.expand(real_data.size())
-    alpha = alpha.to(device)
-
-    interpolates = alpha * real_data + ((1 - alpha) * fake_data)
-
-    interpolates = interpolates.to(device)
-    interpolates = torch.autograd.Variable(interpolates, requires_grad=True)
-
-    disc_interpolates = netD(interpolates)
-
-    gradients = torch.autograd.grad(outputs=disc_interpolates,
-                                    inputs=interpolates,
-                                    grad_outputs=torch.ones(disc_interpolates.size()).to(device),
-                                    create_graph=True, retain_graph=True,
-                                    only_inputs=True)[0]
-
-    gradients = gradients.view(gradients.shape[0], -1)
-    gradient_norm = gradients.norm(2, dim=1)
-    diff = (gradient_norm - 1)
-    if one_sided:
-        diff = torch.clamp(diff, min=0)
-    gradient_penalty = (diff ** 2).mean()
-    return gradient_penalty, gradient_norm.mean().item()
-
-
 def get_dist_metric(name):
     """Choose how to calulate pairwise distances for EMD"""
     if name == 'L1':
@@ -142,6 +113,42 @@ class vgg_dist_calculator:
 
     def __call__(self, X, Y, b=64):
         return compute_features_dist_mat_in_batches(X, Y, self.extract, b=b)
+
+
+def batch_dist_matrix(X, Y, b, dist_function):
+    """
+    For each x find the best index i s.t i = argmin_i(x,y_i)-f_i
+    return the value and the argmin
+    """
+    dists = torch.ones(len(X), len(Y))
+    n_batches = len(X) // b
+    for i in range(n_batches):
+        s = slice(i * b,(i + 1) * b)
+        dists[s] = dist_function(X[s], Y).cpu()
+    if len(X) % b != 0:
+        s = slice(n_batches * b, len(X))
+        dists[s] = dist_function(X[s], Y).cpu()
+
+    return dists
+
+def batch_NN(X, Y, f, b, dist_function):
+    """
+    For each x find the best index i s.t i = argmin_i(x,y_i)-f_i
+    return the value and the argmin
+    """
+    NNs = torch.zeros(X.shape[0], dtype=torch.long, device=X.device)
+    NN_dists = torch.zeros(X.shape[0], device=X.device)
+    n_batches = len(X) // b
+    for i in range(n_batches):
+        s = slice(i * b,(i + 1) * b)
+        dists = dist_function(X[s], Y) - f
+        NN_dists[s], NNs[s] = dists.min(1)
+    if len(X) % b != 0:
+        s = slice(n_batches * b, len(X))
+        dists = dist_function(X[s], Y) - f
+        NN_dists[s], NNs[s] = dists.min(1)
+
+    return NN_dists, NNs
 
 
 if __name__ == '__main__':

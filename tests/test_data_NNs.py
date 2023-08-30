@@ -10,7 +10,7 @@ from tqdm import tqdm
 from torchvision import utils as vutils
 import torch.nn.functional as F
 
-from losses.loss_utils import vgg_dist_calculator
+from utils.dists import vgg_dist_calculator
 from tests.test_utils import cut_around_center, compute_dists, sample_patch_centers
 
 

@@ -18,7 +18,13 @@ class AdverserialFeatureMatchingLoss(SoftHingeLoss):
         """Train generator to minimize OT in discriminator features"""
         real_features = get_features(netD, real_data)
         fake_features = get_features(netD, fake_data)
-        return w1(real_features, fake_features)
+
+        real_features, _ = torch.sort(real_features.T, dim=1)
+        fake_features, _ = torch.sort(fake_features.T, dim=1)
+
+        SWD = (real_features - fake_features).pow(2).sum(1).sqrt().mean()
+
+        return SWD, {"FeatutresSWD": SWD}
 
 
 class FullAdverserialFeatureMatchingLoss(AdverserialFeatureMatchingLoss):

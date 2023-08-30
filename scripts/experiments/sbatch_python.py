@@ -1,6 +1,5 @@
 import subprocess
 from time import sleep, strftime
-import os
 
 def run_sbatch(train_command, stdout_name, hours, killable, gpu_memory):
     sbatch_text = (f"#!/bin/csh\n#SBATCH --time={hours}:0:0"

@@ -11,7 +11,7 @@ from benchmarking.neural_metrics import InceptionMetrics
 from utils.diffaug import DiffAugment
 from utils.common import dump_images, compose_experiment_name
 from utils.train_utils import copy_G_params, load_params, get_models_and_optimizers, parse_train_args, save_model
-from losses import get_loss_function, calc_gradient_penalty
+from losses import get_loss_function
 from utils.data import get_dataloader
 from utils.logger import get_dir, PLTLogger, WandbLogger
 

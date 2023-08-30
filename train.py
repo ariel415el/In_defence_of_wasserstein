@@ -6,8 +6,9 @@ import torch
 from benchmarking.neural_metrics import InceptionMetrics
 from utils.diffaug import DiffAugment
 from utils.common import dump_images, compose_experiment_name
-from utils.train_utils import copy_G_params, load_params, Prior, get_models_and_optimizers, parse_train_args, save_model
-from losses import get_loss_function, calc_gradient_penalty
+from utils.train_utils import copy_G_params, load_params, Prior, get_models_and_optimizers, parse_train_args, \
+    save_model, calc_gradient_penalty
+from losses import get_loss_function
 from utils.data import get_dataloader
 from utils.logger import get_dir, PLTLogger, WandbLogger
 
@@ -24,10 +25,8 @@ def train_GAN(args):
     inception_metrics = InceptionMetrics([next(iter(train_loader)) for _ in range(args.fid_n_batches)], torch.device("cpu"))
     other_metrics = [
                 get_loss_function("MiniBatchLoss-dist=w1"),
-                get_loss_function("MiniBatchLoss-dist=nn"),
-                # get_loss_function("MiniBatchPatchLoss-dist=w1-p=8-s=4"),
-                # get_loss_function("MiniBatchPatchLoss-dist=w1-epsilon=10-p=16-s=8"),
-                # get_loss_function("MiniBatchPatchLoss-dist=nn-p=8-s=4"),
+                get_loss_function("MiniBatchLoss-dist=swd"),
+                # get_loss_function("MiniBatchPatchLoss-dist=swd-p=8-s=4"),
                 # LapSWD()
               ]
 

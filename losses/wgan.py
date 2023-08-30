@@ -1,5 +1,3 @@
-from losses.loss_utils import calc_gradient_penalty
-
 
 class WGANLoss:
     """Should be used with GP"""

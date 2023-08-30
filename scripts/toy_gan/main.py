@@ -17,7 +17,8 @@ import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "utils"))
-from losses import get_loss_function, calc_gradient_penalty
+from losses import get_loss_function
+from utils.train_utils import calc_gradient_penalty
 from logger import PLTLogger
 
 

@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from torchvision import utils as vutils
 
-from losses.loss_utils import vgg_dist_calculator, L2
+from utils.dists import vgg_dist_calculator, L2
 
 
 def find_mode_collapses(G, D, z_dim, outputs_dir, device):
