@@ -142,3 +142,31 @@ def get_models_and_optimizers(args, device, saved_model_folder):
             print(f"Loaded ckpt of iteration: {start_iteration}")
     return prior, netG, netD, optimizerG, optimizerD, start_iteration
 
+
+def calc_gradient_penalty(netD, real_data, fake_data, one_sided=False):
+    """Ensure the netD is smooth by forcing the gradient between real and fake data to ahve norm of 1"""
+    device = real_data.device
+    alpha = torch.rand(1, 1)
+    alpha = alpha.expand(real_data.size())
+    alpha = alpha.to(device)
+
+    interpolates = alpha * real_data + ((1 - alpha) * fake_data)
+
+    interpolates = interpolates.to(device)
+    interpolates = torch.autograd.Variable(interpolates, requires_grad=True)
+
+    disc_interpolates = netD(interpolates)
+
+    gradients = torch.autograd.grad(outputs=disc_interpolates,
+                                    inputs=interpolates,
+                                    grad_outputs=torch.ones(disc_interpolates.size()).to(device),
+                                    create_graph=True, retain_graph=True,
+                                    only_inputs=True)[0]
+
+    gradients = gradients.view(gradients.shape[0], -1)
+    gradient_norm = gradients.norm(2, dim=1)
+    diff = (gradient_norm - 1)
+    if one_sided:
+        diff = torch.clamp(diff, min=0)
+    gradient_penalty = (diff ** 2).mean()
+    return gradient_penalty, gradient_norm.mean().item()
