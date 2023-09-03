@@ -5,6 +5,7 @@ import os
 import torch
 
 from models import get_models
+from scripts.experiments.experiment_utils import find_last_file
 from tests.generate_images import generate_images
 from tests.interpolate import interpolate
 from tests.test_data_NNs import find_nns, find_patch_nns
@@ -13,6 +14,7 @@ from tests.test_emd import test_emd
 from tests.test_mode_collapse import find_mode_collapses
 from tests.test_utils import get_data
 from tests.test_discriminator import saliency_maps, test_range
+from tests.OT import compare_real_fake_patch_dist
 
 
 def load_pretrained_models(args, ckpt_path, device):
@@ -33,12 +35,14 @@ def load_pretrained_models(args, ckpt_path, device):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('model_dir', help="Path to trained model dir")
-    parser.add_argument('--ckpt_name', default='last', type=str)
+    parser.add_argument('--ckpt_name', default=None, type=str)
     parser.add_argument('--device', default="cpu")
     args = parser.parse_args()
     model_dir = args.model_dir
     device = torch.device(args.device)
 
+    if args.ckpt_name is None:
+        args.ckpt_name = find_last_file(f'{model_dir}/models', ext='.pth').split(".")[0]
     ckpt_path = f'{model_dir}/models/{args.ckpt_name}.pth'  # path to the checkpoint
     outputs_dir = f'{model_dir}/test_outputs'
     os.makedirs(outputs_dir, exist_ok=True)
@@ -65,6 +69,10 @@ if __name__ == '__main__':
 
     # Full data tests
     data = get_data(args['data_path'], args['im_size'], args['center_crop'], args['gray_scale'], limit_data=args['limit_data']).to(device)
+
+    compare_real_fake_patch_dist(netG,  z_dim, data, dist='swd', p=8, s=4, outputs_dir=outputs_dir)
+    exit()
+    # Nearest neighbor visualizations
     fake_images = netG(torch.randn((4, z_dim), device=device))
     find_nns(fake_images, data, outputs_dir=outputs_dir, show_first_n=2)
     # find_patch_nns(fake_images, data, patch_size=32, search_margin=2, outputs_dir=outputs_dir, n_centers=4)

@@ -5,7 +5,7 @@ import torch
 
 from benchmarking.neural_metrics import InceptionMetrics
 from utils.diffaug import DiffAugment
-from utils.common import dump_images, compose_experiment_name
+from utils.common import dump_images, compose_experiment_name, batch_generation
 from utils.train_utils import copy_G_params, load_params, Prior, get_models_and_optimizers, parse_train_args, \
     save_model, calc_gradient_penalty
 from losses import get_loss_function
@@ -24,10 +24,10 @@ def train_GAN(args):
 
     inception_metrics = InceptionMetrics([next(iter(train_loader)) for _ in range(args.fid_n_batches)], torch.device("cpu"))
     other_metrics = [
-                get_loss_function("MiniBatchLoss-dist=w1"),
+                # get_loss_function("MiniBatchLoss-dist=w1"),
                 get_loss_function("MiniBatchLoss-dist=swd"),
-                # get_loss_function("MiniBatchPatchLoss-dist=swd-p=8-s=4"),
-                # LapSWD()
+                get_loss_function("MiniBatchPatchLoss-dist=swd-p=8-s=4"),
+                get_loss_function("MiniBatchPatchLoss-dist=swd-p=16-s=8"),
               ]
 
     loss_function = get_loss_function(args.loss_function)
@@ -108,13 +108,7 @@ def evaluate(netG, netD, inception_metrics, other_metrics, fixed_noise, debug_fi
     netD.eval()
     start = time()
     with torch.no_grad():
-        fixed_noise_fake_images = netG(fixed_noise)
-        if args.D_step_every > 0 :
-            D_fake = netD(fixed_noise_fake_images)
-            D_real = netD(debug_fixed_reals)
-            logger.log({'D_real': D_real.mean().item(),
-                       'D_fake': D_fake.mean().item(),
-                       }, step=iteration)
+        fake_images = batch_generation(netG, args.z_dim, len(debug_all_reals), 512, torch.device("cpu"))
 
         if args.fid_n_batches > 0 and iteration % args.fid_freq == 0:
             fake_batches = [netG(torch.randn_like(fixed_noise).to(device)) for _ in range(args.fid_n_batches)]
@@ -122,10 +116,10 @@ def evaluate(netG, netD, inception_metrics, other_metrics, fixed_noise, debug_fi
 
         for metric in other_metrics:
             logger.log({
-                f'{metric.name}_fixed_noise_gen_to_train': metric(fixed_noise_fake_images.cpu(), debug_all_reals.cpu()),
+                f'{metric.name}_fixed_noise_gen_to_train': metric(fake_images.cpu(), debug_all_reals.cpu()),
             }, step=iteration)
 
-        dump_images(fixed_noise_fake_images,  f'{saved_image_folder}/{iteration}.png')
+        dump_images(netG(fixed_noise),  f'{saved_image_folder}/{iteration}.png')
         if iteration == 0:
             dump_images(debug_fixed_reals, f'{saved_image_folder}/debug_fixed_reals.png')
 

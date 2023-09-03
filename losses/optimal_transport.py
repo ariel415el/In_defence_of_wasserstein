@@ -75,27 +75,28 @@ def duplicate_to_match_lengths(arr1, arr2):
 
     return arr1, arr2
 
-def swd(x, y, num_proj=1024, **kwargs):
+def swd(x, y, num_proj=128, **kwargs):
     num_proj = int(num_proj)
-    b, c, h, w = x.shape
+    _, c, h, w = x.shape
 
     # Sample random normalized projections
-    rand = torch.randn(num_proj, c * h * w).to(x.device)  # (slice_size**2*ch)
-    rand = rand / torch.norm(rand, dim=1, keepdim=True)  # noramlize to unit directions
+    rand = torch.randn(c * h * w, num_proj).to(x.device)  # (slice_size**2*ch)
+    rand = rand / torch.norm(rand, dim=0, keepdim=True)  # noramlize to unit directions
 
     # Project images
-    projx = torch.mm(x.reshape(-1, c * h * w), rand.T).T
-    projy = torch.mm(y.reshape(-1, c * h * w), rand.T).T
+    projx = torch.mm(x.reshape(-1, c * h * w), rand)
+    projy = torch.mm(y.reshape(-1, c * h * w), rand)
 
-    projx, projy = duplicate_to_match_lengths(projx, projy)
+    projx, projy = duplicate_to_match_lengths(projx.T, projy.T)
 
     # Sort and compute L1 loss
     projx, _ = torch.sort(projx, dim=1)
     projy, _ = torch.sort(projy, dim=1)
 
-    n = projx.shape[1]
-    # SWD = (projx - projy).pow(2).sum(1).sqrt().mean() / n
+
     SWD = (projx - projy).abs().mean()
+    # SWD = (projx - projy).pow(2).sum(1).sqrt().mean()
+    # SWD = (projx - projy).pow(2).sum(1).sqrt().mean() / projx.shape[1]
 
     return SWD, {"SWD": SWD}
 
@@ -108,6 +109,8 @@ def sinkhorn(x, y, epsilon=1, **kwargs):
 
 
 def discrete_dual(x, y, n_steps=500, batch_size=None, lr=0.001, verbose=False, nnb=256, dist="L2"):
+    x = x.reshape(len(x), -1)
+    y = y.reshape(len(y), -1)
     pbar = range(n_steps)
     if verbose:
         print(f"Optimizing duals: {x.shape}, {y.shape}")
@@ -116,27 +119,29 @@ def discrete_dual(x, y, n_steps=500, batch_size=None, lr=0.001, verbose=False, n
     if batch_size is None:
         batch_size = len(x)
 
-    loss_func = get_dist_metric(dist)
-    psi = torch.zeros(len(x), requires_grad=True, device=x.device)
-    opt_psi = torch.optim.Adam([psi], lr=lr)
-    # scheduler = ReduceLROnPlateau(opt_psi, 'min', threshold=0.0001, patience=200)
-    for _ in pbar:
-        opt_psi.zero_grad()
+    with torch.enable_grad():
+        loss_func = get_dist_metric(dist)
+        psi = torch.zeros(len(x), requires_grad=True, device=x.device)
+        opt_psi = torch.optim.Adam([psi], lr=lr)
+        # scheduler = ReduceLROnPlateau(opt_psi, 'min', threshold=0.0001, patience=200)
+        for _ in pbar:
+            opt_psi.zero_grad()
 
-        mini_batch = y[torch.randperm(len(y))[:batch_size]]
+            mini_batch = y[torch.randperm(len(y))[:batch_size]]
 
-        phi, outputs_idx = batch_NN(mini_batch, x, psi, nnb, loss_func)
+            phi, outputs_idx = batch_NN(mini_batch, x, psi, nnb, loss_func)
 
-        dual_estimate = torch.mean(phi) + torch.mean(psi)
+            dual_estimate = torch.mean(phi) + torch.mean(psi)
 
-        loss = -1 * dual_estimate  # maximize over psi
-        loss.backward()
-        opt_psi.step()
-        # scheduler.step(dual_estimate)
-        if verbose:
-            pbar.set_description(f"dual estimate: {dual_estimate.item()}, LR: {opt_psi.param_groups[0]['lr']}")
+            loss = -1 * dual_estimate  # maximize over psi
+            loss.backward()
+            opt_psi.step()
+            # scheduler.step(dual_estimate)
+            if verbose:
+                pbar.set_description(f"dual estimate: {dual_estimate.item()}, LR: {opt_psi.param_groups[0]['lr']}")
 
-    return dual_estimate.item()
+        return dual_estimate, {"dual": dual_estimate.item()}
+
 
 class MiniBatchLoss:
     def __init__(self, dist='w1', **kwargs):

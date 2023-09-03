@@ -7,6 +7,7 @@ from torch import optim as optim
 
 from models import get_models
 
+
 def parse_train_args(arguments_string=None):
     parser = argparse.ArgumentParser()
 
@@ -66,6 +67,7 @@ def parse_train_args(arguments_string=None):
 
     return parser.parse_args(arguments_string)
 
+
 def copy_G_params(model):
     flatten = deepcopy(list(p.data for p in model.parameters()))
     return flatten
@@ -111,6 +113,7 @@ def save_model(prior, netG, netD, optimizerG, optimizerD, saved_model_folder, it
                 "optimizerD": optimizerD.state_dict()
                 },
                fname)
+
 
 def get_models_and_optimizers(args, device, saved_model_folder):
     prior = Prior(args.z_prior, args.z_dim)

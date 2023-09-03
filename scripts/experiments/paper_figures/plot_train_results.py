@@ -1,11 +1,13 @@
 import os
 import pickle
+import sys
 
 import numpy as np
 from PIL import Image
 from matplotlib import pyplot as plt
 
-from scripts.experiments.OT.experiment_utils import find_dir, find_last_image
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+from experiment_utils import find_dir, find_last_file
 
 COLORS=['r', 'g', 'b', 'c', 'm', 'y', 'k']
 
@@ -27,7 +29,7 @@ def plot(root, plot_name, titles_and_name_lists, plot_loss=None, s=4,  n=5):
         if not found_path:
             continue
         dir = os.path.join(root, found_path)
-        img_name = find_last_image(os.path.join(dir, "images"))
+        img_name = find_last_file(os.path.join(dir, "images"))
         images = os.path.join(dir, "images", img_name)
         images = np.array(Image.open(images))
         d = images.shape[0] // 2
@@ -59,7 +61,7 @@ def plot(root, plot_name, titles_and_name_lists, plot_loss=None, s=4,  n=5):
                     patch_plot = pickle.load((open(patch_plot, "rb")))
 
                     ax2.plot(np.arange(len(patch_plot)), patch_plot, line_type, color=color, label=name)
-                    ax2.annotate(f"{patch_plot[-1]:.2f}", (len(patch_plot) - 1, patch_plot[-1]), textcoords="offset points", xytext=(-2, 2), ha="center")
+                    ax2.annotate(f"{patch_plot[-1]:.4f}", (len(patch_plot) - 1, patch_plot[-1]), textcoords="offset points", xytext=(-2, 2), ha="center")
 
                 all_axs.append(ax2)
 

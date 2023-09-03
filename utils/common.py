@@ -10,6 +10,7 @@ def compose_experiment_name(args):
                 f"{'_GS' if args.gray_scale else ''}{f'_CC-{args.center_crop}' if args.center_crop else ''}" \
                 f"_L-{args.loss_function}_Z-{args.z_dim}x{args.z_prior}_B-{args.r_bs}-{args.f_bs}_{args.tag}"
 
+
 def parse_classnames_and_kwargs(string, kwargs=None):
     """Import a class and create an instance with kwargs from strings in format
     '<class_name>_<kwarg_1_name>=<kwarg_1_value>_<kwarg_2_name>=<kwarg_2_value>"""
@@ -33,6 +34,7 @@ def find_nth_decimal(x, first, size=2):
     "extract the nth to n+lth digits from a float"
     return (x * 10**(first-1) % 1 * 10**size).to(int)
 
+
 def hash_vectors(x, n=1000):
     """maps a (b,d) float tensor into (d,) integer tensor in range (0,n-1) in a deterministic manner (using 3 of its decimals)"""
     l = 1
@@ -40,3 +42,20 @@ def hash_vectors(x, n=1000):
         l+=1
     decimals = find_nth_decimal(x.mean(1), first=3, size=l)
     return (decimals / 10 ** l * n).to(torch.long)
+
+
+def batch_generation(netG, z_dim, n, b, device):
+    n_batches = n // b
+    fake_data = []
+    for i in range(n_batches):
+        z = torch.randn((b, z_dim))
+        if torch.cuda.is_available():
+            z = z.cuda()
+        fake_data.append(netG(z).to(device))
+    if n_batches * b < n:
+        z = torch.randn((n - n_batches * b, z_dim))
+        if torch.cuda.is_available():
+            z = z.cuda()
+        fake_data.append(netG(z).to(device))
+    fake_data = torch.cat(fake_data)
+    return fake_data

@@ -9,8 +9,9 @@ from torchvision.utils import make_grid
 import torch.nn.functional as F
 
 import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 from utils.data import get_transforms
+
 
 def get_data(data_path, im_size=None, c=3, center_crop=None, gray_scale=False, flatten=True, limit_data=None):
     if os.path.isdir(data_path):
@@ -37,7 +38,8 @@ def get_data(data_path, im_size=None, c=3, center_crop=None, gray_scale=False, f
 
 
 def get_centroids(data, n_centroids, use_faiss=False):
-    np_data = data.cpu().numpy()
+    d,c,h,w = data.shape
+    np_data = data.cpu().numpy().reshape(d, -1)
     if use_faiss:
         import faiss
         kmeans = faiss.Kmeans(np_data.shape[1], n_centroids, niter=100, verbose=False, gpu=True)
@@ -50,7 +52,8 @@ def get_centroids(data, n_centroids, use_faiss=False):
 
 
     centroids = torch.from_numpy(centroids).to(data.device)
-    return centroids
+    print("Got centroids")
+    return centroids.reshape(n_centroids,c,h,w)
 
 
 def read_grid_batch(path, d, c, flatten=True):
@@ -101,7 +104,7 @@ def find_dir(root, names, disallowed_names=[]):
     return valid_dirs[0]
 
 
-def find_last_image(dir):
-    files = glob.glob(f'{dir}/*.png')
+def find_last_file(dir, ext='.png'):
+    files = glob.glob(f'{dir}/*{ext}')
     if files:
         return os.path.basename(max(files, key=os.path.getctime))

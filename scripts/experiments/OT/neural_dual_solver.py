@@ -12,7 +12,7 @@ from models import get_models
 from losses import get_loss_function
 from utils.train_utils import calc_gradient_penalty
 from utils.data import get_dataloader
-from utils.logger import get_dir, PLTLogger, WandbLogger
+from utils.logger import get_dir, PLTLogger
 
 
 """Train a neural discriminator to optimal differentiation between two splits of a dataset
@@ -33,7 +33,7 @@ def get_models_and_optimizers(args):
 
 
 def train_dual_function(args):
-    logger = (WandbLogger if args.wandb else PLTLogger)(args, plots_image_folder)
+    logger = PLTLogger(args, plots_image_folder)
 
     loss_function = get_loss_function("WGANLoss")
 
@@ -115,8 +115,8 @@ if __name__ == "__main__":
     parser.add_argument('--n_iterations', default=1000000, type=int)
 
     # Evaluation
-    parser.add_argument('--wandb', action='store_true', default=False, help="Otherwise use PLT localy")
     parser.add_argument('--log_freq', default=10000, type=int)
+    # parser.add_argument('--plot_w1', action='store_true', default=False)
 
     # Other
     parser.add_argument('--project_name', default='Dual-solvers')

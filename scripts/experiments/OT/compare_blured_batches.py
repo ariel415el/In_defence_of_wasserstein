@@ -3,7 +3,7 @@ import sys
 import torch
 from matplotlib import pyplot as plt
 import numpy as np
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 from losses.optimal_transport import MiniBatchLoss, MiniBatchPatchLoss
 from scripts.experiments.experiment_utils import get_data, batch_to_image
 from torchvision.transforms import transforms
@@ -80,6 +80,7 @@ def plot_per_level(names_and_batches, dists, image_dists, patch_dists, normalize
         plt.savefig(os.path.join(output_dir, f'blurred_plot{"" if line_type == "-" else f"-patch({p}-{s})"}{"_normalize" if normalize else ""}.png'))
         plt.clf()
 
+
 def plot_per_dist(names_and_batches, dists, image_dists, patch_dists):
     """Compare the plots of different levels (Image/Patch) for each metric"""
     for i, dist in enumerate(dists):
@@ -98,15 +99,15 @@ def plot_per_dist(names_and_batches, dists, image_dists, patch_dists):
 
 if __name__ == '__main__':
     device = torch.device('cpu')
-    b = 1
-    n_images = 1
+    b = 64
+    n_images = 10000
     im_size = 64
     size = 5
-    dists = ["swd", "w1"]
-    p = 7
-    s = 1
+    dists = ["w1", "discrete_dual", 'swd']
+    p = 8
+    s = 4
 
-    data_path = '/mnt/storage_ssd/datasets/FFHQ/FFHQ'
+    data_path = '/cs/labs/yweiss/ariel1/data/FFHQ/FFHQ'
     c = 3
     gray_scale = False
     center_crop = 80
