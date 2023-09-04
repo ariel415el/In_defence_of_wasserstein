@@ -46,6 +46,7 @@ def compute_dists(x, y, dist='edges'):
 
     return dists.reshape(x.shape[0], -1)
 
+
 def cut_around_center(img, center, size, margin=0):
     hs = size // 2
     r = img.shape[-2]
@@ -54,13 +55,15 @@ def cut_around_center(img, center, size, margin=0):
                     max(0, center[1] - hs - margin): min(c, center[1] + hs + margin)]
     return crop
 
-def sample_patch_centers(img_dim, p, n_centers):
+
+def sample_patch_centers(img_dim, p, n_centers, stride=1, offset=0):
     h = p // 2
-    centers = np.arange(h, img_dim - h + 1, 1)
+    centers = np.arange(h, img_dim - h + 1, stride) + offset
     centers = list(itertools.product(centers, repeat=2))
     shuffle(centers)
     centers = centers[:n_centers]
     return centers
+
 
 def inverse_latent_sampling(G, z, real_images, n_steps=1000, lr=0.01):
     from torch import optim
