@@ -3,8 +3,10 @@ import sys
 import torch
 from matplotlib import pyplot as plt
 import numpy as np
+import torch.multiprocessing as mp
+
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-from losses.optimal_transport import MiniBatchLoss, MiniBatchPatchLoss
+from losses.optimal_transport import MiniBatchPatchLoss
 from utils.common import parse_classnames_and_kwargs
 from scripts.experiments.experiment_utils import get_data, batch_to_image
 from torchvision.transforms import transforms
@@ -30,19 +32,22 @@ def main():
         ]
         plot_images(names_and_batches)
 
-        image_dists = {dist: [] for dist in dists}
-        patch_dists = {dist: [] for dist in dists}
-
+        data.share_memory_()
+        patch_dists_means = {dist: [] for dist in dists}
+        patch_dists_stds = {dist: [] for dist in dists}
         for name, batch in names_and_batches:
+            batch.share_memory_()
             for dist in dists:
                 print(name, dist)
                 dist_name, kwargs = parse_classnames_and_kwargs(dist)
-                image_dists[dist].append(MiniBatchLoss(dist_name, **kwargs)(batch.clone(), data.clone()))
-                patch_dists[dist].append(MiniBatchPatchLoss(dist_name, p=p, s=s, **kwargs)(batch.clone(), data.clone()))
+                dist_metric = MiniBatchPatchLoss(dist_name, p=p, s=s, **kwargs)
+                # vals = [dist_metric(batch.clone(), data.clone()) for _ in range(n_reps)]
+                vals = run_distributed(dist_metric, batch, data, n_reps)
+                patch_dists_means[dist].append(np.mean(vals))
+                patch_dists_stds[dist].append(np.std(vals))
 
-        plot_per_level(names_and_batches, dists, image_dists, patch_dists)
-        plot_per_level(names_and_batches, dists, image_dists, patch_dists, normalize=True)
-        plot_per_dist(names_and_batches, dists, image_dists, patch_dists)
+        plot(names_and_batches, dists, patch_dists_means, patch_dists_stds, normalize=False)
+        plot(names_and_batches, dists, patch_dists_means, patch_dists_stds, normalize=True)
 
 
 def plot_images(names_and_batches):
@@ -59,46 +64,50 @@ def plot_images(names_and_batches):
     plt.clf()
 
 
-def plot_per_level(names_and_batches, dists, image_dists, patch_dists, normalize=False):
+def plot(names_and_batches, dists,  patch_dists_means, patch_dists_stds, normalize=False):
     """Compare the plots of different metrics on the same level (Image/Patch)"""
-    for dict, line_type in [(image_dists, '-'), (patch_dists, '--')]:
-        plt.figure()
-        for i, dist in enumerate(dists):
-            n = len(dict[dist])
-            label = dist if line_type == '-' else f"patch({p}-{s})-" + dist
+    plt.figure()
+    for i, dist in enumerate(dists):
+        n = len(patch_dists_means[dist])
+        label = f"patch({p}-{s})-" + dist
 
-            vals = np.array(dict[dist])
-            if normalize:
-                vals /= vals[0]
-            # vals += desired_mean
+        vals = np.array(patch_dists_means[dist])
+        stds = np.array(patch_dists_stds[dist])
+        if normalize:
+            stds /= vals[0]
+            vals /= vals[0]
 
-            plt.plot(range(len(dict[dist])), vals, line_type, label=label, alpha=0.75, color=COLORS[i])
-            # plt.annotate(f"{dict[dist][-1]:.2f}", (n - 1, dict[dist][-1]), textcoords="offset points", xytext=(-2, 2), ha="center")
+        plt.plot(range(len(patch_dists_means[dist])), vals, label=label, alpha=0.75, color=COLORS[i])
+        plt.fill_between(range(len(patch_dists_means[dist])), vals - stds / 2, vals + stds / 2, alpha=0.15, color=COLORS[i])
 
         plt.xticks(range(n), [x[0] for x in names_and_batches], rotation=0)
         plt.xlabel("Blur Sigma")
         plt.ylabel("Change factor")
         # plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05),
         #           fancybox=True, shadow=True, ncol=5)
-        plt.legend()
-        plt.savefig(os.path.join(output_dir, f'blurred_plot{"" if line_type == "-" else f"-patch({p}-{s})"}{"_normalize" if normalize else ""}.png'))
-        plt.clf()
+    plt.legend()
+    plt.savefig(os.path.join(output_dir, f'blurred_plot{f"-patch({p}-{s})"}{"_normalize" if normalize else ""}.png'))
+    plt.clf()
 
 
-def plot_per_dist(names_and_batches, dists, image_dists, patch_dists):
-    """Compare the plots of different levels (Image/Patch) for each metric"""
-    for i, dist in enumerate(dists):
-        plt.figure()
-        for dict, line_type in [(image_dists, '-'), (patch_dists, '--')]:
-            n = len(image_dists[dist])
-            label = dist if line_type == '-' else f"patch({p}-{s})-" + dist
-            plt.plot(range(len(dict[dist])),dict[dist], line_type, label=label, alpha=0.75, color=COLORS[i])
-            plt.annotate(f"{dict[dist][-1]:.2f}", (n - 1, dict[dist][-1]), textcoords="offset points", xytext=(-2, 2), ha="center")
+def worker(idx, vals, f, batch, data):
+    torch.manual_seed(idx)
+    vals[idx] = f(batch, data)
 
-        plt.xticks(range(n), [x[0] for x in names_and_batches], rotation=0)
-        plt.legend()
-        plt.savefig(os.path.join(output_dir, f'blurred_plot_{dist}.png'))
-        plt.clf()
+
+def run_distributed(f, b1, b2, n):
+    ret_vals = mp.Manager().list()
+    for _ in range(n):
+        ret_vals.append(0)
+    ps = []
+    torch.set_num_threads(1)
+    for idx in range(n):
+        pr = mp.Process(target=worker, args=(idx, ret_vals, f, b1, b2))
+        pr.start()
+        ps.append(pr)
+    for pr in ps:
+        pr.join()
+    return ret_vals
 
 
 if __name__ == '__main__':
@@ -106,13 +115,20 @@ if __name__ == '__main__':
     b = 64
     n_images = 64
     im_size = 64
+    n_proj = 16
     size = 5
-    dists = ["w1", 'swd-num_proj=32',
-             'projected_w1-num_proj=32-dim=1', 'projected_w1-num_proj=32-dim=4', 'projected_w1-num_proj=32-dim=8']
-    # sigmas = [0.1, 0.5, 1, 1.5, 2]
-    sigmas = [0.5, 1.5]
+    dists = [
+            "w1",
+             f'swd-num_proj={n_proj}',
+             f'projected_w1-num_proj={n_proj}-dim=1',
+             f'projected_w1-num_proj={n_proj}-dim=4',
+             f'projected_w1-num_proj={n_proj}-dim=8',
+             ]
+    sigmas = [0.1, 0.5, 1, 1.5, 2]
+    # sigmas = [0.5, 1.5]
     p = 8
     s = 8
+    n_reps = 16
 
     data_path = '/mnt/storage_ssd/datasets/FFHQ/FFHQ'
     c = 3
