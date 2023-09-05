@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 from losses.optimal_transport import MiniBatchPatchLoss
-from scripts.experiments.experiment_utils import get_data, get_centroids, batch_to_image
+from scripts.experiments.experiment_utils import get_data
 
 COLORS =['r', 'g', 'b', 'k']
 

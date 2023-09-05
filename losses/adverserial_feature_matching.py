@@ -1,7 +1,7 @@
 import torch
-from torch.nn import functional as F
 
-from losses import get_ot_plan, w1, SoftHingeLoss
+from losses import SoftHingeLoss
+from utils.distribution_metrics import w1
 
 
 def get_features(net, img, patch_wise=False):
