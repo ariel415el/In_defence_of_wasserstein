@@ -5,10 +5,11 @@ from matplotlib import pyplot as plt
 import numpy as np
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 from losses.optimal_transport import MiniBatchLoss, MiniBatchPatchLoss
+from utils.common import parse_classnames_and_kwargs
 from scripts.experiments.experiment_utils import get_data, batch_to_image
 from torchvision.transforms import transforms
 
-COLORS =['r', 'g', 'b', 'k']
+COLORS =['r', 'g', 'b', 'k', 'y', 'm', 'c']
 
 
 def main():
@@ -21,12 +22,11 @@ def main():
         b1 = data[:b]
         data = data[-n_images:]
 
-        names_and_batches = [
-            ("sigma=0", b1),
-            ("sigma=1", transforms.GaussianBlur(kernel_size=15, sigma=1)(b1)),
-            ("sigma=2", transforms.GaussianBlur(kernel_size=15, sigma=2)(b1)),
-            ("sigma=3", transforms.GaussianBlur(kernel_size=15, sigma=3)(b1)),
-            ("sigma=4", transforms.GaussianBlur(kernel_size=15, sigma=4)(b1)),
+        names_and_batches = [("sigma=0", b1)]
+        # names_and_batches = []
+        names_and_batches += [
+            (f"sigma={sigma}", transforms.GaussianBlur(kernel_size=15, sigma=sigma)(b1))
+            for sigma in sigmas
         ]
         plot_images(names_and_batches)
 
@@ -36,8 +36,9 @@ def main():
         for name, batch in names_and_batches:
             for dist in dists:
                 print(name, dist)
-                image_dists[dist].append(MiniBatchLoss(dist)(batch, data))
-                patch_dists[dist].append(MiniBatchPatchLoss(dist, p=p, s=s)(batch, data))
+                dist_name, kwargs = parse_classnames_and_kwargs(dist)
+                image_dists[dist].append(MiniBatchLoss(dist_name, **kwargs)(batch.clone(), data.clone()))
+                patch_dists[dist].append(MiniBatchPatchLoss(dist_name, p=p, s=s, **kwargs)(batch.clone(), data.clone()))
 
         plot_per_level(names_and_batches, dists, image_dists, patch_dists)
         plot_per_level(names_and_batches, dists, image_dists, patch_dists, normalize=True)
@@ -68,14 +69,17 @@ def plot_per_level(names_and_batches, dists, image_dists, patch_dists, normalize
 
             vals = np.array(dict[dist])
             if normalize:
-                vals -= vals.min()
-                vals /= vals.max()
+                vals /= vals[0]
             # vals += desired_mean
 
             plt.plot(range(len(dict[dist])), vals, line_type, label=label, alpha=0.75, color=COLORS[i])
             # plt.annotate(f"{dict[dist][-1]:.2f}", (n - 1, dict[dist][-1]), textcoords="offset points", xytext=(-2, 2), ha="center")
 
         plt.xticks(range(n), [x[0] for x in names_and_batches], rotation=0)
+        plt.xlabel("Blur Sigma")
+        plt.ylabel("Change factor")
+        # plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05),
+        #           fancybox=True, shadow=True, ncol=5)
         plt.legend()
         plt.savefig(os.path.join(output_dir, f'blurred_plot{"" if line_type == "-" else f"-patch({p}-{s})"}{"_normalize" if normalize else ""}.png'))
         plt.clf()
@@ -100,18 +104,21 @@ def plot_per_dist(names_and_batches, dists, image_dists, patch_dists):
 if __name__ == '__main__':
     device = torch.device('cpu')
     b = 64
-    n_images = 10000
+    n_images = 64
     im_size = 64
     size = 5
-    dists = ["w1", "discrete_dual", 'swd']
+    dists = ["w1", 'swd-num_proj=32',
+             'projected_w1-num_proj=32-dim=1', 'projected_w1-num_proj=32-dim=4', 'projected_w1-num_proj=32-dim=8']
+    # sigmas = [0.1, 0.5, 1, 1.5, 2]
+    sigmas = [0.5, 1.5]
     p = 8
-    s = 4
+    s = 8
 
-    data_path = '/cs/labs/yweiss/ariel1/data/FFHQ/FFHQ'
+    data_path = '/mnt/storage_ssd/datasets/FFHQ/FFHQ'
     c = 3
     gray_scale = False
     center_crop = 80
 
-    output_dir = os.path.join(os.path.dirname(__file__), "outputs", "compare_blured_batches")
+    output_dir = os.path.join(os.path.dirname(__file__), "outputs", f"compare_blured_batches-{p}-{s}-{n_images}")
 
     main()

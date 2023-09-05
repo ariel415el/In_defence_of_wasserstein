@@ -32,13 +32,15 @@ if __name__ == '__main__':
     n_centroids = 128
     crop_size = 90
     img_size = 64
-    root = '/cs/labs/yweiss/ariel1/data'
-    # root = '/mnt/storage_ssd/datasets/'
+    # root = '/cs/labs/yweiss/ariel1/data'
+    root = '/mnt/storage_ssd/datasets/'
 
     FFHQ = f'{root}/FFHQ/FFHQ'
 
     out_path = f'{root}/FFHQ/FFHQ_centroids'
     os.makedirs(out_path, exist_ok=True)
+    out_path_means = f'{root}/FFHQ/FFHQ_centroids_means'
+    os.makedirs(out_path_means, exist_ok=True)
 
     # centers = sample_patch_centers(crop_size-20, img_size, 10000, stride=1, offset=20)
     centers = get_centers(128)
@@ -48,8 +50,12 @@ if __name__ == '__main__':
         fpath = os.path.join(FFHQ, os.listdir(FFHQ)[i])
         img_org = np.array(Image.open(fpath))
         # img_org = crop_center(img_org, crop_size)
+        mean = 0
         for j, center in enumerate(centers):
             print(i,j, center)
             img = crop(img_org, center, 90)
             Image.fromarray(img.astype(np.uint8)).save(os.path.join(out_path, f"img-{i}-{j}.png"))
+            mean += img.astype(float)
+        mean /= len(centers)
+        Image.fromarray(mean.astype(np.uint8)).save(os.path.join(out_path_means, f"mean-{i}.png"))
 

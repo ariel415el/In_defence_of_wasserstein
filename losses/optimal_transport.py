@@ -29,6 +29,7 @@ def to_patches(x, p=8, s=4, sample_patches=None):
 
 
 def w1(x, y, epsilon=0, **kwargs):
+    """Compute Optimal transport with L2 norm as base metric"""
     base_metric = get_dist_metric("L2")
     C = base_metric(x.reshape(len(x), -1), y.reshape(len(y), -1))
     OTPlan = get_ot_plan(C.detach().cpu().numpy(), int(epsilon))
@@ -38,6 +39,7 @@ def w1(x, y, epsilon=0, **kwargs):
 
 
 def nn(x, y, alpha=None, **kwargs):
+    """some over distances to nearest neighbor in the other set"""
     base_metric = get_dist_metric("L2")
     C = base_metric(x.reshape(len(x), -1), y.reshape(len(y), -1))
     if alpha is not None:
@@ -46,12 +48,37 @@ def nn(x, y, alpha=None, **kwargs):
     return nn_loss, {"nn_loss": nn_loss}
 
 def remd(x, y, **kwargs):
+    """Releaxed EMD: Style transfer by re-laxed optimal transport and self-similarity
+    This is basicly bidirectional NN loss"""
     base_metric = get_dist_metric("L2")
     C = base_metric(x.reshape(len(x), -1), y.reshape(len(y), -1))
     nn_loss = max(C.min(dim=0)[0].mean(), C.min(dim=1)[0].mean())
     return nn_loss, {"remd_loss": nn_loss}
 
+def projected_w1(x, y, epsilon=0, dim=64, num_proj=16, **kwargs):
+    """Project points to 'dim' dimensions and compute OT there. Avearage over 'num_proj' such projections"""
+    num_proj = int(num_proj)
+    dim = int(dim)
+    _, c, h, w = x.shape
 
+    dists = []
+    for i in range(num_proj):
+        # Sample random normalized projections
+        rand = torch.randn(c * h * w, dim).to(x.device)  # (slice_size**2*ch)
+        rand = rand / torch.norm(rand, dim=0, keepdim=True)  # noramlize to unit directions
+
+        # Project images
+        projx = torch.mm(x.reshape(-1, c * h * w), rand)
+        projy = torch.mm(y.reshape(-1, c * h * w), rand)
+
+        base_metric = get_dist_metric("L2")
+        C = base_metric(projx.reshape(len(projx), -1), projy.reshape(len(projy), -1))
+        OTPlan = get_ot_plan(C.detach().cpu().numpy(), int(epsilon))
+        OTPlan = torch.from_numpy(OTPlan).to(C.device)
+        W1 = torch.sum(OTPlan * C)
+        dists.append(W1)
+    W1 = torch.stack(dists).mean()
+    return W1, {"W1-L2": W1}
 
 def duplicate_to_match_lengths(arr1, arr2):
     """
@@ -94,9 +121,9 @@ def swd(x, y, num_proj=128, **kwargs):
     projy, _ = torch.sort(projy, dim=1)
 
 
-    SWD = (projx - projy).abs().mean()
+    # SWD = (projx - projy).abs().mean()
     # SWD = (projx - projy).pow(2).sum(1).sqrt().mean()
-    # SWD = (projx - projy).pow(2).sum(1).sqrt().mean() / projx.shape[1]
+    SWD = (projx - projy).pow(2).sum(1).sqrt().mean() / projx.shape[1]
 
     return SWD, {"SWD": SWD}
 
