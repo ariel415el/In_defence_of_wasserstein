@@ -46,8 +46,8 @@ def main():
                 patch_dists_means[dist].append(np.mean(vals))
                 patch_dists_stds[dist].append(np.std(vals))
 
-        plot(names_and_batches, dists, patch_dists_means, patch_dists_stds, normalize=False)
-        plot(names_and_batches, dists, patch_dists_means, patch_dists_stds, normalize=True)
+        plot([0] + sigmas, dists, patch_dists_means, patch_dists_stds, normalize=False)
+        plot([0] + sigmas, dists, patch_dists_means, patch_dists_stds, normalize=True)
 
 
 def plot_images(names_and_batches):
@@ -64,7 +64,7 @@ def plot_images(names_and_batches):
     plt.clf()
 
 
-def plot(names_and_batches, dists,  patch_dists_means, patch_dists_stds, normalize=False):
+def plot(sigmas, dists, patch_dists_means, patch_dists_stds, normalize=False):
     """Compare the plots of different metrics on the same level (Image/Patch)"""
     plt.figure()
     for i, dist in enumerate(dists):
@@ -77,10 +77,10 @@ def plot(names_and_batches, dists,  patch_dists_means, patch_dists_stds, normali
             stds /= vals[0]
             vals /= vals[0]
 
-        plt.plot(range(len(patch_dists_means[dist])), vals, label=label, alpha=0.75, color=COLORS[i])
-        plt.fill_between(range(len(patch_dists_means[dist])), vals - stds / 2, vals + stds / 2, alpha=0.15, color=COLORS[i])
+        plt.plot(sigmas, vals, label=label, alpha=0.4, color=COLORS[i])
+        plt.fill_between(sigmas, vals - stds / 2, vals + stds / 2, alpha=0.15, color=COLORS[i])
 
-        plt.xticks(range(n), [x[0] for x in names_and_batches], rotation=0)
+        plt.xticks(sigmas, [f"{x}" for x in sigmas], rotation=45)
         plt.xlabel("Blur Sigma")
         plt.ylabel("Change factor")
         # plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05),
@@ -91,7 +91,8 @@ def plot(names_and_batches, dists,  patch_dists_means, patch_dists_stds, normali
 
 
 def worker(idx, vals, f, batch, data):
-    torch.manual_seed(idx)
+    from datetime import datetime
+    torch.manual_seed(datetime.now().timestamp() + idx)
     vals[idx] = f(batch, data)
 
 
@@ -112,27 +113,28 @@ def run_distributed(f, b1, b2, n):
 
 if __name__ == '__main__':
     device = torch.device('cpu')
-    b = 64
-    n_images = 64
+    b = 16
+    n_images = 16
     im_size = 64
-    n_proj = 16
+    n_proj = 1
     size = 5
     dists = [
             "w1",
              f'swd-num_proj={n_proj}',
              f'projected_w1-num_proj={n_proj}-dim=1',
              f'projected_w1-num_proj={n_proj}-dim=4',
-             f'projected_w1-num_proj={n_proj}-dim=8',
+             # f'projected_w1-num_proj={n_proj}-dim=8',
              ]
-    sigmas = [0.1, 0.5, 1, 1.5, 2]
+    sigmas = [0.1, 0.5, 1.5, 3]
+    # sigmas = [0.1, 0.2, 0.5]
     # sigmas = [0.5, 1.5]
     p = 8
-    s = 8
+    s = 6
     n_reps = 16
 
     data_path = '/mnt/storage_ssd/datasets/FFHQ/FFHQ'
-    c = 3
-    gray_scale = False
+    c = 1
+    gray_scale = True
     center_crop = 80
 
     output_dir = os.path.join(os.path.dirname(__file__), "outputs", f"compare_blured_batches-{p}-{s}-{n_images}")

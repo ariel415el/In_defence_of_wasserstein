@@ -28,34 +28,59 @@ def get_centers(img_dim):
         for j in [-3 ,-2,-1,0,1,2,3]:
             centers.append((h-i,h-j))
     return centers
-if __name__ == '__main__':
-    n_centroids = 128
-    crop_size = 90
-    img_size = 64
-    # root = '/cs/labs/yweiss/ariel1/data'
-    root = '/mnt/storage_ssd/datasets/'
 
-    FFHQ = f'{root}/FFHQ/FFHQ'
+def ver1(data_path, out_path, crop_size=90):
+    images_dir = f'{out_path}/ver1/images'
+    centroids_dir = f'{out_path}/ver1/true_centroids'
+    os.makedirs(images_dir, exist_ok=True)
+    os.makedirs(centroids_dir, exist_ok=True)
 
-    out_path = f'{root}/FFHQ/FFHQ_centroids'
-    os.makedirs(out_path, exist_ok=True)
-    out_path_means = f'{root}/FFHQ/FFHQ_centroids_means'
-    os.makedirs(out_path_means, exist_ok=True)
-
-    # centers = sample_patch_centers(crop_size-20, img_size, 10000, stride=1, offset=20)
-    centers = get_centers(128)
-    print(len(centers))
-    # exit()
+    centers = get_centers(n_centroids)
+    data_paths = os.listdir(data_path)
     for i in range(n_centroids):
-        fpath = os.path.join(FFHQ, os.listdir(FFHQ)[i])
+        fpath = os.path.join(data_path, data_paths[i])
         img_org = np.array(Image.open(fpath))
-        # img_org = crop_center(img_org, crop_size)
         mean = 0
         for j, center in enumerate(centers):
             print(i,j, center)
-            img = crop(img_org, center, 90)
-            Image.fromarray(img.astype(np.uint8)).save(os.path.join(out_path, f"img-{i}-{j}.png"))
+            img = crop(img_org, center, crop_size)
+            Image.fromarray(img.astype(np.uint8)).save(os.path.join(images_dir, f"img-{i}-{j}.png"))
             mean += img.astype(float)
         mean /= len(centers)
-        Image.fromarray(mean.astype(np.uint8)).save(os.path.join(out_path_means, f"mean-{i}.png"))
+        Image.fromarray(mean.astype(np.uint8)).save(os.path.join(centroids_dir, f"mean-{i}.png"))
 
+
+def ver2(data_path, out_path, crop_size=90, offset=16):
+    images_dir = f'{out_path}/ver2/images'
+    centroids_dir = f'{out_path}/ver2/true_centroids'
+    os.makedirs(images_dir, exist_ok=True)
+    os.makedirs(centroids_dir, exist_ok=True)
+
+    h = crop_size // 2
+
+
+    data_paths = os.listdir(data_path)
+    for i in range(n_centroids):
+        fpath = os.path.join(data_path, data_paths[i])
+        img_org = np.array(Image.open(fpath))
+        d = img_org.shape[0]
+        center_crop = crop(img_org, (d//2,d//2), crop_size)
+        centers = np.arange(h + offset, d - h - offset + 1)
+        centers = list(itertools.product(centers, repeat=2))
+        mean = 0
+        for j, center in enumerate(centers):
+            print(i,j, center)
+            output = np.zeros((d,d,3))
+            output[center[0]-h: center[0]+h, center[1]-h: center[1]+h] = center_crop
+            Image.fromarray(output.astype(np.uint8)).save(os.path.join(images_dir, f"img-{i}-{j}.png"))
+            mean += output.astype(float)
+        mean /= len(centers)
+        Image.fromarray(mean.astype(np.uint8)).save(os.path.join(centroids_dir, f"mean-{i}.png"))
+
+if __name__ == '__main__':
+    root = '/mnt/storage_ssd/datasets'
+    data_path = f'{root}/FFHQ/FFHQ'
+    n_centroids = 128
+    out_path =  f'{root}/FFHQ/FFHQ_centroids'
+    # ver1(data_path, out_path, crop_size=90)
+    ver2(data_path, out_path, crop_size=90)

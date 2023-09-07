@@ -2,7 +2,6 @@ import numpy as np
 import ot
 import torch
 from tqdm import tqdm
-
 from utils.metrics import get_dist_metric, batch_NN
 
 
@@ -53,9 +52,29 @@ def projected_w1(x, y, epsilon=0, dim=64, num_proj=16, **kwargs):
 
         base_metric = get_dist_metric("L2")
         C = base_metric(projx.reshape(len(projx), -1), projy.reshape(len(projy), -1))
-        OTPlan = _compute_ot_plan(C.detach().cpu().numpy(), int(epsilon))
+        OTPlan = _compute_ot_plan(C.detach().cpu().numpy().copy(), int(epsilon))
         OTPlan = torch.from_numpy(OTPlan).to(C.device)
         W1 = torch.sum(OTPlan * C)
+
+        # projx = projx.T
+        # projy = projy.T
+        # sorted_projx, arsortx = torch.sort(projx, dim=1)
+        # sorted_projy, arsorty = torch.sort(projy, dim=1)
+        # SWD = (sorted_projx - sorted_projy).pow(2).sum(1).sqrt().div(projx.shape[1]).mean()
+        #
+        # arx = arsortx[0]
+        # ary = arsorty[0]
+        # ary_r = np.ones_like(ary)
+        # ary_r[ary] = np.arange(len(ary_r))
+        # ot_map = arx[ary_r]
+        # SWD2 = (projx[:,ot_map] - projy).pow(2).sqrt().mean()
+        #
+        # OTPlan2 = torch.zeros_like(OTPlan)
+        # OTPlan2[ot_map, torch.arange(projx.shape[1])] = 1 / projx.shape[1]
+        #
+        # W12 =  torch.sum(OTPlan2 * C)
+        # W13 =  C[ot_map, torch.arange(projx.shape[1])].sum() / projx.shape[1]
+
         dists.append(W1)
     W1 = torch.stack(dists).mean()
     return W1, {"W1-L2": W1}
@@ -80,9 +99,7 @@ def swd(x, y, num_proj=128, **kwargs):
     projy, _ = torch.sort(projy, dim=1)
 
 
-    # SWD = (projx - projy).abs().mean()
-    # SWD = (projx - projy).pow(2).sum(1).sqrt().mean()
-    SWD = (projx - projy).pow(2).sum(1).sqrt().mean() / projx.shape[1]
+    SWD = (projx - projy).abs().mean() # This is same for L2 and L1 since in 1d: .pow(2).sum(1).sqrt() == .pow(2).sqrt() == .abs()
 
     return SWD, {"SWD": SWD}
 
