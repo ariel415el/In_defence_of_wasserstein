@@ -14,7 +14,7 @@ from torchvision.transforms import transforms
 COLORS =['r', 'g', 'b', 'k', 'y', 'm', 'c']
 
 
-def main():
+def main(noise=False):
     """Compare batch of blurred images with increasing sigma to batch of sharp data
         Comparison is done with different metrics (W1, SWD) and on image and patch level
     """
@@ -26,10 +26,17 @@ def main():
 
         names_and_batches = [("sigma=0", b1)]
         # names_and_batches = []
-        names_and_batches += [
-            (f"sigma={sigma}", transforms.GaussianBlur(kernel_size=15, sigma=sigma)(b1))
-            for sigma in sigmas
-        ]
+        if noise:
+            names_and_batches += [
+                (f"sigma={sigma}", b1 + torch.randn_like(b1) * 0.1*sigma)
+                for sigma in sigmas
+            ]
+        else:
+            names_and_batches += [
+                (f"sigma={sigma}", transforms.GaussianBlur(kernel_size=15, sigma=sigma)(b1))
+                for sigma in sigmas
+            ]
+
         plot_images(names_and_batches)
 
         data.share_memory_()
@@ -113,30 +120,33 @@ def run_distributed(f, b1, b2, n):
 
 if __name__ == '__main__':
     device = torch.device('cpu')
-    b = 16
-    n_images = 16
+    b = 64
+    n_images = 64
     im_size = 64
-    n_proj = 1
+    n_proj = 4
     size = 5
     dists = [
             "w1",
              f'swd-num_proj={n_proj}',
-             f'projected_w1-num_proj={n_proj}-dim=1',
-             f'projected_w1-num_proj={n_proj}-dim=4',
-             # f'projected_w1-num_proj={n_proj}-dim=8',
+             # f'projected_w1-num_proj={n_proj}-dim=1',
+             # f'projected_w1-num_proj={n_proj}-dim=4',
+             f'projected_w1-num_proj={n_proj}-dim=9',
              ]
-    sigmas = [0.1, 0.5, 1.5, 3]
-    # sigmas = [0.1, 0.2, 0.5]
-    # sigmas = [0.5, 1.5]
-    p = 8
-    s = 6
-    n_reps = 16
+    sigmas = [0.5, 1.5, 3]
+    s = 8
+    n_reps = 12
 
-    data_path = '/mnt/storage_ssd/datasets/FFHQ/FFHQ'
     c = 1
     gray_scale = True
-    center_crop = 80
+    for p in [3, 8]:
+        for noise in [False]:
+            for data_path, center_crop in [
+                ('/mnt/storage_ssd/datasets/square_data/black_S-10_O-1_S-1', None),
+                ('/mnt/storage_ssd/datasets/MNIST/MNIST/jpgs/training', None),
+                ('/mnt/storage_ssd/datasets/FFHQ/FFHQ', 80),
+            ]:
+                output_dir = os.path.join(os.path.dirname(__file__),
+                                          "outputs", os.path.basename(data_path),
+                                          f"compare_blured_batches-{p}-{s}-{n_images}-N={noise}")
 
-    output_dir = os.path.join(os.path.dirname(__file__), "outputs", f"compare_blured_batches-{p}-{s}-{n_images}")
-
-    main()
+                main(noise)

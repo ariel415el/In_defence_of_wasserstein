@@ -93,7 +93,7 @@ def train_GAN(args):
                 backup_para = copy_G_params(netG)
                 load_params(netG, avg_param_G)
 
-                evaluate(netG, netD, inception_metrics, other_metrics, debug_fixed_noise,
+                evaluate(prior, netG, netD, inception_metrics, other_metrics, debug_fixed_noise,
                          debug_fixed_reals, debug_all_reals, saved_image_folder, iteration, logger, args)
 
                 save_model(prior, netG, netD, optimizerG, optimizerD, saved_model_folder, iteration, args)
@@ -103,18 +103,19 @@ def train_GAN(args):
             iteration += 1
 
 
-def evaluate(netG, netD, inception_metrics, other_metrics, fixed_noise, debug_fixed_reals,
+def evaluate(prior, netG, netD, inception_metrics, other_metrics, fixed_noise, debug_fixed_reals,
              debug_all_reals, saved_image_folder, iteration, logger, args):
     netG.eval()
     netD.eval()
     start = time()
     with torch.no_grad():
-        fake_images = batch_generation(netG, args.z_dim, len(debug_all_reals), 512, torch.device("cpu"))
+        fake_images = batch_generation(netG, prior, len(debug_all_reals), 512, torch.device("cpu"))
 
         if args.fid_n_batches > 0 and iteration % args.fid_freq == 0:
             fake_batches = [netG(torch.randn_like(fixed_noise).to(device)) for _ in range(args.fid_n_batches)]
             logger.log(inception_metrics(fake_batches), step=iteration)
 
+        print(f"Computing metrics between {len(debug_all_reals)} real and {len(fake_images)} fake images")
         for metric in other_metrics:
             logger.log({
                 f'{metric.name}_fixed_noise_gen_to_train': metric(fake_images.cpu(), debug_all_reals.cpu()),
@@ -144,7 +145,7 @@ if __name__ == "__main__":
     print(f"eval loader size {data_size}")
     full_batch_loader, _ = get_dataloader(args.data_path, args.im_size, data_size, args.n_workers,
                                                val_percentage=0, gray_scale=args.gray_scale, center_crop=args.center_crop,
-                                               load_to_memory=args.load_data_to_memory, limit_data=len(train_loader.dataset))
+                                               load_to_memory=args.load_data_to_memory, limit_data=args.limit_data)
 
     if args.r_bs == -1:
         args.r_bs = data_size
