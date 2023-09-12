@@ -49,13 +49,11 @@ def batch_generation(netG, z_dim, n, b, device):
     fake_data = []
     for i in range(n_batches):
         z = torch.randn((b, z_dim))
-        if torch.cuda.is_available():
-            z = z.cuda()
+        z = z.to(next(netG.parameters()).device)
         fake_data.append(netG(z).to(device))
     if n_batches * b < n:
         z = torch.randn((n - n_batches * b, z_dim))
-        if torch.cuda.is_available():
-            z = z.cuda()
+        z = z.to(next(netG.parameters()).device)
         fake_data.append(netG(z).to(device))
     fake_data = torch.cat(fake_data)
     return fake_data

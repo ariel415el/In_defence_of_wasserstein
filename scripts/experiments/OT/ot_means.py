@@ -10,9 +10,10 @@ from matplotlib import pyplot as plt
 from torch import nn
 from tqdm import tqdm
 
-from utils import get_data
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "utils"))
-from common import dump_images
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+from experiment_utils import get_data
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+from utils.common import dump_images
 
 
 def get_ot_plan(C):
@@ -22,11 +23,14 @@ def get_ot_plan(C):
     OTplan = ot.emd(uniform_x, uniform_y, C)
     return OTplan
 
+
 def dist_mat(X, Y):
     return ((X * X).sum(1)[:, None] + (Y * Y).sum(1)[None, :] - 2.0 * X @ Y.T)**0.5
 
+
 def compute_means(ot_map, data, k):
     return (ot_map[:,:, None] * data[None, ] * k).sum(1)
+
 
 def ot_means(data, k, n_iters):
     """at each iteration compute OT and replace centroid with weighted mean with the according OT map weights"""
@@ -46,11 +50,13 @@ def ot_means(data, k, n_iters):
         dump_images(torch.from_numpy(centroids).reshape(args.k, -1, args.im_size, args.im_size), f"{out_dir}/OTMeans-{i}.png")
     return losses
 
+
 def weisfeld_step(X, dist, W):
     nominator = (W / dist) @ X         ## np.allclose(nominator[0],((1/C)[0][:, None] * data).sum(0))
     denominator = (W / dist).sum(1)[:, None]
     new_centroids = nominator / denominator
     return new_centroids
+
 
 def ot_means_weisfeld(data, k, n_iters, n_weisfeld):
     """at each iteration compute OT and peroform Weisfeld steps to approximate the minimum of the weighted sum of
@@ -73,7 +79,6 @@ def ot_means_weisfeld(data, k, n_iters, n_weisfeld):
         dump_images(torch.from_numpy(centroids).reshape(args.k, -1, args.im_size, args.im_size),
                     f"{out_dir}/images/OTMeans_weisfeld-{i}.png")
     return losses
-
 
 
 def pixel_ot(data, k, n_iters):
@@ -99,6 +104,7 @@ def pixel_ot(data, k, n_iters):
             dump_images(centroids.reshape(args.k, -1, args.im_size, args.im_size), f"{out_dir}/pixelOT-{i}.png")
     return losses
 
+
 def block(in_feat, out_feat, normalize='in'):
     layers = [nn.Linear(in_feat, out_feat)]
     if normalize == "bn":
@@ -107,6 +113,7 @@ def block(in_feat, out_feat, normalize='in'):
         layers.append(nn.InstanceNorm1d(out_feat))
     layers.append(nn.LeakyReLU(0.2, inplace=True))
     return layers
+
 
 class Generator(nn.Module):
     def __init__(self, z_dim, output_dim=64, nf=128, depth=4, normalize='none', **kwargs):
@@ -126,6 +133,7 @@ class Generator(nn.Module):
     def forward(self, z):
         img = self.model(z)
         return img
+
 
 def generator_ot_means(data, k, n_iters, n_steps):
     """at each iteration compute OT and perform SGD to minimize the generator outputs"""
@@ -155,6 +163,7 @@ def generator_ot_means(data, k, n_iters, n_steps):
         if i % 10 == 0:
             dump_images(centroids.reshape(args.k, -1, args.im_size, args.im_size), f"{out_dir}/GeneratorOTMeans-{i}.png")
     return losses
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

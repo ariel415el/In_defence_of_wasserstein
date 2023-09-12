@@ -26,6 +26,7 @@ def train_GAN(args):
     other_metrics = [
                 # get_loss_function("MiniBatchLoss-dist=w1"),
                 get_loss_function("MiniBatchLoss-dist=swd"),
+                get_loss_function("MiniBatchPatchLoss-dist=swd-p=4-s=4"),
                 get_loss_function("MiniBatchPatchLoss-dist=swd-p=8-s=4"),
                 get_loss_function("MiniBatchPatchLoss-dist=swd-p=16-s=8"),
               ]

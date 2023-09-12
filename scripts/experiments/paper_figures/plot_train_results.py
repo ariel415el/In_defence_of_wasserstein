@@ -40,20 +40,20 @@ def plot(root, plot_name, titles_and_name_lists, plot_loss=None, s=4,  n=5):
         ax.imshow(images)
         ax.axis('off')
 
-        plot = os.path.join(dir, "plots", "MiniBatchLoss-dist=w1_fixed_noise_gen_to_train.pkl")
+        plot = os.path.join(dir, "plots", "MiniBatchLoss-dist=swd_fixed_noise_gen_to_train.pkl")
         plot = pickle.load((open(plot, "rb")))
 
         if plot_loss is not None:
             ax.set_title(f"{name}", fontsize=4 * s)
             if plot_loss == "separate":
                 ax2 = axes[-1, i]
-                ax2.plot(np.arange(len(plot)), plot, color=COLORS[0], label=f"Image W1")
+                ax2.plot(np.arange(len(plot)), plot, color=COLORS[0], label=f"Image SWD")
                 ax2.annotate(f"{plot[-1]:.2f}", (len(plot)-1, plot[-1]), textcoords="offset points", xytext=(-2, 2), ha="center")
 
                 names_and_plot_paths = [
-                    # ("Image-swd", "MiniBatchLoss-dist=w1_fixed_noise_gen_to_train.pkl", COLORS[0], '-'),
                     ("Patch-8-swd", "MiniBatchPatchLoss-dist=swd-p=8-s=4_fixed_noise_gen_to_train.pkl", COLORS[1], '--'),
                     ("Patch-16-swd", "MiniBatchPatchLoss-dist=swd-p=16-s=8_fixed_noise_gen_to_train.pkl", COLORS[2], '--'),
+                    ("Patch-4-swd", "MiniBatchPatchLoss-dist=swd-p=4-s=4_fixed_noise_gen_to_train.pkl", COLORS[3], '--'),
                 ]
 
                 for j, (name, path, color, line_type) in enumerate(names_and_plot_paths):
