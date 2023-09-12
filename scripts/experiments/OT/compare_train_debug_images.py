@@ -40,7 +40,7 @@ if __name__ == '__main__':
     names_and_batchs = [("Real", real_batch)]
     for name, path in names_and_paths:
         if not os.path.isfile(path):
-            path = os.path.join(path, find_last_file(path))
+            path = find_last_file(path)
         names_and_batchs += [(name,  read_grid_batch(path, im_size, c, flatten=False).to(device)) ]
 
     fig, ax = plt.subplots(nrows=1, ncols=len(names_and_batchs), figsize=(len(names_and_batchs)*s, s))

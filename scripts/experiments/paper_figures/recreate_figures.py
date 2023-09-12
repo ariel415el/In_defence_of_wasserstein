@@ -2,7 +2,8 @@ import os
 import sys
 import argparse
 
-from plot_train_results import plot
+from plot_train_results import plot, get_dir_paths
+
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from sbatch_python import run_sbatch
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
@@ -18,11 +19,12 @@ class Figure:
 
     @staticmethod
     def plot_fig(names_and_commands, dataset_name, plot_type):
-        plot(f'{out_root}/{project_name}', f"Exp-{dataset_name}.png",
-             [(name, [compose_experiment_name(parse_train_args(command)).replace("_test", "")], [])
-              for name,command in names_and_commands],
-             plot_loss=plot_type, n=args.n, s=args.s
-             )
+        titles_and_name_lists = [
+                (name, [compose_experiment_name(parse_train_args(command)).replace("_test", "")], [])
+              for name,command in names_and_commands]
+        named_dirs = get_dir_paths(f'{out_root}/{project_name}', titles_and_name_lists)
+        plot(named_dirs, f"{out_root}/Exp-{dataset_name}.png",plot_loss=plot_type, n=args.n, s=args.s)
+
 
 class Figure_1(Figure):
     """Figure 1 in the papers compares the outputs of the OT-means algorithm to that of CTransformLoss"""

@@ -107,4 +107,4 @@ def find_dir(root, names, disallowed_names=[]):
 def find_last_file(dir, ext='.png'):
     files = glob.glob(f'{dir}/*{ext}')
     if files:
-        return os.path.basename(max(files, key=os.path.getctime))
+        return max(files, key=os.path.getctime)

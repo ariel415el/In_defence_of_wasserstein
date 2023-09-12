@@ -42,8 +42,9 @@ if __name__ == '__main__':
     device = torch.device(args.device)
 
     if args.ckpt_name is None:
-        args.ckpt_name = find_last_file(f'{model_dir}/models', ext='.pth').split(".")[0]
-    ckpt_path = f'{model_dir}/models/{args.ckpt_name}.pth'  # path to the checkpoint
+        args.ckpt_name = find_last_file(f'{model_dir}/models', ext='.pth')
+    else:
+        ckpt_path = f'{model_dir}/models/{args.ckpt_name}.pth'  # path to the checkpoint
     outputs_dir = f'{model_dir}/test_outputs'
     os.makedirs(outputs_dir, exist_ok=True)
 
