@@ -38,7 +38,8 @@ class AdverserialPatchFeatureMatchingLoss(SoftHingeLoss):
         """Train generator to minimize OT in discriminator features"""
         real_features = get_features(netD, real_data, patch_wise=True)
         fake_features = get_features(netD, fake_data, patch_wise=True)
-        return w1(real_features, fake_features)
+        return w1(real_features.reshape(len(real_features), -1),
+                  fake_features.reshape(len(fake_features), -1))
 
 
 class FullAdverserialPatchFeatureMatchingLoss(AdverserialPatchFeatureMatchingLoss):

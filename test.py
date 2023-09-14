@@ -15,6 +15,7 @@ from tests.test_mode_collapse import find_mode_collapses
 from tests.test_utils import get_data
 from tests.test_discriminator import saliency_maps, test_range
 from tests.OT import compare_real_fake_patch_dist
+from utils.train_utils import Prior
 
 
 def load_pretrained_models(args, ckpt_path, device):
@@ -28,8 +29,10 @@ def load_pretrained_models(args, ckpt_path, device):
     netD.load_state_dict(weights['netD'])
     netD.to(device)
     netD.eval()
+    prior = Prior(args.z_prior, args.z_dim)
+    prior.z = weights['prior']
 
-    return netG, netD
+    return netG, netD, prior
 
 
 if __name__ == '__main__':
@@ -42,7 +45,7 @@ if __name__ == '__main__':
     device = torch.device(args.device)
 
     if args.ckpt_name is None:
-        args.ckpt_name = find_last_file(f'{model_dir}/models', ext='.pth')
+        ckpt_path = find_last_file(f'{model_dir}/models', ext='.pth')
     else:
         ckpt_path = f'{model_dir}/models/{args.ckpt_name}.pth'  # path to the checkpoint
     outputs_dir = f'{model_dir}/test_outputs'
@@ -54,11 +57,11 @@ if __name__ == '__main__':
     z_dim = args['z_dim']
     data_root = args['data_path']
     print("Loading models", end='...')
-    netG, netD = load_pretrained_models(argparse.Namespace(**args), ckpt_path, device)
+    netG, netD, prior = load_pretrained_models(argparse.Namespace(**args), ckpt_path, device)
     print("Done")
 
     # No data tests
-    generate_images(netG, z_dim, outputs_dir, device)
+    generate_images(netG, prior, outputs_dir, device)
     # find_mode_collapses(netG, netD, z_dim, outputs_dir, device)
     # interpolate(netG, z_dim, n_zs=15, steps=25, outputs_dir=outputs_dir, device=device)
 
@@ -71,10 +74,14 @@ if __name__ == '__main__':
     # Full data tests
     data = get_data(args['data_path'], args['im_size'], args['center_crop'], args['gray_scale'], limit_data=args['limit_data']).to(device)
 
-    compare_real_fake_patch_dist(netG,  z_dim, data, dist='swd', p=8, s=4, outputs_dir=outputs_dir)
-    exit()
+    compare_real_fake_patch_dist(netG,  prior, data, metric_names=['MiniBatchLoss-dist=w1',
+                                                                   'MiniBatchLoss-dist=swd',                                                                                                                      'MiniBatchPatchLoss-dist=swd-p=8-s=4'
+                                                                   'MiniBatchPatchLoss-dist=swd-p=8-s=4',
+                                                                   'MiniBatchPatchLoss-dist=w1-p=8-s=4-n_samples=10000',
+                                                                  ], outputs_dir=outputs_dir)
+
     # Nearest neighbor visualizations
-    fake_images = netG(torch.randn((4, z_dim), device=device))
+    fake_images = netG(prior.sample(4).to(device))
     find_nns(fake_images, data, outputs_dir=outputs_dir, show_first_n=2)
     # find_patch_nns(fake_images, data, patch_size=32, search_margin=2, outputs_dir=outputs_dir, n_centers=4)
     find_patch_nns(fake_images, data, patch_size=22, search_margin=4, outputs_dir=outputs_dir, n_centers=4)

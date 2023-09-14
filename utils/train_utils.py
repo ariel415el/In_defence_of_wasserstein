@@ -125,7 +125,6 @@ def get_models_and_optimizers(args, device, saved_model_folder):
     optimizerG = optim.Adam(netG.parameters(), lr=args.lrG, betas=(0.5, 0.9))
     optimizerD = optim.Adam(netD.parameters(), lr=args.lrD, betas=(0.5, 0.9))
 
-
     if args.loadG is not None:
         ckpt = torch.load(args.loadG, map_location=args.device)
         netG.load_state_dict(ckpt['netG'])

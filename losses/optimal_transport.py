@@ -19,7 +19,9 @@ class MiniBatchLoss:
         self.kwargs = kwargs
 
     def compute(self, x, y):
-        return self.metric(x, y, **self.kwargs)
+        return self.metric(x.reshape(len(x), -1),
+                           y.reshape(len(y), -1),
+                           **self.kwargs)
 
     def __call__(self, images_X, images_Y):
         with torch.no_grad():
@@ -40,7 +42,10 @@ class MiniBatchPatchLoss(MiniBatchLoss):
         self.n_samples = n_samples
 
     def compute(self, x, y):
-        return self.metric(to_patches(x, self.p, self.s, self.n_samples),
-                           to_patches(y, self.p, self.s, self.n_samples), **self.kwargs)
+        x_patches = to_patches(x, self.p, self.s, self.n_samples)
+        y_patches = to_patches(y, self.p, self.s, self.n_samples)
+        return self.metric(x_patches.reshape(len(x_patches), -1),
+                           y_patches.reshape(len(y_patches), -1),
+                           **self.kwargs)
 
 

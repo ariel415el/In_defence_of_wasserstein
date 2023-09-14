@@ -6,9 +6,12 @@ from utils.metrics import get_dist_metric, batch_NN
 
 
 def w1(x, y, epsilon=0, **kwargs):
-    """Compute Optimal transport with L2 norm as base metric"""
+    """Compute Optimal transport with L2 norm as base metric
+        param x: (b1,d) shaped tensor
+        param y: (b2,d) shaped tensor
+    """
     base_metric = get_dist_metric("L2")
-    C = base_metric(x.reshape(len(x), -1), y.reshape(len(y), -1))
+    C = base_metric(x, y)
     OTPlan = _compute_ot_plan(C.detach().cpu().numpy(), int(epsilon))
     OTPlan = torch.from_numpy(OTPlan).to(C.device)
     W1 = torch.sum(OTPlan * C)
@@ -16,9 +19,12 @@ def w1(x, y, epsilon=0, **kwargs):
 
 
 def nn(x, y, alpha=None, **kwargs):
-    """some over distances to nearest neighbor in the other set"""
+    """some over distances to nearest neighbor in the other set
+        param x: (b1,d) shaped tensor
+        param y: (b2,d) shaped tensor
+    """
     base_metric = get_dist_metric("L2")
-    C = base_metric(x.reshape(len(x), -1), y.reshape(len(y), -1))
+    C = base_metric(x, y)
     if alpha is not None:
         C = C / (C.min(dim=0)[0] + float(alpha))  # compute_normalized_scores
     nn_loss = C.min(dim=1)[0].mean()
@@ -27,31 +33,37 @@ def nn(x, y, alpha=None, **kwargs):
 
 def remd(x, y, **kwargs):
     """Releaxed EMD: Style transfer by re-laxed optimal transport and self-similarity
-    This is basicly bidirectional NN loss"""
+        This is basicly bidirectional NN loss
+        param x: (b1,d) shaped tensor
+        param y: (b2,d) shaped tensor
+    """
     base_metric = get_dist_metric("L2")
-    C = base_metric(x.reshape(len(x), -1), y.reshape(len(y), -1))
+    C = base_metric(x, y)
     nn_loss = max(C.min(dim=0)[0].mean(), C.min(dim=1)[0].mean())
     return nn_loss, {"remd_loss": nn_loss}
 
 
 def projected_w1(x, y, epsilon=0, dim=64, num_proj=16, **kwargs):
-    """Project points to 'dim' dimensions and compute OT there. Avearage over 'num_proj' such projections"""
+    """Project points to 'dim' dimensions and compute OT there. Avearage over 'num_proj' such projections
+        param x: (b1,d) shaped tensor
+        param y: (b2,d) shaped tensor
+    """
     num_proj = int(num_proj)
     dim = int(dim)
-    _, c, h, w = x.shape
+    b, d = x.shape
 
     dists = []
     for i in range(num_proj):
         # Sample random normalized projections
-        rand = torch.randn(c * h * w, dim).to(x.device)  # (slice_size**2*ch)
+        rand = torch.randn(d, dim).to(x.device)  # (slice_size**2*ch)
         rand = rand / torch.norm(rand, dim=0, keepdim=True)  # noramlize to unit directions
 
         # Project images
-        projx = torch.mm(x.reshape(-1, c * h * w), rand)
-        projy = torch.mm(y.reshape(-1, c * h * w), rand)
+        projx = torch.mm(x, rand)
+        projy = torch.mm(y, rand)
 
         base_metric = get_dist_metric("L2")
-        C = base_metric(projx.reshape(len(projx), -1), projy.reshape(len(projy), -1))
+        C = base_metric(projx, projy)
         OTPlan = _compute_ot_plan(C.detach().cpu().numpy().copy(), int(epsilon))
         OTPlan = torch.from_numpy(OTPlan).to(C.device)
         W1 = torch.sum(OTPlan * C)
@@ -81,23 +93,28 @@ def projected_w1(x, y, epsilon=0, dim=64, num_proj=16, **kwargs):
 
 
 def swd(x, y, num_proj=128, **kwargs):
+    """
+    Project samples to 1d and compute OT there with the sorting trick. Average over num_proj directions
+    param x: (b1,d) shaped tensor
+    param y: (b2,d) shaped tensor
+    """
     num_proj = int(num_proj)
-    _, c, h, w = x.shape
+    assert (len(x.shape) == len(y.shape)) and x.shape[1] == y.shape[1]
+    _, d = x.shape
 
     # Sample random normalized projections
-    rand = torch.randn(c * h * w, num_proj).to(x.device)  # (slice_size**2*ch)
+    rand = torch.randn(d, num_proj).to(x.device)  # (slice_size**2*ch)
     rand = rand / torch.norm(rand, dim=0, keepdim=True)  # noramlize to unit directions
 
     # Project images
-    projx = torch.mm(x.reshape(-1, c * h * w), rand)
-    projy = torch.mm(y.reshape(-1, c * h * w), rand)
+    projx = torch.mm(x, rand)
+    projy = torch.mm(y, rand)
 
     projx, projy = _duplicate_to_match_lengths(projx.T, projy.T)
 
     # Sort and compute L1 loss
     projx, _ = torch.sort(projx, dim=1)
     projy, _ = torch.sort(projy, dim=1)
-
 
     SWD = (projx - projy).abs().mean() # This is same for L2 and L1 since in 1d: .pow(2).sum(1).sqrt() == .pow(2).sqrt() == .abs()
 
@@ -116,8 +133,6 @@ def discrete_dual(x, y, n_steps=500, batch_size=None, lr=0.001, verbose=False, n
     """Solve the discrete dual OT problem with minibatches and SGD:
      Optimize n scalars (dual potentials) defining the dual formulation"""
 
-    x = x.reshape(len(x), -1)
-    y = y.reshape(len(y), -1)
     pbar = range(n_steps)
     if verbose:
         print(f"Optimizing duals: {x.shape}, {y.shape}")
@@ -159,6 +174,7 @@ def _compute_ot_plan(C, epsilon=0):
     else:
         OTplan = ot.emd(uniform_x, uniform_y, C)
     return OTplan
+
 
 def _duplicate_to_match_lengths(arr1, arr2):
     """
