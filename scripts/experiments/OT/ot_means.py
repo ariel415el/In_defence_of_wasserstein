@@ -80,6 +80,7 @@ def ot_mean(data, k, n_iters, minimization_method):
         'MiniBatchPatchLoss-dist=swd-p=8-s=4',
     ]
     metrics = {metric: get_loss_function(metric) for metric in metrics}
+    _, c,h,w = data.shape
     data = data.reshape(len(data), -1).numpy()
     centroids = np.random.randn(k, data.shape[-1]).astype(np.float32) * 0.5
     plots = defaultdict(list)
@@ -87,7 +88,8 @@ def ot_mean(data, k, n_iters, minimization_method):
         centroids = minimization_method(centroids, data)
 
         for metric_name, metric in metrics.items():
-            dist = metric(torch.from_numpy(centroids), torch.from_numpy(data)).item()
+            dist = metric(torch.from_numpy(centroids).reshape(-1, c, h, w),
+                          torch.from_numpy(data).reshape(-1, c, h, w)).item()
             plots[metric_name].append(dist)
             print(f"{metric_name}: {dist:.4f}\n")
 
@@ -123,7 +125,7 @@ if __name__ == "__main__":
     os.makedirs(os.path.join(out_dir, "plots"), exist_ok=True)
 
     data = get_data(args.data_path, args.im_size, c=1 if args.gray_scale else 3,
-                    limit_data=args.limit_data, center_crop=args.center_crop)
+                    limit_data=args.limit_data, center_crop=args.center_crop, flatten=False)
 
     minimiztion_func = lambda x, y: weisfeld_minimization(x,y, n_steps=5)
     plots = ot_mean(data, args.k, 10, minimiztion_func)
