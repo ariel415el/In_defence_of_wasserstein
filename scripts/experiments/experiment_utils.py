@@ -38,6 +38,7 @@ def get_data(data_path, im_size=None, c=3, center_crop=None, gray_scale=False, f
 
 
 def get_centroids(data, n_centroids, use_faiss=False):
+    print("Computing centroids", end='...')
     d,c,h,w = data.shape
     np_data = data.cpu().numpy().reshape(d, -1)
     if use_faiss:
