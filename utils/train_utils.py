@@ -54,7 +54,7 @@ def parse_train_args(arguments_string=None):
 
     # Other
     parser.add_argument('--project_name', default='GANs')
-    parser.add_argument('--tag', default='test')
+    parser.add_argument('--train_name', default=None)
     parser.add_argument('--n_workers', default=4, type=int)
     parser.add_argument('--loadG', default=None, type=str)
     parser.add_argument('--resume_last_ckpt', action='store_true', default=False,

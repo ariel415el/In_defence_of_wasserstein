@@ -48,7 +48,7 @@ class PLTLogger:
 
 class WandbLogger:
     def __init__(self, args, save_dir):
-        self.wandb = wandb.init(project=args.project_name, dir=save_dir, name=args.name)
+        self.wandb = wandb.init(project=args.project_name, dir=save_dir, name=args.train_name)
 
     def log(self, val_dict, step):
         self.wandb.log(val_dict, step=step)
@@ -57,7 +57,7 @@ class WandbLogger:
         pass
 
 def get_dir(args):
-    task_name = os.path.join(f"outputs", args.project_name,   args.name)
+    task_name = os.path.join(f"outputs", args.project_name,   args.train_name)
     saved_model_folder = os.path.join(task_name, 'models')
     saved_image_folder = os.path.join(task_name, 'images')
     plots_image_folder = os.path.join(task_name, 'plots')

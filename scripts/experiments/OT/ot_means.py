@@ -86,12 +86,12 @@ def ot_mean(data, k, n_iters, minimization_method):
     plots = defaultdict(list)
     for i in range(n_iters):
         centroids = minimization_method(centroids, data)
-
+        print(data.shape, centroids.shape)
         for metric_name, metric in metrics.items():
             dist = metric(torch.from_numpy(centroids).reshape(-1, c, h, w),
                           torch.from_numpy(data).reshape(-1, c, h, w)).item()
             plots[metric_name].append(dist)
-            print(f"{metric_name}: {dist:.4f}\n")
+            print(f"{metric_name}: {dist:.4f}")
 
         dump_images(torch.from_numpy(centroids).reshape(args.k, -1, args.im_size, args.im_size),
                     f"{out_dir}/images/otMeans-{i}.png")
@@ -116,10 +116,13 @@ if __name__ == "__main__":
     # Other
     parser.add_argument('--project_name', default="OTMeans", type=str)
     parser.add_argument('--n_workers', default=4, type=int)
-    parser.add_argument("--tag", default="testt", type=str)
+    parser.add_argument("--train_name", default=None, type=str)
     args = parser.parse_args()
 
-    out_dir = f"outputs/{args.project_name}/{os.path.basename(args.data_path)}_I-{args.im_size}_K-{args.k}_{args.tag}"
+    if args.train_name is None:
+        args.train_name = f"{os.path.basename(args.data_path)}_I-{args.im_size}_K-{args.k}"
+    out_dir = f"outputs/{args.project_name}/{args.train_name}"
+
     os.makedirs(out_dir, exist_ok=True)
     os.makedirs(os.path.join(out_dir, "images"), exist_ok=True)
     os.makedirs(os.path.join(out_dir, "plots"), exist_ok=True)

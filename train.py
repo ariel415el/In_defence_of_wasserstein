@@ -150,7 +150,8 @@ if __name__ == "__main__":
     if args.r_bs == -1:
         args.r_bs = data_size
 
-    args.name = compose_experiment_name(args)
+    if args.train_name is None:
+        args.train_name = compose_experiment_name(args)
 
     saved_model_folder, saved_image_folder, plots_image_folder = get_dir(args)
 
