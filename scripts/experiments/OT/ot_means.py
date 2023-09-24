@@ -8,9 +8,6 @@ import numpy as np
 import ot
 import torch
 from matplotlib import pyplot as plt
-from torch import nn
-from tqdm import tqdm
-
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from experiment_utils import get_data
@@ -34,6 +31,7 @@ def dist_mat(X, Y):
 def compute_means(ot_map, data, k):
     return (ot_map[:,:, None] * data[None, ] * k).sum(1)
 
+
 def average_minimization(centroids, data, k):
     C = dist_mat(centroids, data)
     ot_map = get_ot_plan(C)
@@ -49,26 +47,27 @@ def weisfeld_step(X, dist_mat, W):
     return new_centroids
 
 
-def weisfeld_minimization(centroids, data, n_steps):
+def weisfeld_minimization(centroids, data, n_steps=5):
     """at each iteration compute OT and peroform Weisfeld steps to approximate the minimum of the weighted sum of
      distances according OT map weights"""
     for j in range(n_steps):
         C = dist_mat(centroids, data)
-        ot_map = get_ot_plan(C)
+        ot_map = get_ot_plan(C.cpu().detach().numpy())
         centroids = weisfeld_step(data, C, ot_map)
     return centroids
 
 
-def sgd_minimization(centroids, data):
+def sgd_minimization(centroids, data, n_steps=100):
     centroids.requires_grad_()
-    opt = torch.optim.Adam([centroids], lr=0.01)
-    C = dist_mat(centroids, data)
-    ot_map = get_ot_plan(C.cpu().detach().numpy())
-    loss = torch.sum(torch.from_numpy(ot_map).cuda() * C)
-    opt.zero_grad()
-    loss.backward()
-    opt.step()
-    centroids.dtach()
+    opt = torch.optim.Adam([centroids], lr=0.005)
+    for i in range(n_steps):
+        C = dist_mat(centroids, data)
+        ot_map = get_ot_plan(C.cpu().detach().numpy())
+        loss = torch.sum(torch.from_numpy(ot_map) * C)
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+    centroids.detach().cpu().numpy()
     return centroids
 
 
@@ -81,21 +80,33 @@ def ot_mean(data, k, n_iters, minimization_method):
     ]
     metrics = {metric: get_loss_function(metric) for metric in metrics}
     _, c,h,w = data.shape
-    data = data.reshape(len(data), -1).numpy()
-    centroids = np.random.randn(k, data.shape[-1]).astype(np.float32) * 0.5
+    data = data.reshape(len(data), -1)
+    # centroids = np.random.randn(k, data.shape[-1]).astype(np.float32) * 0.5
+    centroids = torch.randn((k, data.shape[-1])) * 0.5
     plots = defaultdict(list)
     for i in range(n_iters):
         centroids = minimization_method(centroids, data)
-        print(data.shape, centroids.shape)
         for metric_name, metric in metrics.items():
-            dist = metric(torch.from_numpy(centroids).reshape(-1, c, h, w),
-                          torch.from_numpy(data).reshape(-1, c, h, w)).item()
+            dist = metric(centroids.reshape(-1, c, h, w),
+                          data.reshape(-1, c, h, w)).item()
             plots[metric_name].append(dist)
-            print(f"{metric_name}: {dist:.4f}")
+            print(f"Iter: {i}: {metric_name}: {dist:.4f}")
 
-        dump_images(torch.from_numpy(centroids).reshape(args.k, -1, args.im_size, args.im_size),
+        dump_images(centroids.reshape(args.k, -1, args.im_size, args.im_size),
                     f"{out_dir}/images/otMeans-{i}.png")
     return plots
+
+def log(plots):
+    COLORS=['r', 'g', 'b' ,'y', 'k']
+    for i, (metric_name, plot) in enumerate(plots.items()):
+        plt.plot(np.arange(len(plot)), plot, label=metric_name, color=COLORS[i])
+        plt.annotate(f"{plot[-1]:.2f}", (len(plot) -1, plot[-1]), textcoords="offset points",
+                     xytext=(-2, 2), ha="center")
+        pickle.dump(plot, open(f'{out_dir}/plots/{metric_name}_fixed_noise_gen_to_train.pkl', 'wb'))
+
+    plt.legend()
+    plt.savefig(f"{out_dir}/Losses.png")
+    plt.clf()
 
 
 if __name__ == "__main__":
@@ -111,6 +122,7 @@ if __name__ == "__main__":
     # Model
     parser.add_argument('--k', default=64, type=int)
     parser.add_argument('--im_size', default=64, type=int)
+    parser.add_argument('--min_method', default="weisfeld", type=str, help="[weisfeld, sgd, mean]")
 
 
     # Other
@@ -120,7 +132,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.train_name is None:
-        args.train_name = f"{os.path.basename(args.data_path)}_I-{args.im_size}_K-{args.k}"
+        args.train_name = f"{os.path.basename(args.data_path)}_M-{args.min_method}_I-{args.im_size}_K-{args.k}"
     out_dir = f"outputs/{args.project_name}/{args.train_name}"
 
     os.makedirs(out_dir, exist_ok=True)
@@ -130,15 +142,8 @@ if __name__ == "__main__":
     data = get_data(args.data_path, args.im_size, c=1 if args.gray_scale else 3,
                     limit_data=args.limit_data, center_crop=args.center_crop, flatten=False)
 
-    minimiztion_func = lambda x, y: weisfeld_minimization(x,y, n_steps=5)
+    minimiztion_func = globals()[f"{args.min_method}_minimization"]
+
     plots = ot_mean(data, args.k, 10, minimiztion_func)
 
-    COLORS=['r', 'g', 'b' ,'y', 'k']
-    for i, (metric_name, plot) in enumerate(plots.items()):
-        plt.plot(np.arange(len(plot)), plot, label=metric_name, color=COLORS[i])
-        plt.annotate(f"{plot[-1]:.2f}", (len(plot) -1, plot[-1]), textcoords="offset points",
-                     xytext=(-2, 2), ha="center")
-
-    plt.legend()
-    plt.savefig(f"{out_dir}/Losses.png")
-    plt.clf()
+    log(plots)
