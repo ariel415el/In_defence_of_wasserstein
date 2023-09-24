@@ -1,3 +1,5 @@
+import json
+
 import torch
 import torch.nn.functional as F
 
@@ -49,3 +51,26 @@ class MiniBatchPatchLoss(MiniBatchLoss):
                            **self.kwargs)
 
 
+class MiniBatchMSPatchLoss:
+    def __init__(self, dists="['w1', 'swd', 'swd']", ps='[64, 32, 8]', intervals='[10000, 10000]', s=1, **kwargs):
+        self.intervals = eval(intervals)
+        self.s = int(s)
+
+        self.losses = [MiniBatchPatchLoss(dist=dist, p=p, s=s, **kwargs) for dist,p in zip(json.loads(dists), eval(ps))]
+        self.loss_idx = 0
+        self.n_steps = 0
+
+    def compute(self, x, y):
+        if self.loss_idx < len(self.intervals):
+            if self.n_steps == self.intervals[self.loss_idx]:
+                self.loss_idx += 1
+                self.n_steps = 0
+        loss = self.losses[self.loss_idx].compute(x, y)
+        self.n_steps += 1
+        return loss
+
+    def trainD(self, netD, real_data, fake_data):
+        raise NotImplemented("MiniBatchMSPatchLoss should be run with --n_D_steps 0")
+
+    def trainG(self, netD, real_data, fake_data):
+        return self.compute(real_data, fake_data)
