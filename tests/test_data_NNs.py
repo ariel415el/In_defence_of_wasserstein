@@ -113,4 +113,4 @@ def find_nns(fake_images, data, outputs_dir, show_first_n=2):
             results.append(torch.cat([fake_image.unsqueeze(0), nns]))
 
         vutils.save_image(torch.cat(results, dim=0).add(1).mul(0.5), f'{outputs_dir}/nns/im.png', normalize=False,
-                          nrow=1 + show_first_n)
+                          nrow=1 + show_first_n, pad_value=1)

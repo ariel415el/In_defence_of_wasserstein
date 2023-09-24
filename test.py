@@ -82,7 +82,7 @@ if __name__ == '__main__':
 
     # Nearest neighbor visualizations
     fake_images = netG(prior.sample(4).to(device))
-    find_nns(fake_images, data, outputs_dir=outputs_dir, show_first_n=2)
+    find_nns(fake_images, data, outputs_dir=outputs_dir, show_first_n=1)
     # find_patch_nns(fake_images, data, patch_size=32, search_margin=2, outputs_dir=outputs_dir, n_centers=4)
     find_patch_nns(fake_images, data, patch_size=22, search_margin=4, outputs_dir=outputs_dir, n_centers=4)
     # find_patch_nns(fake_images, data, patch_size=12, search_margin=2, outputs_dir=outputs_dir, n_centers=4)
