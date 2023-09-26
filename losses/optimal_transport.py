@@ -5,11 +5,14 @@ import torch.nn.functional as F
 
 from utils import distribution_metrics
 
-def to_patches(x, p=8, s=4, sample_patches=None):
+def to_patches(x, p=8, s=4, sample_patches=None, remove_locations=True):
     """extract flattened patches from a pytorch image"""
+    b, c, _, _ = x.shape
     patches = F.unfold(x, kernel_size=p, stride=s)  # shape (b, c*p*p, N_patches)
-    patches = patches.permute(0, 2, 1)
-    patches = patches.reshape(-1, x.shape[1], p, p)
+    if remove_locations:
+        patches = patches.permute(0, 2, 1).reshape(-1, c*p**2)
+    else:
+        patches = patches.permute(2, 0, 1).reshape(-1, b, c*p**2)
     if sample_patches is not None:
         patches = patches[torch.randperm(len(patches))[:int(sample_patches)]]
     return patches
@@ -46,9 +49,7 @@ class MiniBatchPatchLoss(MiniBatchLoss):
     def compute(self, x, y):
         x_patches = to_patches(x, self.p, self.s, self.n_samples)
         y_patches = to_patches(y, self.p, self.s, self.n_samples)
-        return self.metric(x_patches.reshape(len(x_patches), -1),
-                           y_patches.reshape(len(y_patches), -1),
-                           **self.kwargs)
+        return self.metric(x_patches, y_patches, **self.kwargs)
 
 
 class MiniBatchMSPatchLoss:
@@ -56,7 +57,7 @@ class MiniBatchMSPatchLoss:
         self.intervals = eval(intervals)
         self.s = int(s)
 
-        self.losses = [MiniBatchPatchLoss(dist=dist, p=p, s=s, **kwargs) for dist,p in zip(json.loads(dists), eval(ps))]
+        self.losses = [MiniBatchPatchLoss(dist=dist, p=p, s=s, **kwargs) for dist, p in zip(json.loads(dists), eval(ps))]
         self.loss_idx = 0
         self.n_steps = 0
 
@@ -74,3 +75,19 @@ class MiniBatchMSPatchLoss:
 
     def trainG(self, netD, real_data, fake_data):
         return self.compute(real_data, fake_data)
+
+
+class MiniBatchLocalPatchLoss(MiniBatchLoss):
+    def __init__(self, dist='w1', p=5, s=1, n_samples=None, **kwargs):
+        super(MiniBatchLocalPatchLoss, self).__init__(dist,  **kwargs)
+        self.dist_name = dist
+        self.p = int(p)
+        self.s = int(s)
+        self.n_samples = n_samples
+
+    def compute(self, x, y):
+        x_patches = to_patches(x, self.p, self.s, self.n_samples, remove_locations=False)
+        y_patches = to_patches(y, self.p, self.s, self.n_samples, remove_locations=False)
+        n_locs, _, _ = x_patches.shape
+        loss = torch.stack([self.metric(x_patches[l], y_patches[l], **self.kwargs)[0] for l in range(n_locs)]).mean()
+        return loss, {f"Local-{self.dist_name}": loss.item()}
