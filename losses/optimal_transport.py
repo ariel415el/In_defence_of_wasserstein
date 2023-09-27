@@ -5,6 +5,7 @@ import torch.nn.functional as F
 
 from utils import distribution_metrics
 
+
 def to_patches(x, p=8, s=4, sample_patches=None, remove_locations=True):
     """extract flattened patches from a pytorch image"""
     b, c, _, _ = x.shape
@@ -53,11 +54,10 @@ class MiniBatchPatchLoss(MiniBatchLoss):
 
 
 class MiniBatchMSPatchLoss:
-    def __init__(self, dists="['w1', 'swd', 'swd']", ps='[64, 32, 8]', intervals='[10000, 10000]', s=1, **kwargs):
+    def __init__(self, dists="['w1', 'swd', 'swd']", ps='[64, 32, 8]', ss='[1, 2, 8]', intervals='[10000, 10000]', **kwargs):
         self.intervals = eval(intervals)
-        self.s = int(s)
 
-        self.losses = [MiniBatchPatchLoss(dist=dist, p=p, s=s, **kwargs) for dist, p in zip(json.loads(dists), eval(ps))]
+        self.losses = [MiniBatchPatchLoss(dist=dist, p=p, s=s, **kwargs) for dist, p, s in zip(json.loads(dists), eval(ps), eval(ss))]
         self.loss_idx = 0
         self.n_steps = 0
 
