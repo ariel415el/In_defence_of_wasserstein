@@ -39,8 +39,7 @@ def get_data(data_path, im_size=None, c=3, center_crop=None, gray_scale=False, f
 
 def get_centroids(data, n_centroids, use_faiss=False):
     print("Computing centroids", end='...')
-    d,c,h,w = data.shape
-    np_data = data.cpu().numpy().reshape(d, -1)
+    np_data = data.cpu().numpy().reshape(data.shape[0], -1).copy(order='C')
     if use_faiss:
         import faiss
         kmeans = faiss.Kmeans(np_data.shape[1], n_centroids, niter=100, verbose=False, gpu=True)
@@ -54,7 +53,7 @@ def get_centroids(data, n_centroids, use_faiss=False):
 
     centroids = torch.from_numpy(centroids).to(data.device)
     print("Got centroids")
-    return centroids.reshape(n_centroids,c,h,w)
+    return centroids.reshape(n_centroids,*data.shape[1:])
 
 
 def read_grid_batch(path, d, c, flatten=True):
