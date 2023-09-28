@@ -22,11 +22,10 @@ def get_dir_paths(root, titles_and_name_lists):
     return named_dirs
 
 
-def plot_batch(ax, batch_image_path, n):
+def plot_batch(ax, batch_image_path, n, im_dim=64):
     images = np.array(Image.open(batch_image_path))
-    d = images.shape[0] // 2
-    f = n * d // 2
-    images = images[d - f:d + f, d - f:d + f]
+    f = (n * im_dim)
+    images = images[:f, :f]
 
     ax.imshow(images)
     ax.axis('off')
@@ -34,11 +33,13 @@ def plot_batch(ax, batch_image_path, n):
 
 def load_plot_and_anotate(ax, val_path, color, label, line_type='-'):
     vals = pickle.load((open(val_path, "rb")))
-    ax.plot(np.arange(len(vals)), vals, line_type, color=color, label=label)
-    ax.annotate(f"{vals[-1]:.2f}", (len(vals) - 1, vals[-1]), textcoords="offset points", xytext=(-2, 2), ha="center")
+    vals = np.nan_to_num(vals)
+    xs = np.arange(len(vals)) / (len(vals) - 1)
+    ax.plot(xs, vals, line_type, color=color, label=label, alpha=0.5)
+    ax.annotate(f"{vals[-1]:.3f}", (0.9, vals[-1]), textcoords="offset points", xytext=(-2, 2), ha="center")
 
 
-def plot(named_dirs, out_path, plot_loss=None, s=4,  n=5):
+def plot(named_dirs, out_path, plot_type=None, s=4,  n=5):
     """
     s: base unit for the size of plot
     n: #images in row of displayed images
@@ -46,44 +47,64 @@ def plot(named_dirs, out_path, plot_loss=None, s=4,  n=5):
     """
 
     width = len(named_dirs)
-    if plot_loss == "common":
+    if plot_type == "common":
         width += 1
-    h=2 if plot_loss == "separate" else 1
-    fig, axes = plt.subplots(h, width, figsize=(width * s, h*s), squeeze=False, sharey='row' if plot_loss == "separate" else 'none')
+    h=2 if plot_type == "separate" else 1
+    fig, axes = plt.subplots(h, width, figsize=(width * s, h*s), squeeze=False, sharey='row' if plot_type == "separate" else 'none')
     for i, (name, dir_path) in enumerate(named_dirs.items()):
-        axes[0, i].set_title(f"{name}", fontsize=4 * s)
-
+        ax1 = axes[0, i]
+        ax1.set_title(f"{name}", fontsize=3 * s)
         batch_image_path = find_last_file(os.path.join(dir_path, "images"))
-        plot_batch(axes[0, i], batch_image_path, n)
+        plot_batch(ax1, batch_image_path, n)
 
-        image_level_plot = os.path.join(dir_path, "plots", "MiniBatchLoss-dist=swd_fixed_noise_gen_to_train.pkl")
-        if plot_loss is not None:
-            if plot_loss == "separate":
+        if plot_type is not None:
+            if plot_type == "separate":
                 ax2 = axes[1, i]
-                load_plot_and_anotate(ax2, image_level_plot, COLORS[0], f"Image SWD", line_type='-')
 
                 names_and_plot_paths = [
-                    ("Patch-4-swd", "MiniBatchPatchLoss-dist=swd-p=4-s=4_fixed_noise_gen_to_train.pkl", COLORS[1], '--'),
-                    ("Patch-8-swd", "MiniBatchPatchLoss-dist=swd-p=8-s=4_fixed_noise_gen_to_train.pkl", COLORS[2], '--'),
-                    ("Patch-16-swd", "MiniBatchPatchLoss-dist=swd-p=16-s=8_fixed_noise_gen_to_train.pkl", COLORS[3], '--'),
+                    # ("Image-W1", "MiniBatchLoss-dist=w1_fixed_noise_gen_to_train.pkl", COLORS[0], '-'),
+                    ("Patch-SWD", "MiniBatchPatchLoss-dist=swd-p=16-s=8_fixed_noise_gen_to_train.pkl", COLORS[1], '--'),
+                    # ("Patch-SWD", "MiniBatchPatchLoss-dist=swd-p=8-s=4_fixed_noise_gen_to_train.pkl", COLORS[1], '--'),
+                    ("LocalPatch-SWD", "MiniBatchLocalPatchLoss-dist=swd-p=16-s=8_fixed_noise_gen_to_train.pkl", COLORS[2], '--'),
+                    # ("LocalPatch-SWD", "MiniBatchLocalPatchLoss-dist=swd-p=8-s=4_fixed_noise_gen_to_train.pkl", COLORS[2], '--'),
+                    # ("LocalPatch-W1", "MiniBatchLocalPatchLoss-dist=w1-p=16-s=8_fixed_noise_gen_to_train.pkl", COLORS[3], '--'),
+                    # ("LocalPatch-W1", "MiniBatchLocalPatchLoss-dist=w1-p=8-s=4_fixed_noise_gen_to_train.pkl", COLORS[3], '--'),
                 ]
 
                 for j, (name, path, color, line_type) in enumerate(names_and_plot_paths):
                     patch_plot = os.path.join(dir_path, "plots", path)
                     load_plot_and_anotate(ax2, patch_plot, color, name, line_type)
 
-                handles, labels = ax2.get_legend_handles_labels()
-                fig.legend(handles, labels, loc='center', ncol=1+len(names_and_plot_paths), prop={'size': s*width})
+                # ax2.set_yscale('log')
+
             else:
                 ax2 = axes[0, -1]
-                load_plot_and_anotate(ax2, image_level_plot, COLORS[i], name)
-                ax2.legend()
+                print(dir_path)
+                # image_level_plot = os.path.join(dir_path, "plots", "MiniBatchLoss-dist=w1_fixed_noise_gen_to_train.pkl")
+                # ax2.set_ylabel(f"Wasserstein-1")
+                # load_plot_and_anotate(ax2, image_level_plot, COLORS[i], name)
+                #
+                image_level_plot = os.path.join(dir_path, "plots", "MiniBatchPatchLoss-dist=swd-p=16-s=2_fixed_noise_gen_to_train.pkl")
+                ax2.set_ylabel(f"Patch SWD")
+                load_plot_and_anotate(ax2, image_level_plot, COLORS[i], name, line_type='--')
+                # ax2.set_yscale('log')
+                ax2.yaxis.tick_right()
 
-            ax2.set_yscale('log')
-            ax2.set_ylabel(f"BatchW1")
+                ax2.legend(prop={'size': 2.5*s})
+                ax2.set_yticks([])
+
         else:
-            axes[0, i].set_title(f"{name}  W1: {plot[-1]:.3f}", fontsize=4 * s)
+            ax1.set_title(name, fontsize=4 * s)
 
-        plt.tight_layout()
-        plt.savefig(out_path)
-        plt.cla()
+    ax2.set_xlabel(f"Relative train time")
+    # ax2.set_xticks([])
+
+    ax2.legend(prop={'size': 2.5 * s})
+
+    # if plot_type == "separate":
+    #     handles, labels = ax2.get_legend_handles_labels()
+    #     fig.legend(handles, labels, loc='center', ncol=1 + len(names_and_plot_paths), prop={'size': s * h})
+
+    plt.tight_layout()
+    plt.savefig(out_path)
+    plt.clf()

@@ -17,87 +17,122 @@ class Figure:
     def get_run_commands(project_name, dataset, additional_params):
         raise NotImplemented
 
-    @staticmethod
-    def plot_fig(names_and_commands, dataset_name, plot_type):
-        titles_and_name_lists = [
-                (name, [compose_experiment_name(parse_train_args(command)).replace("_test", "")], [])
-              for name,command in names_and_commands]
-        named_dirs = get_dir_paths(f'{out_root}/{project_name}', titles_and_name_lists)
-        plot(named_dirs, f"{out_root}/Exp-{dataset_name}.png",plot_loss=plot_type, n=args.n, s=args.s)
 
-
-class Figure_1(Figure):
-    """Figure 1 in the papers compares the outputs of the OT-means algorithm to that of CTransformLoss"""
+class Figure_2a(Figure):
+    """Figure 1 Show that DiscreteWGAN with FC discriminator approximately minimizes W1 by comparing it to OTmeans
+    Use M<N centroids
+    """
+    plot_type='common'
     @staticmethod
     def get_run_commands(project_name, dataset, additional_params):
-        gen_arch = "Pixels --lrG 0.001"
-        base = f" --data_path {dataset}  {additional_params}" \
-               f" --load_data_to_memory --n_workers 0 --project_name {project_name}" \
-               f" --n_iterations 25000 --gen_arch {gen_arch}"
+        nc = 64
+        named_commands = dict()
+        for gen_name, gen_arch in [
+            # ("Pixels", f"Pixels-n={nc} --lrG 0.001 "),
+            ("FC", "FC --lrG 0.0001 ")
+        ]:
+            base = f"python3  train.py --data_path {dataset}  {additional_params} " \
+                   f" --load_data_to_memory --n_workers 0 --project_name {project_name} " \
+                   f" --n_iterations 25000 --gen_arch {gen_arch} " \
+                   f" --z_prior const={nc} --r_bs {nc} --f_bs {nc}"
 
-        names_and_commands = [
-            ("Exp1-PixelCTGAN", base + f" --loss_function CtransformLoss "),
-            ("Exp1-Pixel-W1", base + f" --loss_function MiniBatchLoss-dist=w1 --D_step_every -1 --r_bs -1 "),
-            ("Exp1-OTmeans", f"python3 scripts/EMD/ot_means.py {additional_params} --data_path {dataset}"
-                              f" --project_name {project_name}",  f"Exp1-OTmeans-{os.path.basename(dataset)}")
-        ]
-        return names_and_commands
+            wgan_params = f" --loss_function WGANLoss --gp_weight 10 --lrD 0.001 --G_step_every 5"
+            named_commands[f"DiscreteWGAN-{gen_name}-FC"] = base + wgan_params +" --disc_arch FC-nf=1024"
 
-
-    @staticmethod
-    def plot_fig(names_and_commands, dataset_name):
-        names_and_commands = [(name, compose_experiment_name(parse_train_args(command))) for name, command in names_and_commands[:-1]]
-        names_and_commands += ["OTmeans"]
-        plot(f'{out_root}/{project_name}', f"Exp-{dataset_name}.png",
-             [(name, [compose_experiment_name(parse_train_args(command)).replace("_test", "")], [])
-              for name,command in names_and_commands],
-             plot_loss=None, n=args.n
-             )
+        named_commands["OTmeans"] = f"python3 scripts/experiments/OT/ot_means.py  --k {nc}" \
+                                    f" --data_path {dataset} --project_name {project_name} {additional_params}"
+        return named_commands
 
 
-class Figure_2(Figure):
-    """Figure 2 in the Shows that Discrete GANS behave like CTransformLoss"""
-
+class Figure_2b(Figure):
+    """Figure 1 Show that DiscreteWGAN with FC discriminator approximately minimizes W1 by comparing it to OTmeans
+    Use M=N centroids
+    """
+    plot_type='common'
     @staticmethod
     def get_run_commands(project_name, dataset, additional_params):
-        gen_arch = "Pixels --lrG 0.001"
-        base = f" --data_path {dataset}  {additional_params}" \
-               f" --load_data_to_memory --n_workers 0 --project_name {project_name} --z_prior const=64" \
-               f"  --n_iterations 25000 " \
-               f"--gen_arch {gen_arch} "
+        nc = 1000
+        bs = 64
+        named_commands = dict()
+        for gen_name, gen_arch in [
+            # ("Pixels", f"Pixels-n={nc} --lrG 0.001 "),
+            ("FC", "FC-nf=1024 --lrG 0.0001 ")
+        ]:
+            base = f"python3  train.py --data_path {dataset}  {additional_params} " \
+                   f" --load_data_to_memory --n_workers 0 --project_name {project_name}" \
+                   f" --n_iterations 100000 --gen_arch {gen_arch}" \
+                   f" --z_prior const={nc} --r_bs {bs} --f_bs {bs}"
 
-        names_and_commands = [
-            ("Exp2-PixelWGAN-FC", base + f" --loss_function WGANLoss --gp_weight 10 --lrD 0.001 --G_step_every 5 --disc_arch FC-nf=1024"),
-            ("Exp2-PixelCTGAN-FC", base + f" --loss_function CtransformLoss --lrD 0.001 --disc_arch FC-nf=1024"),
+            wgan_params = f" --loss_function WGANLoss --gp_weight 10 --lrD 0.001"
+            named_commands[f"DiscreteWGAN-{gen_name}-FC"] = base + wgan_params +" --disc_arch FC-nf=1024"
 
-        ]
-        return names_and_commands
+        named_commands["OTmeans"] = f"python3 scripts/experiments/OT/ot_means.py  --k {nc}" \
+                                    f" --data_path {dataset} --project_name {project_name} {additional_params}" \
+                                    f" --min_method sgd"
+        return named_commands
 
 
 class Figure_3(Figure):
-    plot_type = "separate"
-    """Compare DiscreteWGAN with CNN discriminator to direct patch ot minimization of patches of the same size"""
+    """Show that DiscreteWGAN with CNN discriminator minimizes patch-W1 by comparing it to direct patch-SWD miniimzation
+    Add FC discriminator DiscreteWGAN as reference
+    """
+    plot_type='common'
     @staticmethod
     def get_run_commands(project_name, dataset, additional_params):
-        n_iterations = 250000
-        gen_arch = "FC"
-        base = f" --data_path {dataset}  {additional_params}" \
+        nc = 64
+        named_commands = dict()
+        base = f"python3 train.py --data_path {dataset}  {additional_params}" \
                f" --load_data_to_memory --n_workers 0 --project_name {project_name}" \
-               f" --n_iterations {n_iterations} " \
-               f"--gen_arch {gen_arch} --lrG 0.0001 --z_prior const=64"
+               f" --n_iterations 50000 --log_freq 2500"\
+               f" --r_bs {nc} --f_bs {nc} --z_prior const={nc}"
 
-        names_and_commands = [
-            ("Exp3-DiscreteWGAN-FC", base + f" --loss_function WGANLoss --gp_weight 10 --lrD 0.001 --G_step_every 5"
-                                            f" --disc_arch FC-nf=1024"),
-            ("Exp3-DiscreteWGAN-DC", base + f" --loss_function WGANLoss --gp_weight 10 --lrD 0.001 --G_step_every 5 "
-                                            f"--disc_arch DCGAN-normalize=none"),
-            ("Exp3-DiscreteWGAN-GAP-16", base + f" --loss_function WGANLoss --gp_weight 10 --lrD 0.001 --G_step_every 5"
-                                                f" --disc_arch PatchGAN-normalize=in-k=3"),
-            ("Exp3-Discrete-W1", base + f" --loss_function MiniBatchLoss-dist=w1 --D_step_every -1"),
-            # ("Exp3-Discrete-W1_p=16-s=8", base + f" --loss_function MiniBatchPatchLoss-dist=w1-p=16-s=8-n_samples=1024"
-            #                                      f" --D_step_every -1")
-        ]
-        return names_and_commands
+        wgan_params = ' --loss_function WGANLoss --gp_weight 10 --gen_arch FC --lrG 0.0001  --G_step_every 5 --lrD 0.001'
+        named_commands[f"DiscreteWGAN-FC"] = base + wgan_params + f" --disc_arch FC-nf=1024"
+        named_commands[f"DiscreteWGAN-CNN-GAP"] = base + wgan_params + f" --disc_arch PatchGAN-depth=3-k=3-normalize=none"
+
+
+        direct_swd_params = f" --loss_function MiniBatchPatchLoss-dist=swd-p=16-s=1 --D_step_every -1 --gen_arch Pixels-n={nc} --lrG 0.001"
+        named_commands[f"DirectPatchSWD"] = base + direct_swd_params
+
+        # direct_loss = """MiniBatchMSPatchLoss-dists='["swd","swd"]'-ps='[8,16]'-ss='[4,8]'-intervals='[10000]'"""
+        # direct_swd_params = f" --loss_function {direct_loss} --D_step_every -1 --gen_arch Pixels-n={nc} --lrG 0.01"
+        # named_commands[f"DirectPatchSWD-8+16"] = base + direct_swd_params
+
+        return named_commands
+
+
+class Figure_5(Figure):
+    """
+    Show that Discrete WGAN with DC discriminator mixes image-level and patch level losses by comparing it to Multi-scale
+    patch-SWD loss
+    """
+    plot_type='separate'
+    @staticmethod
+    def get_run_commands(project_name, dataset, additional_params):
+        nc = 64
+        named_commands = dict()
+
+        base = f"python3 train.py --data_path {dataset}  {additional_params}" \
+               f" --load_data_to_memory --n_workers 0 --project_name {project_name}" \
+               f" --n_iterations 50000 --log_freq 5000 --z_prior const={nc}"
+
+        direct_loss = """MiniBatchMSPatchLoss-dists='["w1","swd", "swd"]'-ps='[64,16, 8]'-ss='[1,1,1]'-intervals='[5000, 10000]'"""
+        direct_params = f' --loss_function {direct_loss} --D_step_every -1 --gen_arch Pixels-n={nc} --lrG 0.01 '
+        # named_commands[f"DirectPatchSWD"] = base + direct_params
+
+        wgan_params = f' --loss_function WGANLoss --gp_weight 10 --G_step_every 5' \
+                      f' --lrD 0.001  --gen_arch FC --lrG 0.0001 '
+
+        # named_commands[f"DiscreteWGAN-FC"] = base + wgan_params + f" --disc_arch FC-nf=1024"
+
+        disc_arch = f"PatchGAN-depth=3-k=3-nf=256-normalize=none-GAP=True"
+        named_commands[f"DiscreteWGAN-CNN+GAP"] = base + wgan_params + f" --disc_arch {disc_arch}"
+
+        disc_arch = f"PatchGAN-depth=3-k=3-nf=256-normalize=none-GAP=False"
+        named_commands[f"DiscreteWGAN-CNN+FC"] = base + wgan_params + f" --disc_arch {disc_arch}"
+
+
+        return named_commands
 
 
 if __name__ == '__main__':
@@ -105,12 +140,17 @@ if __name__ == '__main__':
     out_root = '/cs/labs/yweiss/ariel1/repos/DataEfficientGANs/outputs'
     data_map = {
         "ffhq": (f'{data_root}/FFHQ/FFHQ', ' --center_crop 80 --limit_data 10000'),
+        "ffhq1k": (f'{data_root}/FFHQ/FFHQ', ' --center_crop 80 --limit_data 1000'),
         "squares": (f'{data_root}/square_data/black_S-10_O-1_S-1', ' --gray_scale'),
-        "mnist": (f'{data_root}/MNIST/MNIST/jpgs/training', ' --gray_scale  --limit_data 10000' )
+        "squares1k": (f'{data_root}/square_data/black_S-10_O-1_S-1', ' --gray_scale --limit_data 1000'),
+        "mnist": (f'{data_root}/MNIST/MNIST/jpgs/training', ' --gray_scale  --limit_data 10000'),
+        "mnist1k": (f'{data_root}/MNIST/MNIST/jpgs/training', ' --gray_scale  --limit_data 10000 --limit_data 1000'),
+        "ffhq_centroids": (f'{data_root}//FFHQ/FFHQ_centroids/shifted_crops/shifted_crops', ''),
+        "mnist_centroids": (f'{data_root}//MNIST/MNIST_centroids/floating_images/floating_images', ' --gray_scale'),
     }
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('figure_idx', type=int)
+    parser.add_argument('figure_idx', type=str)
     parser.add_argument('--datasets', nargs='+', type=str, default=["ffhq", "squares", "mnist"])
 
     parser.add_argument('--run', default=False, action='store_true')
@@ -119,24 +159,29 @@ if __name__ == '__main__':
     parser.add_argument('--hours', default=4, type=int)
 
     parser.add_argument('--plot', default=False, action='store_true')
-    parser.add_argument('--n', default=8, type=int)
-    parser.add_argument('--s', default=3, type=int)
+    parser.add_argument('--n', default=4, type=int)
+    parser.add_argument('--s', default=4, type=int)
+    parser.add_argument('--tag', default='', type=str)
 
     args = parser.parse_args()
-    project_name = f"Figure_Exp{args.figure_idx}"
+    project_name = f"Figure_Exp{args.figure_idx}{args.tag}"
 
     sbatch_params = args.hours, args.killable, args.gpu_memory
-    figure_command_generator = globals()[f"Figure_{args.figure_idx}"]
+    task_name = f"Figure_{args.figure_idx}"
+    figure_command_generator = globals()[task_name]
 
     for dataset_name in args.datasets:
         data_path, data_args = data_map[dataset_name]
-        names_and_commands = figure_command_generator.get_run_commands(project_name, data_path, additional_params=data_args)
+        named_commands = figure_command_generator.get_run_commands(project_name, data_path, additional_params=data_args)
         if args.run:
-            for name, command in names_and_commands:
-                run_sbatch("python3 train.py " + command, f"{name}-{os.path.basename(data_path)}", *sbatch_params)
+            for name, command in named_commands.items():
+                run_sbatch(command, f"{dataset_name}-{name}", task_name=task_name, *sbatch_params)
 
         elif args.plot:
-            figure_command_generator.plot_fig(names_and_commands, dataset_name, figure_command_generator.plot_type)
+            for name in named_commands:
+                named_commands[name] = os.path.join(out_root, project_name, f"{dataset_name}-{name}")
+            plot(named_commands, os.path.join(out_root, project_name, f"Exp-{dataset_name}.png"),
+                                plot_type=figure_command_generator.plot_type, n=args.n, s=args.s)
 
         else:
             raise ValueError("Please supply at least one task (run, plot)")
