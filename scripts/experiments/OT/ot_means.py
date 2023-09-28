@@ -41,8 +41,10 @@ def average_minimization(centroids, data, k):
 
 def weisfeld_step(X, dist_mat, W):
     """See Weisfeld algorithm formula: https://ssabach.net.technion.ac.il/files/2015/12/BS2015.pdf equation (4)"""
+    dist_mat = torch.clip_(dist_mat, min=0.000001) # Avoid dividing by zero
     nominator = (W / dist_mat) @ X         ## np.allclose(nominator[0],((1/C)[0][:, None] * data).sum(0))
     denominator = (W / dist_mat).sum(1)[:, None]
+    denominator = torch.clip_(denominator, min=0.000001) # Avoid dividing by zero
     new_centroids = nominator / denominator
     return new_centroids
 
@@ -71,30 +73,40 @@ def sgd_minimization(centroids, data, n_steps=100):
     return centroids
 
 
-def ot_mean(data, k, n_iters, minimization_method):
-
-    metrics = [
-        'MiniBatchLoss-dist=w1',
-        'MiniBatchLoss-dist=swd',
-        'MiniBatchPatchLoss-dist=swd-p=8-s=4',
-    ]
-    metrics = {metric: get_loss_function(metric) for metric in metrics}
-    _, c,h,w = data.shape
+def ot_mean(data, k, n_iters, minimization_method, init_from=None, verbose=True):
+    print(f"Running OTmeans with k={k} on data of shape {data.shape}")
+    if verbose:
+        plots = defaultdict(list)
+        metrics = [
+            'MiniBatchLoss-dist=w1',
+            'MiniBatchLoss-dist=swd',
+            'MiniBatchPatchLoss-dist=swd-p=8-s=4',
+        ]
+        metrics = {metric: get_loss_function(metric) for metric in metrics}
+    data_shape = data.shape
     data = data.reshape(len(data), -1)
-    # centroids = np.random.randn(k, data.shape[-1]).astype(np.float32) * 0.5
-    centroids = torch.randn((k, data.shape[-1])) * 0.5
-    plots = defaultdict(list)
+    if init_from is None:
+        centroids = torch.randn((k, data.shape[-1])) * 0.5
+    else:
+        centroids = init_from
     for i in range(n_iters):
         centroids = minimization_method(centroids, data)
-        for metric_name, metric in metrics.items():
-            dist = metric(centroids.reshape(-1, c, h, w),
-                          data.reshape(-1, c, h, w)).item()
-            plots[metric_name].append(dist)
-            print(f"Iter: {i}: {metric_name}: {dist:.4f}")
 
-        dump_images(centroids.reshape(args.k, -1, args.im_size, args.im_size),
-                    f"{out_dir}/images/otMeans-{i}.png")
-    return plots
+        if verbose:
+            print(f"Iter: {i}")
+            for metric_name, metric in metrics.items():
+                dist = metric(centroids.reshape(-1, *data_shape[1:]),
+                              data.reshape(-1, *data_shape[1:])).item()
+                print(f"\b {metric_name}: {dist:.4f}")
+                plots[metric_name].append(dist)
+
+            dump_images(centroids.reshape(args.k, -1, args.im_size, args.im_size),
+                        f"{out_dir}/images/otMeans-{i}.png")
+    if verbose:
+        return plots
+    else:
+        return centroids
+
 
 def log(plots):
     COLORS=['r', 'g', 'b' ,'y', 'k']
@@ -144,6 +156,6 @@ if __name__ == "__main__":
 
     minimiztion_func = globals()[f"{args.min_method}_minimization"]
 
-    plots = ot_mean(data, args.k, 10, minimiztion_func)
+    plots = ot_mean(data, args.k, 10, minimiztion_func, verbose=True)
 
     log(plots)

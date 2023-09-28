@@ -42,12 +42,14 @@ def get_centroids(data, n_centroids, use_faiss=False):
     np_data = data.cpu().numpy().reshape(data.shape[0], -1).copy(order='C')
     if use_faiss:
         import faiss
-        kmeans = faiss.Kmeans(np_data.shape[1], n_centroids, niter=100, verbose=False, gpu=True)
+        kmeans = faiss.Kmeans(np_data.shape[1], n_centroids, verbose=True, gpu=True)
         kmeans.train(np_data)
         centroids = kmeans.centroids
+
     else:
+
         from sklearn.cluster import KMeans
-        kmeans = KMeans(n_clusters=n_centroids, random_state=0, verbose=0).fit(np_data)
+        kmeans = KMeans(n_clusters=n_centroids, random_state=0, verbose=0, max_iter=50).fit(np_data)
         centroids = kmeans.cluster_centers_
 
 
