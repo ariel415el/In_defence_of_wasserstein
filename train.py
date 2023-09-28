@@ -3,8 +3,6 @@ from time import time
 
 import torch
 
-from benchmarking.neural_metrics import InceptionMetrics
-from utils.diffaug import DiffAugment
 from utils.common import dump_images, compose_experiment_name, batch_generation
 from utils.train_utils import copy_G_params, load_params, Prior, get_models_and_optimizers, parse_train_args, \
     save_model, calc_gradient_penalty
@@ -22,13 +20,12 @@ def train_GAN(args):
     debug_fixed_reals = next(iter(train_loader)).to(device)
     debug_all_reals = next(iter(full_batch_loader)).to(device)
 
-    inception_metrics = InceptionMetrics([next(iter(train_loader)) for _ in range(args.fid_n_batches)], torch.device("cpu"))
     other_metrics = [
                 # get_loss_function("MiniBatchLoss-dist=w1"),
                 get_loss_function("MiniBatchLoss-dist=swd"),
-                get_loss_function("MiniBatchPatchLoss-dist=swd-p=4-s=4"),
-                get_loss_function("MiniBatchPatchLoss-dist=swd-p=8-s=4"),
-                get_loss_function("MiniBatchPatchLoss-dist=swd-p=16-s=8"),
+                # get_loss_function("MiniBatchPatchLoss-dist=swd-p=4-s=4"),
+                # get_loss_function("MiniBatchPatchLoss-dist=swd-p=8-s=4"),
+                # get_loss_function("MiniBatchPatchLoss-dist=swd-p=16-s=8"),
               ]
 
     loss_function = get_loss_function(args.loss_function)
@@ -44,9 +41,6 @@ def train_GAN(args):
 
             noise = prior.sample(args.f_bs).to(device)
             fake_images = netG(noise)
-
-            real_images = DiffAugment(real_images, policy=args.augmentation)
-            fake_images = DiffAugment(fake_images, policy=args.augmentation)
 
             # #####  1. train Discriminator #####
             if iteration % args.D_step_every == 0 and args.D_step_every > 0:
@@ -72,7 +66,6 @@ def train_GAN(args):
                 if not args.no_fake_resample:
                     noise = prior.sample(args.f_bs).to(device)
                     fake_images = netG(noise)
-                    fake_images = DiffAugment(fake_images, policy=args.augmentation)
 
                 Gloss, debug_Glosses = loss_function.trainG(netD, real_images, fake_images)
                 netG.zero_grad()
@@ -93,7 +86,7 @@ def train_GAN(args):
                 backup_para = copy_G_params(netG)
                 load_params(netG, avg_param_G)
 
-                evaluate(prior, netG, netD, inception_metrics, other_metrics, debug_fixed_noise,
+                evaluate(prior, netG, netD, other_metrics, debug_fixed_noise,
                          debug_fixed_reals, debug_all_reals, saved_image_folder, iteration, logger, args)
 
                 save_model(prior, netG, netD, optimizerG, optimizerD, saved_model_folder, iteration, args)
@@ -103,17 +96,13 @@ def train_GAN(args):
             iteration += 1
 
 
-def evaluate(prior, netG, netD, inception_metrics, other_metrics, fixed_noise, debug_fixed_reals,
+def evaluate(prior, netG, netD, other_metrics, fixed_noise, debug_fixed_reals,
              debug_all_reals, saved_image_folder, iteration, logger, args):
     netG.eval()
     netD.eval()
     start = time()
     with torch.no_grad():
         fake_images = batch_generation(netG, prior, len(debug_all_reals), 512, torch.device("cpu"))
-
-        if args.fid_n_batches > 0 and iteration % args.fid_freq == 0:
-            fake_batches = [netG(torch.randn_like(fixed_noise).to(device)) for _ in range(args.fid_n_batches)]
-            logger.log(inception_metrics(fake_batches), step=iteration)
 
         print(f"Computing metrics between {len(debug_all_reals)} real and {len(fake_images)} fake images")
         for metric in other_metrics:

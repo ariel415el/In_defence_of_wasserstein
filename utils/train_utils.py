@@ -24,7 +24,7 @@ def parse_train_args(arguments_string=None):
     parser.add_argument('--disc_arch', default='DCGAN')
     parser.add_argument('--im_size', default=64, type=int)
     parser.add_argument('--z_dim', default=64, type=int)
-    parser.add_argument('--z_prior', default="normal", type=str, help="[normal, binary, uniform]")
+    parser.add_argument('--z_prior', default="const=64", type=str, help="[normal, binary, uniform]")
     parser.add_argument('--spectral_normalization', action='store_true', default=False)
     parser.add_argument('--weight_clipping', type=float, default=None)
     parser.add_argument('--gp_weight', default=0, type=float)
@@ -53,7 +53,7 @@ def parse_train_args(arguments_string=None):
                                                                      " statistics (0 turns off FID)")
 
     # Other
-    parser.add_argument('--project_name', default='GANs')
+    parser.add_argument('--project_name', default='train_results')
     parser.add_argument('--train_name', default=None)
     parser.add_argument('--n_workers', default=4, type=int)
     parser.add_argument('--loadG', default=None, type=str)

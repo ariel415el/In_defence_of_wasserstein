@@ -41,31 +41,7 @@ def human_format(num):
 
 
 def print_num_params(model):
-    # n = sum(p.nelement() * p.element_size() for p in model.parameters() if p.requires_grad)
-    # n += sum(p.nelement() * p.element_size() for p in model.buffers() if p.requires_grad)
     n = sum(p.nelement() for p in model.parameters() if p.requires_grad)
     n += sum(p.nelement() for p in model.buffers() if p.requires_grad)
     return human_format(n)
 
-
-if __name__ == '__main__':
-    for arch_name, s in [('FC', 64), ('FC-nf=1024-depth=8', 64), ('DCGAN-normalize=in-nf=128', 64),
-                         # ("DCGAN-nf=64", 64), ('ResNet', 64),
-                         # ('FC', 128), ("DCGAN", 128),('ResNet', 128) ,
-                         # ("FastGAN", 128), ('StyleGAN', 128),
-                         # ('BagNet-rf=9', 64), ('BagNet-rf=9', 128)
-                         ]:
-        print(f"{arch_name}: {s}x{s}")
-
-        try:
-            model_name, kwargs = parse_classnames_and_kwargs(arch_name, kwargs={"output_dim": s, "z_dim": s})
-            netG = importlib.import_module("models." + model_name).Generator(**kwargs)
-
-
-            print("\t-G params (MB): ", print_num_params(netG))
-        except Exception as e:
-            print(e)
-            pass
-        model_name, kwargs = parse_classnames_and_kwargs(arch_name, kwargs={"input_dim": s})
-        netD = importlib.import_module("models." + model_name).Discriminator(**kwargs)
-        print("\t-D params (MB): ", print_num_params(netD))

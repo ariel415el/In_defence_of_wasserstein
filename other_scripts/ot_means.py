@@ -1,18 +1,14 @@
 import argparse
 import os
-import pickle
 import sys
-from collections import defaultdict
 
 import numpy as np
 import ot
 import torch
-from matplotlib import pyplot as plt
+
+from experiment_utils import get_data
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-from experiment_utils import get_data
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-from losses import get_loss_function
 from utils.common import dump_images
 
 
@@ -26,17 +22,6 @@ def get_ot_plan(C):
 
 def dist_mat(X, Y):
     return ((X * X).sum(1)[:, None] + (Y * Y).sum(1)[None, :] - 2.0 * X @ Y.T)**0.5
-
-
-def compute_means(ot_map, data, k):
-    return (ot_map[:,:, None] * data[None, ] * k).sum(1)
-
-
-def average_minimization(centroids, data, k):
-    C = dist_mat(centroids, data)
-    ot_map = get_ot_plan(C)
-    centroids = compute_means(ot_map, data, k)
-    return centroids
 
 
 def weisfeld_step(X, dist_mat, W):
@@ -59,67 +44,23 @@ def weisfeld_minimization(centroids, data, n_steps=5):
     return centroids
 
 
-def sgd_minimization(centroids, data, n_steps=100):
-    centroids.requires_grad_()
-    opt = torch.optim.Adam([centroids], lr=0.005)
-    for i in range(n_steps):
-        C = dist_mat(centroids, data)
-        ot_map = get_ot_plan(C.cpu().detach().numpy())
-        loss = torch.sum(torch.from_numpy(ot_map) * C)
-        opt.zero_grad()
-        loss.backward()
-        opt.step()
-    centroids.detach().cpu().numpy()
-    return centroids
-
-
-def ot_mean(data, k, n_iters, minimization_method, init_from=None, verbose=True):
+def ot_means(data, k, n_iters, init_from=None, debug_dir=None):
     print(f"Running OTmeans with k={k} on data of shape {data.shape}")
-    if verbose:
-        plots = defaultdict(list)
-        metrics = [
-            'MiniBatchLoss-dist=w1',
-            'MiniBatchLoss-dist=swd',
-            'MiniBatchPatchLoss-dist=swd-p=8-s=4',
-        ]
-        metrics = {metric: get_loss_function(metric) for metric in metrics}
     data_shape = data.shape
     data = data.reshape(len(data), -1)
+
     if init_from is None:
         centroids = torch.randn((k, data.shape[-1])) * 0.5
     else:
         centroids = init_from
+
     for i in range(n_iters):
-        centroids = minimization_method(centroids, data)
+        centroids = weisfeld_minimization(centroids, data)
 
-        if verbose:
-            print(f"Iter: {i}")
-            for metric_name, metric in metrics.items():
-                dist = metric(centroids.reshape(-1, *data_shape[1:]),
-                              data.reshape(-1, *data_shape[1:])).item()
-                print(f"\b {metric_name}: {dist:.4f}")
-                plots[metric_name].append(dist)
+        if debug_dir is not None:
+            dump_images(centroids.reshape(-1, *data.shape[1:]), f"{debug_dir}/images/otMeans-{i}.png")
 
-            dump_images(centroids.reshape(args.k, -1, args.im_size, args.im_size),
-                        f"{out_dir}/images/otMeans-{i}.png")
-    if verbose:
-        return plots
-    else:
-        return centroids
-
-
-def log(plots):
-    COLORS=['r', 'g', 'b' ,'y', 'k']
-    for i, (metric_name, plot) in enumerate(plots.items()):
-        plt.plot(np.arange(len(plot)), plot, label=metric_name, color=COLORS[i])
-        plt.annotate(f"{plot[-1]:.2f}", (len(plot) -1, plot[-1]), textcoords="offset points",
-                     xytext=(-2, 2), ha="center")
-        pickle.dump(plot, open(f'{out_dir}/plots/{metric_name}_fixed_noise_gen_to_train.pkl', 'wb'))
-
-    plt.legend()
-    plt.savefig(f"{out_dir}/Losses.png")
-    plt.clf()
-
+    return centroids
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -134,8 +75,7 @@ if __name__ == "__main__":
     # Model
     parser.add_argument('--k', default=64, type=int)
     parser.add_argument('--im_size', default=64, type=int)
-    parser.add_argument('--min_method', default="weisfeld", type=str, help="[weisfeld, sgd, mean]")
-
+    parser.add_argument('--n_iters', default=10, type=int)
 
     # Other
     parser.add_argument('--project_name', default="OTMeans", type=str)
@@ -144,7 +84,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.train_name is None:
-        args.train_name = f"{os.path.basename(args.data_path)}_M-{args.min_method}_I-{args.im_size}_K-{args.k}"
+        args.train_name = f"{os.path.basename(args.data_path)}_I-{args.im_size}_K-{args.k}"
     out_dir = f"outputs/{args.project_name}/{args.train_name}"
 
     os.makedirs(out_dir, exist_ok=True)
@@ -154,8 +94,5 @@ if __name__ == "__main__":
     data = get_data(args.data_path, args.im_size, c=1 if args.gray_scale else 3,
                     limit_data=args.limit_data, center_crop=args.center_crop, flatten=False)
 
-    minimiztion_func = globals()[f"{args.min_method}_minimization"]
 
-    plots = ot_mean(data, args.k, 10, minimiztion_func, verbose=True)
-
-    log(plots)
+    centroids = ot_means(data, args.k, args.n_iters, out_dir)
