@@ -81,3 +81,17 @@ python3 train.py --data_path <data-path>  --z_prior const=64 --gen_arch FC --dis
 ```
 python3 train.py --data_path <data-path> --z_prior const=64 --gen_arch Pixels --lrG 0.01 --D_step_every -1 --n_iterations 2000  --loss_function MiniBatchMSPatchLoss-dists='["w1","swd"]'-ps='[64, 8]'-ss='[1,4]'-intervals='[1000]'
 ```
+
+# Data
+### squares dataset: run 
+```
+python3 other_scripts/create_squares_dataset.py 
+```
+will create the datsaet 
+
+### FFHQ
+Download 128x128 thumbnails from https://github.com/NVlabs/ffhq-dataset
+
+###
+Download MNIST from http://yann.lecun.com/exdb/mnist/
+We used [store_mnist_as_png.py](store_mnist_as_png.py) to store the dataset as pngs for the training scripts to load
