@@ -13,7 +13,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from utils.data import get_transforms
 
 
-def get_data(data_path, im_size=None, c=3, center_crop=None, gray_scale=False, flatten=True, limit_data=None):
+def get_data(data_path, im_size=None, center_crop=None, gray_scale=False, limit_data=None):
     if os.path.isdir(data_path):
         image_paths = sorted([os.path.join(data_path, x) for x in os.listdir(data_path)])[:limit_data]
     else:
@@ -28,11 +28,6 @@ def get_data(data_path, im_size=None, c=3, center_crop=None, gray_scale=False, f
         data.append(img)
 
     data = torch.stack(data)
-    if c == 1:
-        data = torch.mean(data, dim=1, keepdim=True)
-
-    if flatten:
-        data = data.reshape(len(data), -1)
 
     return data
 

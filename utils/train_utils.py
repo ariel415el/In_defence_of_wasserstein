@@ -28,7 +28,6 @@ def parse_train_args(arguments_string=None):
     parser.add_argument('--spectral_normalization', action='store_true', default=False)
     parser.add_argument('--weight_clipping', type=float, default=None)
     parser.add_argument('--gp_weight', default=0, type=float)
-    parser.add_argument('--n_generators', default=1, type=int)
 
 
     # Training

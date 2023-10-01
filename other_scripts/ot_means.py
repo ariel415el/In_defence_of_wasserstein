@@ -58,7 +58,7 @@ def ot_means(data, k, n_iters, init_from=None, debug_dir=None):
         centroids = weisfeld_minimization(centroids, data)
 
         if debug_dir is not None:
-            dump_images(centroids.reshape(-1, *data.shape[1:]), f"{debug_dir}/images/otMeans-{i}.png")
+            dump_images(centroids.reshape(-1, *data_shape[1:]), f"{debug_dir}/images/otMeans-{i}.png")
 
     return centroids
 
@@ -91,8 +91,8 @@ if __name__ == "__main__":
     os.makedirs(os.path.join(out_dir, "images"), exist_ok=True)
     os.makedirs(os.path.join(out_dir, "plots"), exist_ok=True)
 
-    data = get_data(args.data_path, args.im_size, c=1 if args.gray_scale else 3,
-                    limit_data=args.limit_data, center_crop=args.center_crop, flatten=False)
+    data = get_data(args.data_path, args.im_size, gray_scale=args.gray_scale,
+                    limit_data=args.limit_data, center_crop=args.center_crop)
 
 
-    centroids = ot_means(data, args.k, args.n_iters, out_dir)
+    centroids = ot_means(data, args.k, args.n_iters, debug_dir=out_dir)

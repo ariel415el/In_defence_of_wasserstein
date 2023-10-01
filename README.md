@@ -82,6 +82,13 @@ python3 train.py --data_path <data-path>  --z_prior const=64 --gen_arch FC --dis
 python3 train.py --data_path <data-path> --z_prior const=64 --gen_arch Pixels --lrG 0.01 --D_step_every -1 --n_iterations 2000  --loss_function MiniBatchMSPatchLoss-dists='["w1","swd"]'-ps='[64, 8]'-ss='[1,4]'-intervals='[1000]'
 ```
 
+In order to find the data nearest neighbors for generated images needed for Figure 11 of the paper please run
+the following command and specify the directory with the outputs of the above command
+```
+python3 other_scripts/find_nearest_neighbors.py <path to trained model>
+```
+the NN plot will appear in a subfolder named 'test_outputs' int the trained model directory specified.
+
 # Data
 ### squares dataset: run 
 ```

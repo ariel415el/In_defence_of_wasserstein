@@ -63,7 +63,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     # Data
-    parser.add_argument('--data_path', default="/mnt/storage_ssd/datasets/FFHQ/FFHQ/FFHQ",
+    parser.add_argument('--data_path', default="/mnt/storage_ssd/datasets/FFHQ/FFHQ",
                         help="Path to train images")
     parser.add_argument('--center_crop', default=None, type=int)
     parser.add_argument('--limit_data', default=10000, type=int)
@@ -75,8 +75,8 @@ if __name__ == '__main__':
     output_dir = os.path.join(os.path.dirname(__file__), "..", "outputs", "batch_size_effect", os.path.basename(args.data_path))
     device = torch.device('cpu')
 
-    data = get_data(args.data_path, args.im_size, c=1 if args.gray_scale else 3,
-                    limit_data=args.limit_data, center_crop=args.center_crop, flatten=False)
+    data = get_data(args.data_path, args.im_size, gray_scale=args.gray_scale,
+                    limit_data=args.limit_data, center_crop=args.center_crop)
 
 
     max_bs = args.batch_sizes[-1]
