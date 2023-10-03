@@ -102,3 +102,6 @@ Download 128x128 thumbnails from https://github.com/NVlabs/ffhq-dataset
 ###
 Download MNIST from http://yann.lecun.com/exdb/mnist/
 We used [store_mnist_as_png.py](store_mnist_as_png.py) to store the dataset as pngs for the training scripts to load
+
+# Credits
+Codebase is based on https://github.com/odegeasslbc/FastGAN-pytorch
