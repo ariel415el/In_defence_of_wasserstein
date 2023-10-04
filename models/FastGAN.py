@@ -95,11 +95,12 @@ class SEBlock(nn.Module):
 
 
 class Generator(nn.Module):
-    def __init__(self, z_dim=100, skip_connections=True, c=3, **kwargs):
+    def __init__(self, input_dim=128, z_dim=100, skip_connections=True, c=3, **kwargs):
         super(Generator, self).__init__()
         self.skip_connections = skip_connections
+        self.input_dim = input_dim
         ngf = 64
-        nfc_multi = {4 :16, 8 :8, 16 :4, 32 :2, 64 :2, 128 :1}
+        nfc_multi = {4 :16, 8 :8, 16 :4, 32 :2, 64 :2, 128 :1, 256:0.5}
         nfc = {}
         for k, v in nfc_multi.items():
             nfc[k] = int( v *ngf)
@@ -110,27 +111,42 @@ class Generator(nn.Module):
         self.feat_16  = UpBlock(nfc[8], nfc[16])
         self.feat_32  = UpBlockComp(nfc[16], nfc[32])
         self.feat_64  = UpBlock(nfc[32], nfc[64])
-        self.feat_128 = UpBlockComp(nfc[64], nfc[128])
+        if input_dim > 64:
+            self.feat_128 = UpBlockComp(nfc[64], nfc[128])
+        if input_dim > 128:
+            self.feat_256 = UpBlock(nfc[128], nfc[256])
 
         if self.skip_connections:
             self.se_64  = SEBlock(nfc[4], nfc[64])
-            self.se_128 = SEBlock(nfc[8], nfc[128])
+            if input_dim > 64:
+                self.se_128 = SEBlock(nfc[8], nfc[128])
+            if input_dim > 128:
+                self.se_256 = SEBlock(nfc[16], nfc[256])
 
-        self.to_full = conv2d(nfc[128], c, 1, 1, 0, bias=False)
+        self.to_full = conv2d(nfc[input_dim], c, 1, 1, 0, bias=False)
 
     def forward(self, input):
         feat_4   = self.init(input)
         feat_8   = self.feat_8(feat_4)
         feat_16  = self.feat_16(feat_8)
         feat_32  = self.feat_32(feat_16)
+
         feat_64 = self.feat_64(feat_32)
         if self.skip_connections:
             feat_64  = self.se_64(feat_4, feat_64)
+        if self.input_dim == 64:
+            return torch.tanh(self.to_full(feat_64))
+
         feat_128 = self.feat_128(feat_64)
         if self.skip_connections:
             feat_128 = self.se_128(feat_8, feat_128)
+        if self.input_dim == 128:
+            return torch.tanh(self.to_full(feat_128))
 
-        im_full = torch.tanh(self.to_full(feat_128))
+        feat_256 = self.feat_256(feat_128)
+        if self.skip_connections:
+            feat_256 = self.se_256(feat_16, feat_256)
+        im_full = torch.tanh(self.to_full(feat_256))
 
         return im_full
 
@@ -169,49 +185,118 @@ class DownBlockComp(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, num_outputs=1, **kwargs):
+    def __init__(self, input_dim=128, num_outputs=1, skip_connections=True, **kwargs):
         super(Discriminator, self).__init__()
-        self.ndf = 48
+        self.ndf = 32
+        self.input_dim = input_dim
+        self.skip_connections = skip_connections
+        self.num_outputs = num_outputs
+
         nc = 3
-        nfc_multi = {4: 16, 8: 16, 16: 8, 32: 4, 64: 2, 128: 1}
+        nfc_multi = {4: 16, 8: 16, 16: 8, 32: 4, 64: 2, 128: 1, 256:0.5}
         nfc = {}
         for k, v in nfc_multi.items():
             nfc[k] = int(v * self.ndf)
 
         self.down_from_full = nn.Sequential(
-            conv2d(nc, nfc[128], 3, 1, 1, bias=False),
+            conv2d(nc, nfc[input_dim], 3, 1, 1, bias=False),
             nn.LeakyReLU(0.2, inplace=True))
 
-        self.down_64 = DownBlockComp(nfc[128], nfc[64])
-        self.down_32 = DownBlockComp(nfc[64], nfc[32])
-        self.down_16 = DownBlockComp(nfc[32], nfc[16])
-        self.down_8 = DownBlockComp(nfc[16], nfc[8])
-        # self.down_4 = DownBlockComp(nfc[8], nfc[4])
+        self.down_2 = DownBlockComp(nfc[input_dim], nfc[input_dim//2])
+        self.down_4 = DownBlockComp(nfc[input_dim//2], nfc[input_dim//4])
+        self.down_8 = DownBlockComp(nfc[input_dim//4], nfc[input_dim//8])
+        if skip_connections:
+            self.se_2_8 = SEBlock(nfc[input_dim//2], nfc[input_dim//8])
+
+        final_dim = input_dim//8
+        if input_dim > 64:
+            self.down_16 = DownBlockComp(nfc[input_dim//8], nfc[input_dim//16])
+            if skip_connections:
+                self.se_4_16 = SEBlock(nfc[input_dim//4], nfc[input_dim//16])
+            final_dim = input_dim // 16
+
+        if input_dim > 128:
+            self.down_32 = DownBlockComp(nfc[input_dim//16], nfc[input_dim//32])
+            if skip_connections:
+                self.se_8_32 = SEBlock(nfc[input_dim//8], nfc[input_dim//32])
+            final_dim = input_dim // 32
+
+        # self.spatial_logits = nn.Sequential(
+        #     conv2d(nfc[final_dim], nfc[final_dim//2], 4, 2, 0, bias=False),
+        #     batchNorm2d(nfc[final_dim//2]),
+        #     nn.LeakyReLU(0.2, inplace=True),
+        #     conv2d(nfc[final_dim//2], num_outputs, 3, 1, 0, bias=False))
 
         self.spatial_logits = nn.Sequential(
-            conv2d(nfc[8], nfc[4], 4, 2, 0, bias=False),
-            batchNorm2d(nfc[4]),
-            nn.LeakyReLU(0.2, inplace=True),
-            conv2d(nfc[4], num_outputs, 3, 1, 0, bias=False))
-        self.num_outputs = num_outputs
+                            conv2d(nfc[final_dim] , nfc[final_dim//2], 1, 1, 0, bias=False),
+                            batchNorm2d(nfc[final_dim//2]), nn.LeakyReLU(0.2, inplace=True),
+                            conv2d(nfc[final_dim//2], 1, 4, 1, 0, bias=False))
+
+        n_layers = {64:3, 128:4, 256:4}
+        self.decoder_big = SimpleDecoder(nfc[final_dim], nc, n_layers=n_layers[input_dim])
 
     def features(self, img):
-        feat_128 = self.down_from_full(img)
-        feat_64 = self.down_64(feat_128)
-        feat_32 = self.down_32(feat_64)
-        feat_16 = self.down_16(feat_32)
-        feat_8 = self.down_8(feat_16)
-        return feat_8
+        feat_x1 = self.down_from_full(img)
+        feat_x2 = self.down_2(feat_x1)
+        feat_x4 = self.down_4(feat_x2)
+        feat_x8 = self.down_8(feat_x4)
+        if self.skip_connections:
+            feat_x8 = self.se_2_8(feat_x2, feat_x8)
+        if self.input_dim == 64:
+            return feat_x8
 
-    def forward(self, img):
+        feat_x16 = self.down_16(feat_x8)
+        if self.skip_connections:
+            feat_x16 = self.se_4_16(feat_x4, feat_x16)
+        if self.input_dim == 128:
+            return feat_x16
+
+        feat_x32 = self.down_32(feat_x16)
+        if self.skip_connections:
+            feat_x32 = self.se_8_32(feat_x8, feat_x32)
+        return feat_x32
+
+    def forward(self, img, reconstruct=False):
         feat_8 = self.features(img)
         output = self.spatial_logits(feat_8)
         if self.num_outputs == 1:
-            output = output.view(len(img))
+            output = output.view(-1)
         else:
-            output = output.view(len(img), self.num_outputs)
+            output = output.view(-1, self.num_outputs)
 
+        if reconstruct:
+            return output, self.decoder_big(feat_8)
         return output
+
+
+class SimpleDecoder(nn.Module):
+    """docstring for CAN_SimpleDecoder"""
+    def __init__(self, nfc_in=64, nc=3, n_layers=5):
+        super(SimpleDecoder, self).__init__()
+
+        nfc_multi = {4:16, 8:8, 16:4, 32:2, 64:2, 128:1, 256:0.5}
+        nfc = {}
+        for k, v in nfc_multi.items():
+            nfc[k] = int(v*32)
+
+        def upBlock(in_planes, out_planes):
+            block = nn.Sequential(
+                nn.Upsample(scale_factor=2, mode='nearest'),
+                conv2d(in_planes, out_planes*2, 3, 1, 1, bias=False),
+                batchNorm2d(out_planes*2), GLU())
+            return block
+
+        self.main = nn.Sequential(  nn.AdaptiveAvgPool2d(8),
+                                    upBlock(nfc_in, nfc[16]) ,
+                                    upBlock(nfc[16], nfc[32]),
+                                    upBlock(nfc[32], nfc[64]),
+                                    upBlock(nfc[64], nfc[128]),
+                                    conv2d(nfc[128], nc, 3, 1, 1, bias=False),
+                                    nn.Tanh() )
+
+    def forward(self, input):
+        # input shape: c x 8 x 8
+        return self.main(input)
 
 if __name__ == '__main__':
     D = Discriminator()
