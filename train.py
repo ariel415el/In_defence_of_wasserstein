@@ -105,8 +105,7 @@ def train_GAN(args):
 
 def evaluate(prior, netG, netD, inception_metrics, other_metrics, fixed_noise, debug_fixed_reals,
              debug_all_reals, saved_image_folder, iteration, logger, args):
-    netG.eval()
-    netD.eval()
+    # netG.eval()
     start = time()
     with torch.no_grad():
         fake_images = batch_generation(netG, prior, len(debug_all_reals), args.f_bs, torch.device("cpu"))
@@ -126,7 +125,6 @@ def evaluate(prior, netG, netD, inception_metrics, other_metrics, fixed_noise, d
             dump_images(debug_fixed_reals, f'{saved_image_folder}/debug_fixed_reals.png')
 
     netG.train()
-    netD.train()
     print(f"Evaluation finished in {time()-start} seconds")
 
 

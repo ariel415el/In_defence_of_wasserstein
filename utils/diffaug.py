@@ -1,9 +1,10 @@
 # Differentiable Augmentation for Data-Efficient GAN Training
 # Shengyu Zhao, Zhijian Liu, Ji Lin, Jun-Yan Zhu, and Song Han
 # https://arxiv.org/pdf/2006.10738
-
+import numpy as np
 import torch
 import torch.nn.functional as F
+from torchvision import transforms
 
 
 def DiffAugment(x, policy='', channels_first=True):
@@ -68,6 +69,12 @@ def rand_cutout(x, ratio=0.5):
     x = x * mask.unsqueeze(1)
     return x
 
+def horizontal_flip(x, ratio=0.5):
+    if np.random.randn() < ratio:
+        return transforms.RandomHorizontalFlip()(x)
+    else:
+        return x
+
 
 def add_noise(x):
     rand = torch.rand_like(x) * 3
@@ -78,4 +85,5 @@ AUGMENT_FNS = {
     'translation': [rand_translation],
     'cutout': [rand_cutout],
     'add_noise': [add_noise],
+    'horizontal_flip': [horizontal_flip],
 }

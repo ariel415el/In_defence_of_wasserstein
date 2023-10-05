@@ -20,6 +20,7 @@ class SoftHingeLoss:
             # D_recon_loss = torch.nn.functional.mse_loss(rec_all, F.interpolate(real_data, rec_all.shape[2])).sum()
             percept.to(rec_all.device)
             D_recon_loss = percept(rec_all, F.interpolate(real_data, rec_all.shape[2])).sum()
+
             Dloss += reconstruct_lambda * D_recon_loss
 
         return Dloss, {"D_scores_real": D_scores_real.mean().item(), "D_scores_fake": D_scores_fake.mean().item()}

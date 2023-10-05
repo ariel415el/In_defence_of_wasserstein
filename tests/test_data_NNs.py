@@ -21,14 +21,14 @@ def imshow(img, axs, title="img"):
     axs.set_title(title)
 
 
-def search_for_nn_patches_in_locality(img, data, center, p, search_margin, dist="edge"):
+def search_for_nn_patches_in_locality(img, data, center, p, stride, search_margin, dist="edge"):
     """
     for a given patch location and size, search the nearest patch from data (only in the same patch location) to
     the patch in img in that location"""
     query_patch = cut_around_center(img, center, p, margin=0)
     # Cut a larger area around the center and  split to patches
     refs = cut_around_center(data, center, p, margin=search_margin)
-    refs = F.unfold(refs, kernel_size=p, stride=1)  # shape (b, c*p*p, N_patches)
+    refs = F.unfold(refs, kernel_size=p, stride=stride)  # shape (b, c*p*p, N_patches)
     n_patches = refs.shape[-1]
     c = img.shape[1]
     refs = refs.permute(0, 2, 1).reshape(-1, c, p, p)
@@ -43,7 +43,7 @@ def search_for_nn_patches_in_locality(img, data, center, p, search_margin, dist=
     return img_index
 
 
-def find_patch_nns(fake_images, data, patch_size, search_margin, outputs_dir, n_centers=10, dist="rgb"):
+def find_patch_nns(fake_images, data, patch_size, stride, search_margin, outputs_dir, n_centers=10, dist="rgb"):
     """
     Search for nearest patch in data to patches from generated images.
     Search is performed in a constrained locality of the query patch location
@@ -63,6 +63,7 @@ def find_patch_nns(fake_images, data, patch_size, search_margin, outputs_dir, n_
                 ref_nn_index = search_for_nn_patches_in_locality(query_image.unsqueeze(0),
                                                                   data, center,
                                                                   p=patch_size,
+                                                                  stride=stride,
                                                                   search_margin=search_margin,
                                                                  dist=dist)
                 q_patch = cut_around_center(query_image, center, patch_size)
@@ -99,7 +100,10 @@ def find_nns_percept(fake_images, data, outputs_dir, device):
                           nrow=5)
 
 
-def find_nns(fake_images, data, outputs_dir, show_first_n=2):
+def find_nns(fake_images, data, outputs_dir, device, show_first_n=2, perceptual=True):
+    from lpips import lpips
+    percept = lpips.LPIPS(net='vgg').to(device)
+
     with torch.no_grad():
         os.makedirs(f'{outputs_dir}/nns', exist_ok=True)
         results = []
@@ -107,7 +111,10 @@ def find_nns(fake_images, data, outputs_dir, show_first_n=2):
         for i in range(len(fake_images)):
             fake_image = fake_images[i]
             # dists = dists_mat[i]
-            dists = [(fake_image - data[j]).pow(2).sum().item() for j in range(len(data))]
+            if perceptual:
+                dists = [percept(fake_image, data[j]).item() for j in range(len(data))]
+            else:
+                dists = [F.mse_loss(fake_image, data[j]).item() for j in range(len(data))]
             nn_indices = np.argsort(dists)
             nns = data[nn_indices[:show_first_n]]
             results.append(torch.cat([fake_image.unsqueeze(0), nns]))

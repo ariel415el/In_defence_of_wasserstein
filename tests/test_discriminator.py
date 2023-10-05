@@ -79,7 +79,7 @@ def saliency_maps(netG, netD, z_dim, data, outputs_dir, device):
                           f'{outputs_dir}/discriminator_visualization/{name}_guided_gradients.png', nrow=nrow, normalize=True)
 
 
-def test_range(netG, netD, z_dim, data, outputs_dir, device):
+def test_discriminator_range(netG, netD, z_dim, data, outputs_dir, device):
     os.makedirs(f"{outputs_dir}/discriminator_visualization", exist_ok=True)
     with torch.no_grad():
         reals = []

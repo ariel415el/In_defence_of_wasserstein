@@ -26,7 +26,7 @@ def parse_classnames_and_kwargs(string, kwargs=None):
 
 def dump_images(batch, fname):
     nrow = int(sqrt(len(batch)))
-    # save_image((batch + 1)/2, fname, nrow=nrow, normalize=False, pad_value=1, scale_each=True)
+    # save_image(batch.add(1).mul(0.5), fname, nrow=nrow, normalize=False)
     save_image(batch, fname, nrow=nrow, normalize=True, pad_value=1, scale_each=True)
 
 

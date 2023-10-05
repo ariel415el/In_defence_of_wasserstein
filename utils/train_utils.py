@@ -14,7 +14,7 @@ def parse_train_args(arguments_string=None):
     # Data
     parser.add_argument('--data_path', default="/mnt/storage_ssd/datasets/FFHQ/FFHQ_1000/FFHQ_1000",
                         help="Path to train images")
-    parser.add_argument('--augmentation', default='', help="comma separated data augmentation ('color,translation')")
+    parser.add_argument('--augmentation', default='color,translation,horizontal_flip', help="comma separated data augmentation ('color,translation,horizontal_flip')")
     parser.add_argument('--limit_data', default=None, type=int, help="limit the size of the dataset")
     parser.add_argument('--center_crop', default=None, help='center_crop_data to specified size', type=int)
     parser.add_argument('--gray_scale', action='store_true', default=False, help="Load data as grayscale")
@@ -22,8 +22,8 @@ def parse_train_args(arguments_string=None):
     # Model
     parser.add_argument('--gen_arch', default='DCGAN')
     parser.add_argument('--disc_arch', default='DCGAN')
-    parser.add_argument('--im_size', default=64, type=int)
-    parser.add_argument('--z_dim', default=64, type=int)
+    parser.add_argument('--im_size', default=256, type=int)
+    parser.add_argument('--z_dim', default=256, type=int)
     parser.add_argument('--z_prior', default="normal", type=str, help="[normal, binary, uniform]")
     parser.add_argument('--spectral_normalization', action='store_true', default=False)
     parser.add_argument('--weight_clipping', type=float, default=None)
@@ -32,11 +32,12 @@ def parse_train_args(arguments_string=None):
 
 
     # Training
-    parser.add_argument('--r_bs', default=64, type=int, help="Real data batch size: -1 for automaticly set as full size batch size")
-    parser.add_argument('--f_bs', default=64, type=int, help="Fake data batch size")
+    parser.add_argument('--r_bs', default=8, type=int, help="Real data batch size: -1 for automaticly set as full size batch size")
+    parser.add_argument('--f_bs', default=8, type=int, help="Fake data batch size")
     parser.add_argument('--loss_function', default="NonSaturatingGANLoss", type=str)
-    parser.add_argument('--lrG', default=0.0001, type=float)
-    parser.add_argument('--lrD', default=0.0001, type=float)
+    parser.add_argument('--lrG', default=0.0002, type=float)
+    parser.add_argument('--lrD', default=0.0002
+                        , type=float)
     parser.add_argument('--avg_update_factor', default=1, type=float,
                         help='moving average factor weight of updating generator (1 means none)')
     parser.add_argument('--D_step_every', default=1, type=int, help="D G only evry 'D_step_every' iterations")
@@ -122,8 +123,8 @@ def get_models_and_optimizers(args, device, saved_model_folder):
     netG.train()
     netD.train()
 
-    optimizerG = optim.Adam(netG.parameters(), lr=args.lrG, betas=(0.5, 0.9))
-    optimizerD = optim.Adam(netD.parameters(), lr=args.lrD, betas=(0.5, 0.9))
+    optimizerG = optim.Adam(netG.parameters(), lr=args.lrG, betas=(0.5, 0.999))
+    optimizerD = optim.Adam(netD.parameters(), lr=args.lrD, betas=(0.5, 0.999))
 
     if args.loadG is not None:
         ckpt = torch.load(args.loadG, map_location=args.device)
