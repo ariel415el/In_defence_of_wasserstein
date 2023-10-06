@@ -9,7 +9,7 @@ from scripts.experiments.experiment_utils import find_last_file
 from tests.generate_images import generate_images
 from tests.interpolate import interpolate
 from tests.latent_inversion import inverse_image
-from tests.test_data_NNs import find_nns, find_patch_nns
+from tests.test_data_NNs import find_nns, find_patch_nns, interactive_nn_debug
 from tests.test_emd import test_emd
 # from tests.latent_inversion import inverse_image
 from tests.test_mode_collapse import find_mode_collapses
@@ -42,7 +42,7 @@ def test():
 
     # find_mode_collapses(netG, netD, z_dim, outputs_dir, device)
 
-    interpolate(netG, z_dim, n_zs=15, steps=25, outputs_dir=outputs_dir, device=device)
+    # interpolate(netG, z_dim, n_zs=15, steps=25, outputs_dir=outputs_dir, device=device)
 
     # Full data tests
     data = get_data(args['data_path'], args['im_size'], args['center_crop'], args['gray_scale'], limit_data=args['limit_data']).to(device)
@@ -63,8 +63,9 @@ def test():
 
     # Nearest neighbor visualizations
     fake_images = netG(prior.sample(4).to(device))
+    interactive_nn_debug(fake_images, data, patch_size=32, stride=4, search_margin=16, dist="rgb")
     find_nns(fake_images, data, outputs_dir, device, show_first_n=1, perceptual=False)
-    find_patch_nns(fake_images, data, patch_size=32, stride=1, search_margin=32, outputs_dir=outputs_dir, n_centers=4, dist='gray')
+    find_patch_nns(fake_images, data, patch_size=32, stride=1, search_margin=32, outputs_dir=outputs_dir, n_centers=16, dist='edges')
     # find_patch_nns(fake_images, data, patch_size=128, search_margin=32, outputs_dir=outputs_dir, n_centers=4, dist='edge')
     # find_patch_nns(fake_images, data, patch_size=12, search_margin=2, outputs_dir=outputs_dir, n_centers=4)
 

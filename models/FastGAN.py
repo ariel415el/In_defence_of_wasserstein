@@ -95,9 +95,9 @@ class SEBlock(nn.Module):
 
 
 class Generator(nn.Module):
-    def __init__(self, input_dim=128, z_dim=100, skip_connections=True, c=3, **kwargs):
+    def __init__(self, input_dim=128, z_dim=100, skip_connections='True', c=3, **kwargs):
         super(Generator, self).__init__()
-        self.skip_connections = skip_connections
+        self.skip_connections = skip_connections == 'True'
         self.input_dim = input_dim
         ngf = 64
         nfc_multi = {4 :16, 8 :8, 16 :4, 32 :2, 64 :2, 128 :1, 256:0.5}
@@ -158,7 +158,8 @@ class DownBlock(nn.Module):
 
         self.main = nn.Sequential(
             conv2d(in_planes, out_planes, 4, 2, 1, bias=False),
-            batchNorm2d(out_planes), nn.LeakyReLU(0.2, inplace=True),
+            batchNorm2d(out_planes),
+            nn.LeakyReLU(0.2, inplace=True),
             )
 
     def forward(self, feat):
@@ -171,26 +172,29 @@ class DownBlockComp(nn.Module):
 
         self.main = nn.Sequential(
             conv2d(in_planes, out_planes, 4, 2, 1, bias=False),
-            batchNorm2d(out_planes), nn.LeakyReLU(0.2, inplace=True),
+            batchNorm2d(out_planes),
+            nn.LeakyReLU(0.2, inplace=True),
             conv2d(out_planes, out_planes, 3, 1, 1, bias=False),
-            batchNorm2d(out_planes), nn.LeakyReLU(0.2)
+            batchNorm2d(out_planes),
+            nn.LeakyReLU(0.2)
             )
 
         self.direct = nn.Sequential(
             nn.AvgPool2d(2, 2),
             conv2d(in_planes, out_planes, 1, 1, 0, bias=False),
-            batchNorm2d(out_planes), nn.LeakyReLU(0.2))
+            batchNorm2d(out_planes),
+            nn.LeakyReLU(0.2))
 
     def forward(self, feat):
         return (self.main(feat) + self.direct(feat)) / 2
 
 
 class Discriminator(nn.Module):
-    def __init__(self, input_dim=128, num_outputs=1, skip_connections=True, **kwargs):
+    def __init__(self, input_dim=128, num_outputs=1, skip_connections='True', **kwargs):
         super(Discriminator, self).__init__()
         self.ndf = 32
         self.input_dim = input_dim
-        self.skip_connections = skip_connections
+        self.skip_connections = skip_connections == 'True'
         self.num_outputs = num_outputs
 
         nc = 3
@@ -206,19 +210,19 @@ class Discriminator(nn.Module):
         self.down_2 = DownBlockComp(nfc[input_dim], nfc[input_dim//2])
         self.down_4 = DownBlockComp(nfc[input_dim//2], nfc[input_dim//4])
         self.down_8 = DownBlockComp(nfc[input_dim//4], nfc[input_dim//8])
-        if skip_connections:
+        if self.skip_connections:
             self.se_1_8 = SEBlock(nfc[input_dim], nfc[input_dim//8])
 
         final_dim = input_dim//8
         if input_dim > 64:
             self.down_16 = DownBlockComp(nfc[input_dim//8], nfc[input_dim//16])
-            if skip_connections:
+            if self.skip_connections:
                 self.se_2_16 = SEBlock(nfc[input_dim//2], nfc[input_dim//16])
             final_dim = input_dim // 16
 
         if input_dim > 128:
             self.down_32 = DownBlockComp(nfc[input_dim//16], nfc[input_dim//32])
-            if skip_connections:
+            if self.skip_connections:
                 self.se_4_32 = SEBlock(nfc[input_dim//4], nfc[input_dim//32])
             final_dim = input_dim // 32
 

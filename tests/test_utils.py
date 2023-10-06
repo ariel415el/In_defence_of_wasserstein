@@ -51,8 +51,25 @@ def cut_around_center(img, center, size, margin=0):
     hs = size // 2
     r = img.shape[-2]
     c = img.shape[-1]
-    crop = img[..., max(0, center[0] - hs - margin): min(r, center[0] + hs + margin),
-                    max(0, center[1] - hs - margin): min(c, center[1] + hs + margin)]
+    assert size + margin*2 < min(r,c), "Desired crop size + margin is biggere than the image itself"
+    ys = center[0] - hs - margin
+    ye = center[0] + hs + margin
+    if ys < 0:
+        ys = 0
+        ye = size
+    if ye > r:
+        ye = r
+        ys = r-size
+
+    xs = center[1] - hs - margin
+    xe = center[1] + hs + margin
+    if center[1] - hs - margin < 0:
+        xs = 0
+        xe = size
+    if center[1] + hs + margin > r:
+        xs = r-size
+        xe = r
+    crop = img[..., xs:xe,ys:ye]
     return crop
 
 
