@@ -195,10 +195,6 @@ class Discriminator(nn.Module):
         self.ndf = 32
         self.input_dim = input_dim
         self.skip_connections = skip_connections == 'True'
-<<<<<<< Updated upstream
-=======
-
->>>>>>> Stashed changes
         self.num_outputs = num_outputs
 
         nc = 3
