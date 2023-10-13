@@ -9,8 +9,11 @@ class SoftHingeLoss:
     Here we use Relu(-x) instead of min(x,0) since -min(-x,0) == max(x,0) == Relu(x)
     See "Geometric GAN" by Lim et al. for more details
     """
-    def trainD(self, netD, real_data, fake_data, reconstruct_lambda=1):
-        D_scores_real, rec_all = netD(real_data, reconstruct=reconstruct_lambda > 0)
+    def trainD(self, netD, real_data, fake_data, reconstruct_lambda=0):
+        if reconstruct_lambda > 0:
+            D_scores_real, rec_all = netD(real_data, reconstruct=True)
+        else:
+            D_scores_real = netD(real_data)
         D_scores_fake = netD(fake_data.detach())
         D_loss_real = F.relu(torch.rand_like(D_scores_real) * 0.2 + 0.8 - D_scores_real).mean()  # -min(-x,0) = max(x,0) = reul(x) =
         D_loss_fake = F.relu(torch.rand_like(D_scores_fake) * 0.2 + 0.8 + D_scores_fake).mean()

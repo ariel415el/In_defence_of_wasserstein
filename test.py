@@ -38,7 +38,7 @@ def load_pretrained_models(args, ckpt_path, device):
 
 def test():
     # 1. Sample fake data
-    generate_images(netG, prior, outputs_dir, 9, args['f_bs'], device)
+    generate_images(netG, prior, outputs_dir, 64, args['f_bs'], device)
 
     # find_mode_collapses(netG, netD, z_dim, outputs_dir, device)
 

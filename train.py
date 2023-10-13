@@ -50,7 +50,7 @@ def train_GAN(args):
 
             # #####  1. train Discriminator #####
             if iteration % args.D_step_every == 0 and args.D_step_every > 0:
-                Dloss, debug_Dlosses = loss_function.trainD(netD, real_images, fake_images)
+                Dloss, debug_Dlosses = loss_function.trainD(netD, real_images, fake_images, reconstruct_lambda=args.rec_lambda)
                 if args.gp_weight > 0:
                     gp, gradient_norm = calc_gradient_penalty(netD, real_images, fake_images)
                     debug_Dlosses['gradient_norm'] = gradient_norm

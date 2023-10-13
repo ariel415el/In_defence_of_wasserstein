@@ -117,7 +117,7 @@ class Generator(nn.Module):
             self.feat_256 = UpBlock(nfc[128], nfc[256])
 
         if self.skip_connections:
-            self.se_64  = SEBlock(nfc[4], nfc[64])
+            self.se_64 = SEBlock(nfc[4], nfc[64])
             if input_dim > 64:
                 self.se_128 = SEBlock(nfc[8], nfc[128])
             if input_dim > 128:
@@ -195,6 +195,10 @@ class Discriminator(nn.Module):
         self.ndf = 32
         self.input_dim = input_dim
         self.skip_connections = skip_connections == 'True'
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
         self.num_outputs = num_outputs
 
         nc = 3
