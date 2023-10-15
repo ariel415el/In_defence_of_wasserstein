@@ -12,6 +12,7 @@ import wandb
 
 mpl.use('Agg')
 
+
 class PLTLogger:
     def __init__(self, args, save_dir):
         self.save_dir = save_dir
@@ -55,6 +56,7 @@ class WandbLogger:
 
     def plot(self):
         pass
+
 
 def get_dir(args):
     task_name = os.path.join(f"outputs", args.project_name,   args.train_name)

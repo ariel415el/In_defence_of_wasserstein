@@ -14,8 +14,6 @@ from utils.logger import get_dir, PLTLogger, WandbLogger
 
 
 def train_GAN(args):
-    logger = (WandbLogger if args.wandb else PLTLogger)(args, plots_image_folder)
-
     prior, netG, netD, optimizerG, optimizerD, start_iteration = get_models_and_optimizers(args, device, saved_model_folder)
 
     debug_fixed_noise = prior.sample(args.f_bs).to(device)
@@ -131,27 +129,26 @@ def evaluate(prior, netG, netD, inception_metrics, other_metrics, fixed_noise, d
 if __name__ == "__main__":
     args = parse_train_args()
 
+    if args.train_name is None:
+        args.train_name = compose_experiment_name(args)
+
+    saved_model_folder, saved_image_folder, plots_image_folder = get_dir(args)
+
+    logger = (WandbLogger if args.wandb else PLTLogger)(args, plots_image_folder)
+
     device = torch.device(args.device)
     if args.device != 'cpu':
         print(f"Working on device: {torch.cuda.get_device_name(device)}")
 
-    train_loader, _ = get_dataloader(args.data_path, args.im_size, args.r_bs, args.n_workers,
+    train_loader, _ = get_dataloader(logger, args.data_path, args.im_size, args.r_bs, args.n_workers,
                                                val_percentage=0, gray_scale=args.gray_scale, center_crop=args.center_crop,
                                                load_to_memory=args.load_data_to_memory, limit_data=args.limit_data)
 
     data_size = len(train_loader.dataset)
     print(f"eval loader size {data_size}")
-    full_batch_loader, _ = get_dataloader(args.data_path, args.im_size, data_size, args.n_workers,
+    full_batch_loader, _ = get_dataloader(logger, args.data_path, args.im_size, data_size, args.n_workers,
                                                val_percentage=0, gray_scale=args.gray_scale, center_crop=args.center_crop,
                                                load_to_memory=args.load_data_to_memory, limit_data=args.limit_data)
-
-    if args.r_bs == -1:
-        args.r_bs = data_size
-
-    if args.train_name is None:
-        args.train_name = compose_experiment_name(args)
-
-    saved_model_folder, saved_image_folder, plots_image_folder = get_dir(args)
 
     train_GAN(args)
 
