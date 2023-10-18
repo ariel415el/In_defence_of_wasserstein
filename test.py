@@ -42,7 +42,7 @@ def test():
 
     # find_mode_collapses(netG, netD, z_dim, outputs_dir, device)
 
-    # interpolate(netG, z_dim, n_zs=15, steps=25, outputs_dir=outputs_dir, device=device)
+    interpolate(netG, z_dim, n_zs=15, seconds=60, fps=30, outputs_dir=outputs_dir, device=device)
 
     # Full data tests
     data = get_data(args['data_path'], args['im_size'], args['center_crop'], args['gray_scale'], limit_data=args['limit_data']).to(device)

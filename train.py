@@ -140,13 +140,13 @@ if __name__ == "__main__":
     if args.device != 'cpu':
         print(f"Working on device: {torch.cuda.get_device_name(device)}")
 
-    train_loader, _ = get_dataloader(logger, args.data_path, args.im_size, args.r_bs, args.n_workers,
+    train_loader, _ = get_dataloader(args.data_path, args.im_size, args.r_bs, args.n_workers,
                                                val_percentage=0, gray_scale=args.gray_scale, center_crop=args.center_crop,
                                                load_to_memory=args.load_data_to_memory, limit_data=args.limit_data)
 
     data_size = len(train_loader.dataset)
     print(f"eval loader size {data_size}")
-    full_batch_loader, _ = get_dataloader(logger, args.data_path, args.im_size, data_size, args.n_workers,
+    full_batch_loader, _ = get_dataloader(args.data_path, args.im_size, data_size, args.n_workers,
                                                val_percentage=0, gray_scale=args.gray_scale, center_crop=args.center_crop,
                                                load_to_memory=args.load_data_to_memory, limit_data=args.limit_data)
 
