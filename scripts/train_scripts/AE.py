@@ -1,10 +1,12 @@
-
 from time import time
 
 import torch
 
 import os
 import sys
+
+from lpips import lpips
+
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from benchmarking.neural_metrics import InceptionMetrics
@@ -32,6 +34,7 @@ def train_GAN(args):
               ]
 
     loss_function = torch.nn.MSELoss()
+    # loss_function = lpips.LPIPS(net='vgg').to(device)
 
     avg_param_G = copy_G_params(netG)
 
@@ -40,7 +43,7 @@ def train_GAN(args):
     while iteration < args.n_iterations:
         for real_images in train_loader:
             real_images = real_images.to(device)
-            recons = netG(netD(real_images))
+            recons = netG(torch.tanh(netD(real_images)))
             loss = loss_function(real_images, recons)
 
             netD.zero_grad()
@@ -78,9 +81,8 @@ def evaluate(netG, netD, inception_metrics, other_metrics, fixed_noise, debug_fi
     netD.eval()
     start = time()
     with torch.no_grad():
-        if args.D_step_every > 0 :
-            recons = netG(netD(debug_fixed_reals))
-
+        recons = netG(torch.tanh(netD(debug_fixed_reals)))
+        fixed_generations = netG(fixed_noise)
 
         if args.fid_n_batches > 0 and iteration % args.fid_freq == 0:
             fake_batches = [netG(torch.randn_like(fixed_noise).to(device)) for _ in range(args.fid_n_batches)]
@@ -92,7 +94,8 @@ def evaluate(netG, netD, inception_metrics, other_metrics, fixed_noise, debug_fi
             }, step=iteration)
 
 
-        dump_images(recons,  f'{saved_image_folder}/{iteration}.png')
+        dump_images(recons,  f'{saved_image_folder}/recons_{iteration}.png')
+        dump_images(fixed_generations,  f'{saved_image_folder}/generations_{iteration}.png')
         if iteration == 0:
             dump_images(debug_fixed_reals, f'{saved_image_folder}/debug_fixed_reals.png')
 
@@ -106,6 +109,13 @@ def evaluate(netG, netD, inception_metrics, other_metrics, fixed_noise, debug_fi
 if __name__ == "__main__":
     args = parse_train_args()
 
+    if args.train_name is None:
+        args.train_name = compose_experiment_name(args)
+
+    saved_model_folder, saved_image_folder, plots_image_folder = get_dir(args)
+
+    logger = (WandbLogger if args.wandb else PLTLogger)(args, plots_image_folder)
+
     device = torch.device(args.device)
     if args.device != 'cpu':
         print(f"Working on device: {torch.cuda.get_device_name(device)}")
@@ -118,16 +128,6 @@ if __name__ == "__main__":
     print(f"eval loader size {data_size}")
     full_batch_loader, _ = get_dataloader(args.data_path, args.im_size, data_size, args.n_workers,
                                                val_percentage=0, gray_scale=args.gray_scale, center_crop=args.center_crop,
-                                               load_to_memory=args.load_data_to_memory, limit_data=len(train_loader.dataset))
-    full_batch_loader = train_loader
-    if args.r_bs == -1:
-        args.r_bs = data_size
-
-    args.name = compose_experiment_name(args)
-
-    saved_model_folder, saved_image_folder, plots_image_folder = get_dir(args)
+                                               load_to_memory=args.load_data_to_memory, limit_data=args.limit_data)
 
     train_GAN(args)
-
-
-

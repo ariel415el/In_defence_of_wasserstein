@@ -3,6 +3,7 @@ from torch.nn import functional as F
 import lpips
 percept = lpips.LPIPS(net='vgg')
 
+
 class SoftHingeLoss:
     """
     The core idea for hinge loss is: D is no longer be optimized when if performs good enough.
