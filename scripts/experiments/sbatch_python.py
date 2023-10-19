@@ -13,7 +13,7 @@ def run_sbatch(train_command, train_name, hours, killable, gpu_memory, cpu_memor
     if killable:
         sbatch_text += "\n#SBATCH --killable"
     sbatch_text += f"\nsource /cs/labs/yweiss/ariel1/venv/bin/activate.csh" \
-                   f"\ncd /cs/labs/yweiss/ariel1/repos/DataEfficientGANs" \
+                   f"\ncd /cs/labs/yweiss/ariel1/repos/In_defence_of_wasserstein" \
                    f"\n{train_command} "
     if train_name is not None:
         sbatch_text += f" --train_name {train_name}"  # _{strftime('%m-%d_T-%H:%M:%S')}"
