@@ -18,7 +18,6 @@ def train_GAN(args):
 
     debug_fixed_noise = prior.sample(args.f_bs).to(device)
     debug_fixed_reals = next(iter(train_loader)).to(device)
-    debug_all_reals = next(iter(full_batch_loader)).to(device)
 
     inception_metrics = InceptionMetrics([next(iter(train_loader)) for _ in range(args.fid_n_batches)], torch.device("cpu"))
     other_metrics = [
@@ -92,7 +91,7 @@ def train_GAN(args):
                 load_params(netG, avg_param_G)
 
                 evaluate(prior, netG, netD, inception_metrics, other_metrics, debug_fixed_noise,
-                         debug_fixed_reals, debug_all_reals, saved_image_folder, iteration, logger, args)
+                         debug_fixed_reals, saved_image_folder, iteration, logger, args)
 
                 save_model(prior, netG, netD, optimizerG, optimizerD, saved_model_folder, iteration, args)
 
@@ -102,20 +101,20 @@ def train_GAN(args):
 
 
 def evaluate(prior, netG, netD, inception_metrics, other_metrics, fixed_noise, debug_fixed_reals,
-             debug_all_reals, saved_image_folder, iteration, logger, args):
+             saved_image_folder, iteration, logger, args):
     # netG.eval()
     start = time()
     with torch.no_grad():
-        fake_images = batch_generation(netG, prior, len(debug_all_reals), args.f_bs, torch.device("cpu"))
+        fake_images = batch_generation(netG, prior, len(debug_fixed_reals), args.f_bs, torch.device("cpu"))
 
         if args.fid_n_batches > 0 and iteration % args.fid_freq == 0:
             fake_batches = [netG(torch.randn_like(fixed_noise).to(device)) for _ in range(args.fid_n_batches)]
             logger.log(inception_metrics(fake_batches), step=iteration)
 
-        print(f"Computing metrics between {len(debug_all_reals)} real and {len(fake_images)} fake images")
+        print(f"Computing metrics between {len(debug_fixed_reals)} real and {len(fake_images)} fake images")
         for metric in other_metrics:
             logger.log({
-                f'{metric.name}_fixed_noise_gen_to_train': metric(fake_images.cpu(), debug_all_reals.cpu()),
+                f'{metric.name}_fixed_noise_gen_to_train': metric(fake_images.cpu(), debug_fixed_reals.cpu()),
             }, step=iteration)
 
         dump_images(netG(fixed_noise),  f'{saved_image_folder}/{iteration}.png')

@@ -8,6 +8,7 @@ from losses.soft_hinge_loss import *
 from losses.two_steps_loss import *
 from losses.wgan import *
 from losses.adverserial_feature_matching import *
+from losses.perceptual_loss import *
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "utils"))
 from common import parse_classnames_and_kwargs
