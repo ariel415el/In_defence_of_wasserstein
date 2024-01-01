@@ -2,7 +2,7 @@ import numpy as np
 import ot
 import torch
 from tqdm import tqdm
-from utils.metrics import get_dist_metric, batch_NN
+from utils.metrics import get_metric
 
 
 def w1(x, y, epsilon=0, **kwargs):
@@ -10,7 +10,7 @@ def w1(x, y, epsilon=0, **kwargs):
         param x: (b1,d) shaped tensor
         param y: (b2,d) shaped tensor
     """
-    base_metric = get_dist_metric("L2")
+    base_metric = get_metric("L2")
     C = base_metric(x, y)
     OTPlan = _compute_ot_plan(C.detach().cpu().numpy(), int(epsilon))
     OTPlan = torch.from_numpy(OTPlan).to(C.device)
@@ -23,7 +23,7 @@ def nn(x, y, alpha=None, **kwargs):
         param x: (b1,d) shaped tensor
         param y: (b2,d) shaped tensor
     """
-    base_metric = get_dist_metric("L2")
+    base_metric = get_metric("L2")
     C = base_metric(x, y)
     if alpha is not None:
         C = C / (C.min(dim=0)[0] + float(alpha))  # compute_normalized_scores
@@ -37,7 +37,7 @@ def remd(x, y, **kwargs):
         param x: (b1,d) shaped tensor
         param y: (b2,d) shaped tensor
     """
-    base_metric = get_dist_metric("L2")
+    base_metric = get_metric("L2")
     C = base_metric(x, y)
     nn_loss = max(C.min(dim=0)[0].mean(), C.min(dim=1)[0].mean())
     return nn_loss, {"remd_loss": nn_loss}
@@ -62,7 +62,7 @@ def projected_w1(x, y, epsilon=0, dim=64, num_proj=16, **kwargs):
         projx = torch.mm(x, rand)
         projy = torch.mm(y, rand)
 
-        base_metric = get_dist_metric("L2")
+        base_metric = get_metric("L2")
         C = base_metric(projx, projy)
         OTPlan = _compute_ot_plan(C.detach().cpu().numpy().copy(), int(epsilon))
         OTPlan = torch.from_numpy(OTPlan).to(C.device)
@@ -142,7 +142,7 @@ def discrete_dual(x, y, n_steps=500, batch_size=None, lr=0.001, verbose=False, n
         batch_size = len(x)
 
     with torch.enable_grad():
-        loss_func = get_dist_metric(dist)
+        loss_func = get_metric(dist)
         psi = torch.zeros(len(x), requires_grad=True, device=x.device)
         opt_psi = torch.optim.Adam([psi], lr=lr)
         # scheduler = ReduceLROnPlateau(opt_psi, 'min', threshold=0.0001, patience=200)
@@ -151,7 +151,7 @@ def discrete_dual(x, y, n_steps=500, batch_size=None, lr=0.001, verbose=False, n
 
             mini_batch = y[torch.randperm(len(y))[:batch_size]]
 
-            phi, outputs_idx = batch_NN(mini_batch, x, psi, nnb, loss_func)
+            phi, outputs_idx = _batch_NN(mini_batch, x, psi, nnb, loss_func)
 
             dual_estimate = torch.mean(phi) + torch.mean(psi)
 
@@ -164,6 +164,25 @@ def discrete_dual(x, y, n_steps=500, batch_size=None, lr=0.001, verbose=False, n
 
         return dual_estimate, {"dual": dual_estimate.item()}
 
+
+def _batch_NN(X, Y, f, b, dist_function):
+    """
+    For each x find the best index i s.t i = argmin_i(x,y_i)-f_i
+    return the value and the argmin
+    """
+    NNs = torch.zeros(X.shape[0], dtype=torch.long, device=X.device)
+    NN_dists = torch.zeros(X.shape[0], device=X.device)
+    n_batches = len(X) // b
+    for i in range(n_batches):
+        s = slice(i * b,(i + 1) * b)
+        dists = dist_function(X[s], Y) - f
+        NN_dists[s], NNs[s] = dists.min(1)
+    if len(X) % b != 0:
+        s = slice(n_batches * b, len(X))
+        dists = dist_function(X[s], Y) - f
+        NN_dists[s], NNs[s] = dists.min(1)
+
+    return NN_dists, NNs
 
 def _compute_ot_plan(C, epsilon=0):
     """Use POT to compute optimal transport between two emprical (uniforms) distriutaion with distance matrix C"""

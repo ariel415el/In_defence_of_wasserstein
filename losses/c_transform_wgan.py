@@ -1,6 +1,6 @@
 import torch
 
-from utils.metrics import get_dist_metric
+from utils.metrics import get_metric
 
 
 class CtransformLoss:
@@ -9,7 +9,7 @@ class CtransformLoss:
     Code inspired by https://github.com/sverdoot/qp-wgan
     """
     def __init__(self, epsilon=0):
-        self.base_metric = get_dist_metric("L2")
+        self.base_metric = get_metric("L2")
         self.epsilon = float(epsilon)
 
     def compute_ot(self, critic, batch, gen_batch):

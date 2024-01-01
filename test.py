@@ -8,7 +8,7 @@ from models import get_models
 from scripts.experiments.experiment_utils import find_last_file
 from tests.generate_images import generate_images
 from tests.interpolate import interpolate
-from tests.test_data_NNs import find_nns, find_patch_nns
+from tests.test_data_NNs import find_nns, find_patch_nns, find_nns_percept
 from tests.test_emd import test_emd
 # from tests.latent_inversion import inverse_image
 from tests.test_mode_collapse import find_mode_collapses
@@ -25,7 +25,7 @@ def load_pretrained_models(args, ckpt_path, device):
     netG.load_state_dict(weights['netG'])
     netG.to(device)
     netG.eval()
-
+    
     netD.load_state_dict(weights['netD'])
     netD.to(device)
     netD.eval()
@@ -74,15 +74,17 @@ if __name__ == '__main__':
     # Full data tests
     data = get_data(args['data_path'], args['im_size'], args['center_crop'], args['gray_scale'], limit_data=args['limit_data']).to(device)
 
-    compare_real_fake_patch_dist(netG,  prior, data, metric_names=['MiniBatchLoss-dist=w1',
-                                                                   'MiniBatchLoss-dist=swd',                                                                                                                      'MiniBatchPatchLoss-dist=swd-p=8-s=4'
-                                                                   'MiniBatchPatchLoss-dist=swd-p=8-s=4',
-                                                                   'MiniBatchPatchLoss-dist=w1-p=8-s=4-n_samples=10000',
-                                                                  ], outputs_dir=outputs_dir)
+    # compare_real_fake_patch_dist(netG,  prior, data, metric_names=['MiniBatchLoss-dist=w1',
+    #                                                                'MiniBatchLoss-dist=swd',                                                                                                                      'MiniBatchPatchLoss-dist=swd-p=8-s=4'
+    #                                                                'MiniBatchPatchLoss-dist=swd-p=8-s=4',
+    #                                                                'MiniBatchPatchLoss-dist=w1-p=8-s=4-n_samples=10000',
+    #                                                               ], outputs_dir=outputs_dir)
 
     # Nearest neighbor visualizations
     fake_images = netG(prior.sample(4).to(device))
     find_nns(fake_images, data, outputs_dir=outputs_dir, show_first_n=1)
+    find_nns_percept(fake_images, data, outputs_dir, device, layer_idx=18)
+    find_nns_percept(fake_images, data, outputs_dir, device, netD, layer_idx=3)
     # find_patch_nns(fake_images, data, patch_size=32, search_margin=2, outputs_dir=outputs_dir, n_centers=4)
     find_patch_nns(fake_images, data, patch_size=22, search_margin=4, outputs_dir=outputs_dir, n_centers=4)
     # find_patch_nns(fake_images, data, patch_size=12, search_margin=2, outputs_dir=outputs_dir, n_centers=4)

@@ -10,7 +10,8 @@ from tqdm import tqdm
 from torchvision import utils as vutils
 import torch.nn.functional as F
 
-from utils.metrics import vgg_dist_calculator
+from utils.common import dump_images
+from utils.metrics import vgg_dist_calculator, discriminator_dist_calculator, L2, batch_dist_matrix
 from tests.test_utils import cut_around_center, compute_dists, sample_patch_centers
 
 
@@ -78,39 +79,36 @@ def find_patch_nns(fake_images, data, patch_size, search_margin, outputs_dir, n_
             plt.clf()
 
 
-def find_nns_percept(fake_images, data, outputs_dir, device):
+def batch_extraction(feature_extractor, data, b):
+    n_batches = len(data) // b
+    reference_features = [feature_extractor.extract(data[i * b:(i + 1) * b]) for i in range(n_batches)]
+    if n_batches*b < len(data):
+        reference_features += [feature_extractor.extract(data[n_batches*b:])]
+    reference_features = torch.cat(reference_features, dim=0)
+    return reference_features
+
+
+def find_nns_percept(fake_images, data, outputs_dir, device, netD=None, layer_idx=None):
     with torch.no_grad():
-        vgg_fe = vgg_dist_calculator(layer_idx=9, device=device)
-        # percept = lpips.LPIPS(net='vgg', lpips=False).to(device)
+        if netD is None:
+            feature_extractor = vgg_dist_calculator(layer_idx, device=device)
+        else:
+            feature_extractor = discriminator_dist_calculator(netD, layer_idx, device=device)
+        out_path = f'{outputs_dir}/nns/{"vgg" if netD is None else "Discriminator"}_im.png'
 
-        os.makedirs(f'{outputs_dir}/nns', exist_ok=True)
-        results = []
-        for i in range(8):
-            fake_image = fake_images[i]
-            # dists = [percept(fake_image, data[i].unsqueeze(0)).sum().item() for i in range(len(data))]
-            dists = [(vgg_fe.extract(fake_image) - vgg_fe.extract(data[i].unsqueeze(0))).pow(2).sum().item() for i in
-                     range(len(data))]
-            nn_indices = np.argsort(dists)
-            nns = data[nn_indices[:4]]
+        dist_mat = feature_extractor(fake_images, data)
+        nn_indices = torch.argmin(dist_mat, dim=1)
+        debug_img = torch.cat([fake_images, data[nn_indices]], dim=-2)
 
-            results.append(torch.cat([fake_image, nns]))
-
-        vutils.save_image(torch.cat(results, dim=0).add(1).mul(0.5), f'{outputs_dir}/nns/im.png', normalize=False,
-                          nrow=5)
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
+        vutils.save_image(debug_img, out_path, normalize=True, nrow=len(fake_images), pad_value=1)
 
 
 def find_nns(fake_images, data, outputs_dir, show_first_n=2):
     with torch.no_grad():
-        os.makedirs(f'{outputs_dir}/nns', exist_ok=True)
-        results = []
-        # dists_mat = (fake_image - data).pow(2).sum(dim=(1,2,3)).numpy()#
-        for i in range(len(fake_images)):
-            fake_image = fake_images[i]
-            # dists = dists_mat[i]
-            dists = [(fake_image - data[j]).pow(2).sum().item() for j in range(len(data))]
-            nn_indices = np.argsort(dists)
-            nns = data[nn_indices[:show_first_n]]
-            results.append(torch.cat([fake_image.unsqueeze(0), nns]))
+        dist_mat = batch_dist_matrix(fake_images.reshape(len(fake_images), -1), data.reshape(len(data), -1), b=64, dist_function=L2())
+        nn_indices = torch.argmin(dist_mat, dim=1)
+        debug_img = torch.cat([fake_images, data[nn_indices]], dim=-2)
 
-        vutils.save_image(torch.cat(results, dim=0).add(1).mul(0.5), f'{outputs_dir}/nns/im.png', normalize=False,
-                          nrow=1 + show_first_n, pad_value=1)
+        os.makedirs(f'{outputs_dir}/nns', exist_ok=True)
+        vutils.save_image(debug_img, f'{outputs_dir}/nns/im.png', normalize=True, nrow=len(fake_images), pad_value=1)

@@ -68,12 +68,9 @@ class Discriminator(nn.Module):
             layers.append(
                 conv_block(layer_depth[i], layer_depth[i + 1], 4, 2, 1, normalize=normalize_layer, transpose=False)
             )
-        self.convs = nn.Sequential(*layers)
+        self.features = nn.Sequential(*layers)
         self.classifier = nn.Linear(layer_depth[-1]*4**2, num_outputs)
         self.num_outputs = num_outputs
-
-    def features(self, img):
-        return self.convs(img)
 
     def forward(self, img):
         b = img.size(0)

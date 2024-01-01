@@ -1,7 +1,7 @@
 import torch
 
 
-def get_dist_metric(name):
+def get_metric(name):
     """Choose how to calulate pairwise distances for EMD"""
     if name == 'L1':
         metric = L1()
@@ -60,13 +60,6 @@ def compute_features_dist_mat_in_batches(X, Y, f, b=64):
             D = D.reshape(D.shape[0], D.shape[1], -1) # In case features are still spatial
             dists[slice_x, slice_y] = torch.norm(D, dim=-1)
 
-    # for slice_x in x_slices:
-    #     features_x = f(X[slice_x])
-    #     for slice_y in y_slices:
-    #         features_y = f(Y[slice_y])
-    #         D = features_x[:, None] - features_y[None,]
-    #         D = D.reshape(D.shape[0], D.shape[1], -1) # In case featueres are still spatial
-    #         dists[slice_x, slice_y] = torch.norm(D, dim=-1)
     return dists
 
 
@@ -107,9 +100,37 @@ class vgg_dist_calculator:
         X = X.to(self.device)
         for i, layer in enumerate(self.vgg_features):
             X = layer(X)
-            # if i in layer_indices:
             if i == layer_idx:
                 return X
+
+    def __call__(self, X, Y, b=64):
+        return compute_features_dist_mat_in_batches(X, Y, self.extract, b=b)
+
+
+class discriminator_dist_calculator:
+    def __init__(self,  netD, layer_idx=None, device=None):
+        from torchvision import transforms
+        assert hasattr(netD, 'features'), "netD has no attribute 'features'"
+        self.netD = netD
+        self.netD.eval()
+        self.device = device
+        self.layer_idx = layer_idx
+        self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+
+    def extract(self, X):
+        if self.device is None:
+            self.device = X.device
+            self.netD = self.netD.to(self.device)
+        X = X.to(self.device)
+        if self.layer_idx is None:
+            return self.netD.features(X)
+        else:
+            for i, layer in enumerate(self.netD.features.children()):
+                X = layer(X)
+                # if i in layer_indices:
+                if i == self.layer_idx:
+                    return X
+            return X
 
     def __call__(self, X, Y, b=64):
         return compute_features_dist_mat_in_batches(X, Y, self.extract, b=b)
@@ -130,25 +151,6 @@ def batch_dist_matrix(X, Y, b, dist_function):
         dists[s] = dist_function(X[s], Y).cpu()
 
     return dists
-
-def batch_NN(X, Y, f, b, dist_function):
-    """
-    For each x find the best index i s.t i = argmin_i(x,y_i)-f_i
-    return the value and the argmin
-    """
-    NNs = torch.zeros(X.shape[0], dtype=torch.long, device=X.device)
-    NN_dists = torch.zeros(X.shape[0], device=X.device)
-    n_batches = len(X) // b
-    for i in range(n_batches):
-        s = slice(i * b,(i + 1) * b)
-        dists = dist_function(X[s], Y) - f
-        NN_dists[s], NNs[s] = dists.min(1)
-    if len(X) % b != 0:
-        s = slice(n_batches * b, len(X))
-        dists = dist_function(X[s], Y) - f
-        NN_dists[s], NNs[s] = dists.min(1)
-
-    return NN_dists, NNs
 
 
 if __name__ == '__main__':
