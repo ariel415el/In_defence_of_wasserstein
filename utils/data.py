@@ -43,7 +43,7 @@ class MemoryDataset(Dataset):
         return len(self.images)
 
     def __getitem__(self, idx):
-        return self.images[idx]
+        return self.images[idx], idx
 
 
 class DiskDataset(Dataset):
@@ -60,7 +60,7 @@ class DiskDataset(Dataset):
         if self.transforms is not None:
             img = self.transforms(img)
         # return img, idx
-        return img
+        return img, idx
 
 
 def get_dataloader(data_root, im_size, batch_size, n_workers, val_percentage=0,

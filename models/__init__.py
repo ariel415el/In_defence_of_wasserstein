@@ -3,23 +3,16 @@ import importlib
 from utils.common import parse_classnames_and_kwargs
 
 
-def get_models(args, device):
+def get_generator(args, device):
     c = 1 if args.gray_scale else 3
     model_name, kwargs = parse_classnames_and_kwargs(args.gen_arch,
                                                      kwargs={"output_dim": args.im_size, "z_dim": args.z_dim, "channels": c})
     netG = importlib.import_module("models." + model_name).Generator(**kwargs)
 
-    model_name, kwargs = parse_classnames_and_kwargs(args.disc_arch,
-                                                     kwargs={"input_dim": args.im_size, "channels": c})
-    netD = importlib.import_module("models." + model_name).Discriminator(**kwargs)
 
-    if args.spectral_normalization:
-        from models.model_utils.spectral_normalization import make_model_spectral_normalized
-        netD = make_model_spectral_normalized(netD)
+    print(f"G params: {print_num_params(netG)}", )
 
-    print(f"G params: {print_num_params(netG)}, D params: {print_num_params(netD)}", )
-
-    return netG.to(device), netD.to(device)
+    return netG.to(device)
 
 
 def human_format(num):

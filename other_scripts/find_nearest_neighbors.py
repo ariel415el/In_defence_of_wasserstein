@@ -9,7 +9,7 @@ from matplotlib import pyplot as plt
 from experiment_utils import get_data, find_last_file
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-from models import get_models
+from models import get_generator
 from utils.train_utils import Prior
 
 
@@ -46,7 +46,7 @@ def find_nns(fake_images, data, outputs_dir,s=4):
 
 
 def load_pretrained_models(args, ckpt_path, device):
-    netG, netD = get_models(args, device)
+    netG, netD = get_generator(args, device)
 
     weights = torch.load(ckpt_path, map_location=device)
     netG.load_state_dict(weights['netG'])
