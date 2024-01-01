@@ -132,6 +132,12 @@ def evaluate(prior, netG, netD, inception_metrics, other_metrics, fixed_noise, d
 
 if __name__ == "__main__":
     args = parse_train_args()
+    if args.train_name is None:
+        args.train_name = compose_experiment_name(args)
+
+    saved_model_folder, saved_image_folder, plots_image_folder = get_dir(args)
+
+    logger = (WandbLogger if args.wandb else PLTLogger)(args, plots_image_folder)
 
     device = torch.device(args.device)
     if args.device != 'cpu':
@@ -146,14 +152,6 @@ if __name__ == "__main__":
     full_batch_loader, _ = get_dataloader(args.data_path, args.im_size, data_size, args.n_workers,
                                                val_percentage=0, gray_scale=args.gray_scale, center_crop=args.center_crop,
                                                load_to_memory=args.load_data_to_memory, limit_data=args.limit_data)
-
-    if args.r_bs == -1:
-        args.r_bs = data_size
-
-    if args.train_name is None:
-        args.train_name = compose_experiment_name(args)
-
-    saved_model_folder, saved_image_folder, plots_image_folder = get_dir(args)
 
     train_GAN(args)
 

@@ -70,7 +70,6 @@ def get_dataloader(data_root, im_size, batch_size, n_workers, val_percentage=0,
     paths = sorted([os.path.join(data_root, im_name) for im_name in os.listdir(data_root)])
     if limit_data is not None:
         paths = paths[:limit_data]
-    if batch_size == -1: batch_size = len(paths)
 
     n_val_images = int(val_percentage * len(paths))
     train_paths, test_paths = paths[n_val_images:], paths[:n_val_images]

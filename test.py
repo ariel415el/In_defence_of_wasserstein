@@ -25,7 +25,7 @@ def load_pretrained_models(args, ckpt_path, device):
     netG.load_state_dict(weights['netG'])
     netG.to(device)
     netG.eval()
-    
+
     netD.load_state_dict(weights['netD'])
     netD.to(device)
     netD.eval()
@@ -63,7 +63,7 @@ if __name__ == '__main__':
     # No data tests
     generate_images(netG, prior, outputs_dir, device)
     # find_mode_collapses(netG, netD, z_dim, outputs_dir, device)
-    # interpolate(netG, z_dim, n_zs=15, steps=25, outputs_dir=outputs_dir, device=device)
+    interpolate(netG, z_dim, n_zs=15, seconds=60, fps=30, outputs_dir=outputs_dir, device=device)
 
     # Partial data tests
     # data = get_data(args['data_path'], args['im_size'], args['center_crop'], limit_data=9).to(device)
