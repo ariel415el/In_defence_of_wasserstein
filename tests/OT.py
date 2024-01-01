@@ -12,7 +12,7 @@ from losses.optimal_transport import MiniBatchPatchLoss
 def compare_real_fake_patch_dist(netG,  prior, data, metric_names, outputs_dir=''):
     with torch.no_grad():
 
-        fake_data = batch_generation(netG, prior, len(data), 512, data.device)
+        fake_data = batch_generation(netG, prior, len(data), 64, data.device)
         dists = {}
         for metric_name in metric_names:
             metric = get_loss_function(metric_name)

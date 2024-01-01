@@ -24,11 +24,11 @@ def train_GAN(args):
 
     inception_metrics = InceptionMetrics([next(iter(train_loader)) for _ in range(args.fid_n_batches)], torch.device("cpu"))
     other_metrics = [
-                # get_loss_function("MiniBatchLoss-dist=w1"),
+                get_loss_function("MiniBatchLoss-dist=w1"),
                 get_loss_function("MiniBatchLoss-dist=swd"),
-                get_loss_function("MiniBatchPatchLoss-dist=swd-p=4-s=4"),
-                get_loss_function("MiniBatchPatchLoss-dist=swd-p=8-s=4"),
-                get_loss_function("MiniBatchPatchLoss-dist=swd-p=16-s=8"),
+                # get_loss_function("MiniBatchPatchLoss-dist=swd-p=4-s=4"),
+                # get_loss_function("MiniBatchPatchLoss-dist=swd-p=8-s=4"),
+                # get_loss_function("MiniBatchPatchLoss-dist=swd-p=16-s=8"),
               ]
 
     loss_function = get_loss_function(args.loss_function)
@@ -109,7 +109,7 @@ def evaluate(prior, netG, netD, inception_metrics, other_metrics, fixed_noise, d
     netD.eval()
     start = time()
     with torch.no_grad():
-        fake_images = batch_generation(netG, prior, len(debug_all_reals), 512, torch.device("cpu"))
+        fake_images = batch_generation(netG, prior, len(debug_all_reals), args.f_bs, device)
 
         if args.fid_n_batches > 0 and iteration % args.fid_freq == 0:
             fake_batches = [netG(torch.randn_like(fixed_noise).to(device)) for _ in range(args.fid_n_batches)]
