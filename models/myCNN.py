@@ -55,9 +55,9 @@ def UpBlock(in_planes, out_planes):
 
 
 class Generator(nn.Module):
-    def __init__(self, input_dim=128, z_dim=100, c=3, nf='64', **kwargs):
+    def __init__(self, output_dim=128, z_dim=100, c=3, nf='64', **kwargs):
         super(Generator, self).__init__()
-        self.input_dim = input_dim
+        self.output_dim = output_dim
         nfc_multi = {4: 16, 8: 8, 16: 4, 32: 2, 64: 2, 128: 1, 256: 0.5}
         nfc = {k: int(v * int(nf)) for k, v in nfc_multi.items()}
 
@@ -67,12 +67,12 @@ class Generator(nn.Module):
         self.feat_16 = UpBlock(nfc[8], nfc[16])
         self.feat_32 = UpBlock(nfc[16], nfc[32])
         self.feat_64 = UpBlock(nfc[32], nfc[64])
-        if input_dim > 64:
+        if output_dim > 64:
             self.feat_128 = UpBlock(nfc[64], nfc[128])
-        if input_dim > 128:
+        if output_dim > 128:
             self.feat_256 = UpBlock(nfc[128], nfc[256])
 
-        self.to_full = conv2d(nfc[input_dim], c, 3, 1, 1, bias=False)
+        self.to_full = conv2d(nfc[output_dim], c, 3, 1, 1, bias=False)
         self.apply(weights_init)
 
     def forward(self, input):
@@ -82,11 +82,11 @@ class Generator(nn.Module):
         feat_32 = self.feat_32(feat_16)
 
         feat_64 = self.feat_64(feat_32)
-        if self.input_dim == 64:
+        if self.output_dim == 64:
             return self.to_full(feat_64)
 
         feat_128 = self.feat_128(feat_64)
-        if self.input_dim == 128:
+        if self.output_dim == 128:
             return self.to_full(feat_128)
 
         feat_256 = self.feat_256(feat_128)

@@ -82,7 +82,7 @@ class Discriminator(nn.Module):
 
     def forward(self, img):
         b = img.size(0)
-        features = self.convs(img)
+        features = self.features(img)
 
         features = features.reshape(b, -1)
 
