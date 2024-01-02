@@ -44,7 +44,8 @@ def hash_vectors(x, n=1000):
     return (decimals / 10 ** l * n).to(torch.long)
 
 
-def batch_generation(netG, prior, n, b, device):
+def batch_generation(netG, prior, n, b, device, org_device):
+    netG.to(device)
     n_batches = n // b
     fake_data = []
     if "const" in prior.prior_type: # generate images for all 'm' zs
@@ -62,4 +63,5 @@ def batch_generation(netG, prior, n, b, device):
             z = prior.sample(n - n_batches * b).to(device)
             fake_data.append(netG(z))
     fake_data = torch.cat(fake_data)
+    netG.to(org_device)
     return fake_data

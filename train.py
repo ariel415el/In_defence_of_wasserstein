@@ -109,7 +109,7 @@ def evaluate(prior, netG, netD, inception_metrics, other_metrics, fixed_noise, d
     netD.eval()
     start = time()
     with torch.no_grad():
-        fake_images = batch_generation(netG, prior, len(debug_all_reals), args.f_bs, device)
+        fake_images = batch_generation(netG, prior, len(debug_all_reals), args.f_bs, torch.device("cpu"), device)
 
         if args.fid_n_batches > 0 and iteration % args.fid_freq == 0:
             fake_batches = [netG(torch.randn_like(fixed_noise).to(device)) for _ in range(args.fid_n_batches)]
