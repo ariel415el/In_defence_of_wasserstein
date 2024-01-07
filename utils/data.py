@@ -81,7 +81,7 @@ def get_dataloader(data_root, im_size, batch_size, n_workers, val_percentage=0,
     train_dataset = dataset_type(paths=train_paths, im_size=im_size, gray_scale=gray_scale, center_crop=center_crop)
     drop_last = (not limit_data) or (limit_data != batch_size)
     train_loader = DataLoader(train_dataset, batch_size=batch_size,
-                              shuffle=True,
+                              shuffle=False,
                               num_workers=n_workers,
                               pin_memory=True, drop_last=drop_last)
 

@@ -5,7 +5,7 @@ from torch import optim
 from torch import nn
 
 from models import get_generator
-from utils.common import dump_images, compose_experiment_name
+from utils.common import dump_images, compose_experiment_name, batch_generation
 from utils.train_utils import copy_G_params, load_params, parse_train_args, save_model
 from losses import get_loss_function
 from utils.data import get_dataloader
@@ -70,11 +70,12 @@ def train_GLO(args):
             rec_loss.backward()
             optimizerG.step()
 
-            logger.log({"Reconstruction-Loss": rec_loss.item()}, iteration)
             if iteration % 1 == 0:
                 optimizerZ.step()
             if args.force_norm_every > 0 and iteration % args.force_norm_every == 0:
                 latent_codes.force_norm()
+
+            logger.log({"Reconstruction-Loss": rec_loss.item()}, iteration)
 
             # Update avg weights
             for p, avg_p in zip(netG.parameters(), avg_param_G):
@@ -97,25 +98,13 @@ def train_GLO(args):
 
             iteration += 1
 
-def batch_generation(latent_codes, netG, n, b, device):
-    n_batches = n // b
-    fake_data = []
-    for i in range(n_batches):
-        zs = latent_codes(torch.arange(i*b, (i+1)*b).to(device))
-        fake_data.append(netG(zs))
-    if n_batches * b < n:
-        zs = latent_codes(torch.arange(n-n_batches * b, n).to(device))
-        fake_data.append(netG(zs))
-    fake_data = torch.cat(fake_data)
-    return fake_data
-
 
 def evaluate(latent_codes, netG, other_metrics, debug_fixed_reals, debug_fixed_indices,
              saved_image_folder, iteration, logger):
     netG.eval()
     start = time()
     with torch.no_grad():
-        fake_images = batch_generation(latent_codes, netG, len(latent_codes.emb.weight), 64, device)
+        fake_images = batch_generation(latent_codes, netG, len(latent_codes.emb.weight), 16, device)
 
         print(f"Computing metrics between {len(debug_fixed_reals)} real and {len(fake_images)} fake images")
         for metric in other_metrics:
