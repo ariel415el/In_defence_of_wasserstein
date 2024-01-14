@@ -1,6 +1,4 @@
 import importlib
-
-from models.model_utils.stochastic_emsamble import StochasticEnsemble
 from utils.common import parse_classnames_and_kwargs
 
 
@@ -13,9 +11,6 @@ def get_models(args, device):
     model_name, kwargs = parse_classnames_and_kwargs(args.disc_arch,
                                                      kwargs={"input_dim": args.im_size, "channels": c})
     netD = importlib.import_module("models." + model_name).Discriminator(**kwargs)
-
-    if args.n_generators > 1:
-        netG = StochasticEnsemble(netG, args.n_generators)
 
     if args.spectral_normalization:
         from models.model_utils.spectral_normalization import make_model_spectral_normalized
