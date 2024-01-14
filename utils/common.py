@@ -46,16 +46,18 @@ def hash_vectors(x, n=1000):
 
 def batch_generation(netG, prior, n, b, device, org_device):
     netG.to(device)
-    n_batches = n // b
     fake_data = []
     if "const" in prior.prior_type: # generate images for all 'm' zs
+        n = len(prior.z)
+        n_batches = n // b
         for i in range(n_batches):
             zs = prior.z[i * b: (i + 1) * b].to(device)
             fake_data.append(netG(zs))
         if n_batches * b < n:
-            zs = prior.z[n - n_batches * b:].to(device)
+            zs = prior.z[n_batches * b:].to(device)
             fake_data.append(netG(zs))
     else:  # Generate 'n' images for random zs in batches of size b
+        n_batches = n // b
         for i in range(n_batches):
             z = prior.sample(b).to(device)
             fake_data.append(netG(z))

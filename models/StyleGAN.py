@@ -1,134 +1,11 @@
 import torch
 from torch import nn
 
+
 def weights_init(m):
     pass
 
-class Discriminator(nn.Module):
-    def __init__(self, input_dim=128):
-        super().__init__()
-        n_conv = 2
-        equal_lr = True
-        n_feature_maps = [512, 512, 512, 512, 512, 256]
-        # n_feature_maps = [512, 256, 128, 64, 32, 16]
-        self.conv_rgb = Conv(3, n_feature_maps[0], 1, equal_lr=equal_lr)
-        self.blocks = nn.Sequential(
-            *[DiscriminatorBlock(n_feature_maps[i], n, n_conv, equal_lr) for i, n in enumerate(n_feature_maps[1:])])
-        self.conv_3 = Conv(n_feature_maps[-1] + 1, n_feature_maps[-1], 3, padding=1, equal_lr=equal_lr)
-        self.conv_4 = Conv(n_feature_maps[-1], n_feature_maps[-1], 4, equal_lr=equal_lr)
-        self.lrelu = nn.LeakyReLU(0.2)
-        self.fc = FC(n_feature_maps[-1], 1, equal_lr=equal_lr)
 
-    def forward(self, x):
-        x = self.conv_rgb(x)
-        x = self.blocks(x)
-        mean_std_batch = torch.sqrt(x.var(0) + 1e-8).mean().expand(x.size(0), 1, x.size(2), x.size(3))
-        x = torch.cat((x, mean_std_batch), 1)
-        x = self.lrelu(self.conv_3(x))
-        x = self.lrelu(self.conv_4(x))
-        return self.fc(x.view(x.size()[:2])).reshape(len(x))
-
-
-class DiscriminatorBlock(nn.Module):
-    def __init__(self, n_feature_maps_in, n_feature_maps_out, n_conv, equal_lr):
-        super().__init__()
-        self.layers = []
-        for _ in range(n_conv - 1):
-            self.layers += [Conv(n_feature_maps_in, n_feature_maps_in, 3, padding=1, equal_lr=equal_lr),
-                            nn.LeakyReLU(0.2)]
-        self.layers += [Conv(n_feature_maps_in, n_feature_maps_out, 3, padding=1, equal_lr=equal_lr), nn.LeakyReLU(0.2)]
-        self.layers = nn.Sequential(*self.layers)
-        self.downsample = lambda x: nn.functional.interpolate(x, scale_factor=0.5, mode='bilinear', align_corners=False)
-        self.conv_res = Conv(n_feature_maps_in, n_feature_maps_out, 1, equal_lr=equal_lr)
-
-    def forward(self, x):
-        return self.conv_res(self.downsample(x)) + self.downsample(self.layers(x))
-
-class Generator(nn.Module):
-    def __init__(self, z_dim, output_dim=128):
-        super().__init__()
-        n_conv_blocks = 2
-        n_layers_mapper = 8
-        n_feature_maps = [512, 512, 512, 512, 512, 256]
-        # n_feature_maps = [512, 256, 128, 64, 32, 16]
-        n_dim_const = 4
-        equal_lr = True
-        self.mapper = Mapper(n_layers_mapper, z_dim, equal_lr)
-        self.synthesizer = Synthesizer(z_dim, n_conv_blocks, n_feature_maps, n_dim_const, equal_lr)
-
-    def forward(self, z, weight_truncation=None):
-        w = self.mapper(z)
-        return self.synthesizer(w, weight_truncation=weight_truncation)
-
-
-class Mapper(nn.Module):
-    def __init__(self, n_layers, n_dim, equal_lr):
-        super().__init__()
-        self.layers = [PixelNorm()]
-        for _ in range(n_layers):
-            self.layers.append(FC(n_dim, n_dim, equal_lr=equal_lr))
-            self.layers.append(nn.LeakyReLU(0.2))
-        self.layers = nn.Sequential(*self.layers)
-
-    def forward(self, z):
-        return self.layers(z)
-
-
-class PixelNorm(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-    def forward(self, z):
-        return z / torch.sqrt(torch.mean(z ** 2, dim=1, keepdim=True) + 1e-8)
-
-
-class Synthesizer(nn.Module):
-    def __init__(self, n_dim_w, n_conv_blocks, n_feature_maps, n_dim_const, equal_lr):
-        super().__init__()
-        self.blocks = [
-            SynthesizerBlock(n_conv_blocks, True, n_dim_w, n_feature_maps[0], equal_lr, n_dim_const=n_dim_const)]
-        for i, n in enumerate(n_feature_maps[1:]):
-            self.blocks.append(
-                SynthesizerBlock(n_conv_blocks, False, n_dim_w, n, equal_lr, n_feature_maps_in=n_feature_maps[i]))
-        self.blocks = nn.Sequential(*self.blocks)
-        self.register_buffer('avg_w', torch.zeros(n_dim_w))
-
-    def forward(self, w, weight_truncation=None):
-        if self.training:
-            self.avg_w.copy_(w.detach().mean(dim=0).lerp(self.avg_w, 0.995))
-        if weight_truncation:
-            w = self.avg_w.lerp(w, weight_truncation)
-        return self.blocks((w, None, None))[2]
-
-
-class SynthesizerBlock(nn.Module):
-    def __init__(self, n_blocks, first, n_dim_w, n_feature_maps_out, equal_lr, n_feature_maps_in=None,
-                 n_dim_const=None):
-        super().__init__()
-        self.first = first
-        if first:
-            self.const = nn.Parameter(torch.randn(1, n_feature_maps_out, n_dim_const, n_dim_const))
-            self.blocks = []
-        else:
-            self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)
-            self.blocks = [ConvBlock(n_dim_w, n_feature_maps_in, n_feature_maps_out, equal_lr)]
-        for _ in range(n_blocks - 1):
-            self.blocks.append(ConvBlock(n_dim_w, n_feature_maps_out, n_feature_maps_out, equal_lr))
-        self.blocks = nn.Sequential(*self.blocks)
-        self.conv_rgb = Conv(n_feature_maps_out, 3, 1, equal_lr=equal_lr)
-        self.affine_transform = AffineTransform(n_dim_w, n_feature_maps_out, equal_lr)
-
-    def forward(self, args):
-        w, x, rgb = args
-        if self.first:
-            x = self.const.expand(w.size(0), -1, -1, -1)
-        else:
-            x = self.upsample(x)
-            rgb = self.upsample(rgb)
-        w, x = self.blocks((w, x))
-        rgb_new = self.conv_rgb(x, y_s=self.affine_transform(w), demod=False)
-        rgb = rgb_new if self.first else rgb + rgb_new
-        return w, x, rgb
 
 
 class ConvBlock(nn.Module):
@@ -201,14 +78,146 @@ class FC(nn.Module):
         return nn.functional.linear(x, self.scale_forward * self.weight, bias=self.bias)
 
 
+class Mapper(nn.Module):
+    def __init__(self, n_layers, n_dim, equal_lr):
+        super().__init__()
+        self.layers = [PixelNorm()]
+        for _ in range(n_layers):
+            self.layers.append(FC(n_dim, n_dim, equal_lr=equal_lr))
+            self.layers.append(nn.LeakyReLU(0.2))
+        self.layers = nn.Sequential(*self.layers)
+
+    def forward(self, z):
+        return self.layers(z)
+
+
+class PixelNorm(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, z):
+        return z / torch.sqrt(torch.mean(z ** 2, dim=1, keepdim=True) + 1e-8)
+
+
+class Synthesizer(nn.Module):
+    def __init__(self, n_dim_w, n_conv_blocks, n_feature_maps, n_dim_const, equal_lr, channels):
+        super().__init__()
+        self.blocks = [
+            SynthesizerBlock(n_conv_blocks, True, n_dim_w, n_feature_maps[0], equal_lr, n_dim_const=n_dim_const)]
+        for i, n in enumerate(n_feature_maps[1:]):
+            self.blocks.append(
+                SynthesizerBlock(n_conv_blocks, False, n_dim_w, n, equal_lr, n_feature_maps_in=n_feature_maps[i]))
+        self.blocks = nn.Sequential(*self.blocks)
+        self.register_buffer('avg_w', torch.zeros(n_dim_w))
+
+    def forward(self, w, weight_truncation=None):
+        if self.training:
+            self.avg_w.copy_(w.detach().mean(dim=0).lerp(self.avg_w, 0.995))
+        if weight_truncation:
+            w = self.avg_w.lerp(w, weight_truncation)
+        return self.blocks((w, None, None))[2]
+
+
+class SynthesizerBlock(nn.Module):
+    def __init__(self, n_blocks, first, n_dim_w, n_feature_maps_out, equal_lr, n_feature_maps_in=None,
+                 n_dim_const=None):
+        super().__init__()
+        self.first = first
+        if first:
+            self.const = nn.Parameter(torch.randn(1, n_feature_maps_out, n_dim_const, n_dim_const))
+            self.blocks = []
+        else:
+            self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)
+            self.blocks = [ConvBlock(n_dim_w, n_feature_maps_in, n_feature_maps_out, equal_lr)]
+        for _ in range(n_blocks - 1):
+            self.blocks.append(ConvBlock(n_dim_w, n_feature_maps_out, n_feature_maps_out, equal_lr))
+        self.blocks = nn.Sequential(*self.blocks)
+        self.conv_rgb = Conv(n_feature_maps_out, 3, 1, equal_lr=equal_lr)
+        self.affine_transform = AffineTransform(n_dim_w, n_feature_maps_out, equal_lr)
+
+    def forward(self, args):
+        w, x, rgb = args
+        if self.first:
+            x = self.const.expand(w.size(0), -1, -1, -1)
+        else:
+            x = self.upsample(x)
+            rgb = self.upsample(rgb)
+        w, x = self.blocks((w, x))
+        rgb_new = self.conv_rgb(x, y_s=self.affine_transform(w), demod=False)
+        rgb = rgb_new if self.first else rgb + rgb_new
+        return w, x, rgb
+
+
+class Generator(nn.Module):
+    def __init__(self, z_dim, output_dim=128, channels=3):
+        super().__init__()
+        n_conv_blocks = 2
+        n_layers_mapper = 8
+        # n_feature_maps = [512, 256, 128, 64, 32, 16]
+        n_feature_maps = [512, 512, 512, 512, 512]
+        if output_dim > 64:
+            n_feature_maps += [256]
+        if output_dim > 128:
+            n_feature_maps += [128]
+        n_dim_const = 4
+        equal_lr = True
+        self.mapper = Mapper(n_layers_mapper, z_dim, equal_lr)
+        self.synthesizer = Synthesizer(z_dim, n_conv_blocks, n_feature_maps, n_dim_const, equal_lr, channels)
+
+    def forward(self, z, weight_truncation=None):
+        w = self.mapper(z)
+        return self.synthesizer(w, weight_truncation=weight_truncation)
+
+
+class Discriminator(nn.Module):
+    def __init__(self, input_dim=128, channels=3):
+        super().__init__()
+        n_conv = 2
+        equal_lr = True
+        n_feature_maps = [512, 512, 512, 512, 512, 256]
+        # n_feature_maps = [512, 256, 128, 64, 32, 16]
+        self.conv_rgb = Conv(channels, n_feature_maps[0], 1, equal_lr=equal_lr)
+        self.blocks = nn.Sequential(
+            *[DiscriminatorBlock(n_feature_maps[i], n, n_conv, equal_lr) for i, n in enumerate(n_feature_maps[1:])])
+        self.conv_3 = Conv(n_feature_maps[-1] + 1, n_feature_maps[-1], 3, padding=1, equal_lr=equal_lr)
+        self.conv_4 = Conv(n_feature_maps[-1], n_feature_maps[-1], 4, equal_lr=equal_lr)
+        self.lrelu = nn.LeakyReLU(0.2)
+        self.fc = FC(n_feature_maps[-1], 1, equal_lr=equal_lr)
+
+    def forward(self, x):
+        x = self.conv_rgb(x)
+        x = self.blocks(x)
+        mean_std_batch = torch.sqrt(x.var(0) + 1e-8).mean().expand(x.size(0), 1, x.size(2), x.size(3))
+        x = torch.cat((x, mean_std_batch), 1)
+        x = self.lrelu(self.conv_3(x))
+        x = self.lrelu(self.conv_4(x))
+        return self.fc(x.view(x.size()[:2])).reshape(len(x))
+
+
+class DiscriminatorBlock(nn.Module):
+    def __init__(self, n_feature_maps_in, n_feature_maps_out, n_conv, equal_lr):
+        super().__init__()
+        self.layers = []
+        for _ in range(n_conv - 1):
+            self.layers += [Conv(n_feature_maps_in, n_feature_maps_in, 3, padding=1, equal_lr=equal_lr),
+                            nn.LeakyReLU(0.2)]
+        self.layers += [Conv(n_feature_maps_in, n_feature_maps_out, 3, padding=1, equal_lr=equal_lr), nn.LeakyReLU(0.2)]
+        self.layers = nn.Sequential(*self.layers)
+        self.downsample = lambda x: nn.functional.interpolate(x, scale_factor=0.5, mode='bilinear', align_corners=False)
+        self.conv_res = Conv(n_feature_maps_in, n_feature_maps_out, 1, equal_lr=equal_lr)
+
+    def forward(self, x):
+        return self.conv_res(self.downsample(x)) + self.downsample(self.layers(x))
+
+
 if __name__ == '__main__':
-    z_dim = 256
-    G = Generator(n_layers_mapper=8, n_dim_mapper=z_dim, n_conv_blocks=2, n_feature_maps=n_feature_maps, n_dim_const=4, equal_lr=True)
-    z = torch.randn(1,z_dim)
+    z_dim = 64
+    z = torch.randn(4, z_dim, requires_grad=True)
+    G = Generator(z_dim, output_dim=256)
 
     print(G(z).shape)
 
     d = 128
     D = Discriminator()
-    x = torch.randn(1, 3, 128, 128)
+    x = torch.randn(6, 3, 128, 128, requires_grad=True)
     print(D(x).shape)

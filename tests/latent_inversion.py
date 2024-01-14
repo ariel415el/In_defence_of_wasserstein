@@ -7,7 +7,7 @@ from torchvision import utils as vutils
 from torchvision.transforms import InterpolationMode
 from tqdm import tqdm
 import torch.nn.functional as F
-from tests.test_utils import cut_around_center, compute_dists, sample_patch_centers
+from tests.test_utils import cut_around_center, sample_patch_centers
 
 
 def plot_torch(real_images, image_inversions, patch_inversion, crop, out_path):
@@ -31,7 +31,7 @@ def imshow(img, axs, title="img"):
 
 def plot_plt(real_images, image_inversions, patch_inversion, crop, out_path, s=5):
     n = len(real_images)
-    fig, ax = plt.subplots(nrows=6, ncols=n, figsize=(s * 6, s * n))
+    fig, ax = plt.subplots(nrows=6, ncols=n, figsize=(s * n, s * 6))
     for j in range (n):
         imshow(real_images[j], ax[0,j], "real_images")
         imshow(image_inversions[j], ax[1,j], "image_inversions")
@@ -54,7 +54,7 @@ def inverse_image(G, z_dim, real_images, outputs_dir, lr=0.01, n_steps=1000, p=3
     optimizer_image = optim.Adam([image_noise], lr=lr)
     optimizer_patch = optim.Adam([patch_noise], lr=lr)
 
-    for iteration in tqdm(range(1000)):
+    for iteration in tqdm(range(n_steps)):
         optimizer_image.zero_grad()
         g_images = G(image_noise)
         rec_loss = F.mse_loss(g_images, real_images)

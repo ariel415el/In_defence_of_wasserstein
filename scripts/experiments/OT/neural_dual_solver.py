@@ -8,6 +8,7 @@ import torch
 import torch.optim as optim
 from tqdm import tqdm
 
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 from models import get_models
 from losses import get_loss_function
 from utils.train_utils import calc_gradient_penalty
@@ -101,6 +102,7 @@ if __name__ == "__main__":
     parser.add_argument('--data_path', default="/mnt/storage_ssd/datasets/FFHQ_1000/FFHQ_1000",
                         help="Path to train images")
     parser.add_argument('--center_crop', default=None, help='center_crop_data to specified size', type=int)
+    parser.add_argument('--gray_scale', action='store_true', default=False, help="Load data as grayscale")
 
     # Model
     parser.add_argument('--disc_arch', default='DCGAN')
@@ -126,8 +128,8 @@ if __name__ == "__main__":
     parser.add_argument('--device', default="cuda:0")
 
     args = parser.parse_args()
-
-    args.name = f"Dual_solver-{os.path.basename(args.data_path)}_{args.im_size}x{args.im_size}" \
+    args.n_generators = 1
+    args.train_name = f"Dual_solver-{os.path.basename(args.data_path)}_{args.im_size}x{args.im_size}" \
                 f"_D-{args.disc_arch}_B-{args.batch_size}_{args.tag}"
 
     device = torch.device(args.device)

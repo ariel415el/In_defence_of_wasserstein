@@ -15,23 +15,21 @@ def get_data(data_root, im_size, center_crop, gray_scale, limit_data=None):
     """Load entire dataset to memory as a single batch"""
     T = get_transforms(im_size, center_crop, gray_scale)
 
-    images = []
-    print("Loading data to memory to find NNs")
     img_names = sorted(os.listdir(data_root))
-    # shuffle(img_names)
     if limit_data is not None:
         img_names = img_names[:limit_data]
-    for fname in tqdm(img_names):
+
+    images = torch.zeros(len(img_names), 1 if gray_scale else 3, im_size, im_size)
+    print("Loading data to memory to find NNs")
+    for i, fname in enumerate(tqdm(img_names)):
         im = Image.open(os.path.join(data_root, fname))
         im = T(im)
-        images += [im]
+        images[i] = im
 
-    data = torch.stack(images)
-
-    return data
+    return images
 
 
-def compute_dists(x, y, dist='edges'):
+def pixel_distance(x, y, dist='edges'):
     if dist == "rgb":
         dists = (x - y)
     elif dist == "gray":
@@ -63,18 +61,3 @@ def sample_patch_centers(img_dim, p, n_centers, stride=1, offset=0):
     shuffle(centers)
     centers = centers[:n_centers]
     return centers
-
-
-def inverse_latent_sampling(G, z, real_images, n_steps=1000, lr=0.01):
-    from torch import optim
-    z.requires_grad_(True)
-    optimizer_image = optim.Adam([z], lr=lr)
-
-    for _ in range(n_steps):
-        optimizer_image.zero_grad()
-        g_images = G(z)
-        rec_loss = F.mse_loss(g_images, real_images)
-        rec_loss.backward()
-        optimizer_image.step()
-
-    return z.detach()

@@ -1,8 +1,5 @@
-import itertools
 import os
-from random import shuffle
 
-import numpy as np
 import torch
 from matplotlib import pyplot as plt
 from tqdm import tqdm
@@ -10,9 +7,8 @@ from tqdm import tqdm
 from torchvision import utils as vutils
 import torch.nn.functional as F
 
-from utils.common import dump_images
-from utils.metrics import vgg_dist_calculator, discriminator_dist_calculator, L2, batch_dist_matrix
-from tests.test_utils import cut_around_center, compute_dists, sample_patch_centers
+from utils.metrics import VggDistCalculator, DiscriminatorDistCalculator, L2, compute_features_nearest_neighbors_batches
+from tests.test_utils import cut_around_center, pixel_distance, sample_patch_centers
 
 
 def imshow(img, axs, title="img"):
@@ -37,7 +33,7 @@ def search_for_nn_patches_in_locality(img, data, center, p, search_margin, dist=
     # Search in RGB values
     print(f"Searching for NN patch in {len(refs)} patches at center {center}:")
 
-    dists = compute_dists(refs, query_patch, dist)
+    dists = pixel_distance(refs, query_patch, dist)
     patch_index = torch.sort(torch.norm(dists, dim=1, p=1))[1][0]
 
     img_index = patch_index // n_patches
@@ -73,41 +69,29 @@ def find_patch_nns(fake_images, data, patch_size, search_margin, outputs_dir, n_
                 imshow(query_image, ax[i, 2], "Query-Image")
                 imshow(data[ref_nn_index], ax[i, 3], f"{dist}-NN-Image")
 
-
             plt.tight_layout()
             fig.savefig(f'{out_dir}/patches-{j}.png')
             plt.clf()
 
 
-def batch_extraction(feature_extractor, data, b):
-    n_batches = len(data) // b
-    reference_features = [feature_extractor.extract(data[i * b:(i + 1) * b]) for i in range(n_batches)]
-    if n_batches*b < len(data):
-        reference_features += [feature_extractor.extract(data[n_batches*b:])]
-    reference_features = torch.cat(reference_features, dim=0)
-    return reference_features
-
-
 def find_nns_percept(fake_images, data, outputs_dir, device, netD=None, layer_idx=None):
     with torch.no_grad():
         if netD is None:
-            feature_extractor = vgg_dist_calculator(layer_idx, device=device)
+            feature_loss = VggDistCalculator(layer_idx, device=device)
         else:
-            feature_extractor = discriminator_dist_calculator(netD, layer_idx, device=device)
+            feature_loss = DiscriminatorDistCalculator(netD, layer_idx, device=device)
         out_path = f'{outputs_dir}/nns/{"vgg" if netD is None else "Discriminator"}_im.png'
 
-        dist_mat = feature_extractor(fake_images, data)
-        nn_indices = torch.argmin(dist_mat, dim=1)
+        nn_indices = compute_features_nearest_neighbors_batches(fake_images, data, feature_loss, bx=64, by=64)
         debug_img = torch.cat([fake_images, data[nn_indices]], dim=-2)
 
         os.makedirs(os.path.dirname(out_path), exist_ok=True)
         vutils.save_image(debug_img, out_path, normalize=True, nrow=len(fake_images), pad_value=1)
 
 
-def find_nns(fake_images, data, outputs_dir, show_first_n=2):
+def find_nns(fake_images, data, outputs_dir):
     with torch.no_grad():
-        dist_mat = batch_dist_matrix(fake_images.reshape(len(fake_images), -1), data.reshape(len(data), -1), b=64, dist_function=L2())
-        nn_indices = torch.argmin(dist_mat, dim=1)
+        nn_indices = compute_features_nearest_neighbors_batches(fake_images, data, L2(), bx=64, by=64)
         debug_img = torch.cat([fake_images, data[nn_indices]], dim=-2)
 
         os.makedirs(f'{outputs_dir}/nns', exist_ok=True)
