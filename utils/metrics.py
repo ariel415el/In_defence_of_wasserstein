@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from torchvision import transforms, models
 
@@ -118,14 +119,14 @@ def get_batche_slices(n, b):
     n_batches = n // b
     slices = []
     for i in range(n_batches):
-        slices.append(range(i * b, (i + 1) * b))
+        slices.append(np.arange(i * b, (i + 1) * b))
 
     if n % b != 0:
-        slices.append(range(n_batches * b, n))
+        slices.append(np.arange(n_batches * b, n))
     return slices
 
 
-def compute_features_nearest_neighbors_batches(X, Y, loss_function, bx=64, by=64):
+def compute_nearest_neighbors_in_batches(X, Y, loss_function, bx=64, by=64):
     """Compute distance matrix in features of a function f(X) but restrict maximum inference batch to 'b'"""
     X = X.cpu()
     Y = Y.cpu()
@@ -139,6 +140,19 @@ def compute_features_nearest_neighbors_batches(X, Y, loss_function, bx=64, by=64
         NNs[x_slice] = dists.argmin(1).long()
 
     return NNs
+
+
+def compute_pairwise_distances_in_batches(X, Y, loss_function, bx=64, by=64):
+    """Compute distance matrix in features of a function f(X) but restrict maximum inference batch to 'b'"""
+    X = X.cpu()
+    Y = Y.cpu()
+    x_slices = get_batche_slices(len(X), bx)
+    y_slices = get_batche_slices(len(Y), by)
+    dists = torch.zeros(len(X), len(Y), device=X.device)
+    for x_slice in x_slices:
+        for y_slice in y_slices:
+            dists[x_slice][:, y_slice] = loss_function(X[x_slice], Y[y_slice])
+    return dists
 
 
 if __name__ == '__main__':

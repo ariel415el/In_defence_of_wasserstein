@@ -54,7 +54,9 @@ def train_dual_function(args):
             if args.gp_weight > 0:
                 gp, gradient_norm = calc_gradient_penalty(netD, batch_1, batch_2)
                 debug_Dlosses['gradient_norm'] = gradient_norm
-                Dloss +=  args.gp_weight * gp
+                Dloss += args.gp_weight * gp
+                if "W1" in debug_Dlosses:
+                    debug_Dlosses['normalized W1'] = (debug_Dlosses['W1'] / gradient_norm) if gradient_norm > 0 else 0
             netD.zero_grad()
             Dloss.backward()
             optimizerD.step()
@@ -81,14 +83,15 @@ def evaluate(netD, loader_1, loader_2, iteration, logger, args):
     with torch.no_grad():
         netD.eval()
         start = time()
-        w1 = 0
+        exp_1 = 0
+        exp_2 = 0
         for batch in tqdm(loader_1):
-            w1 += netD(batch.to(device)).sum()
+            exp_1 += netD(batch.to(device)).sum()
 
         for batch in tqdm(loader_2):
-            w1 -= netD(batch.to(device)).sum()
+            exp_2 += netD(batch.to(device)).sum()
 
-        w1 = w1 / (len(loader_1.dataset) + len(loader_2.dataset))
+        w1 = exp_1 / len(loader_1.dataset) - exp_2 / len(loader_2.dataset)
 
         logger.log({'Full-W1': w1.item()}, step=iteration)
         netD.train()
@@ -128,7 +131,6 @@ if __name__ == "__main__":
     parser.add_argument('--device', default="cuda:0")
 
     args = parser.parse_args()
-    args.n_generators = 1
     args.train_name = f"Dual_solver-{os.path.basename(args.data_path)}_{args.im_size}x{args.im_size}" \
                 f"_D-{args.disc_arch}_B-{args.batch_size}_{args.tag}"
 
