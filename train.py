@@ -75,8 +75,8 @@ def train_GAN(args):
                 backup_para = copy_G_params(netG)
                 load_params(netG, avg_param_G)
 
-                evaluate(prior, netG, debug_fixed_noise,
-                         debug_fixed_reals, saved_image_folder, iteration, logger, args)
+                evaluate(prior, netG, debug_fixed_noise, debug_fixed_reals, saved_image_folder,
+                         iteration, logger, args)
 
                 save_model(prior, netG, netD, optimizerG, optimizerD, saved_model_folder, iteration, args)
 
@@ -85,15 +85,15 @@ def train_GAN(args):
             iteration += 1
 
 
-def evaluate(prior, netG, fixed_noise, debug_fixed_reals,
-             debug_all_reals, saved_image_folder, iteration, logger, args):
+def evaluate(prior, netG, fixed_noise, debug_fixed_reals, saved_image_folder,
+             iteration, logger, args):
     netG.eval()
     start = time()
     with torch.no_grad():
-        if full_batch_loader is not None:
+        if args.full_batch_metrics:
+            debug_all_reals = next(iter(full_batch_loader)).to(device)
             fake_images = batch_generation(netG, prior, len(debug_all_reals), args.f_bs, torch.device("cpu"), device)
             other_metrics = [get_loss_function(metric_name) for metric_name in args.full_batch_metrics]
-            debug_all_reals = next(iter(full_batch_loader)).to(device)
 
             print(f"Computing metrics between {len(debug_all_reals)} real and {len(fake_images)} fake images")
             for metric in other_metrics:
