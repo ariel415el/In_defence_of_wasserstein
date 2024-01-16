@@ -36,9 +36,6 @@ class MemoryDataset(Dataset):
                 img = transforms(img)
             self.images.append(img)
 
-        # if on_gpu:
-        #     self.images = torch.stack(self.images)
-        #     self.images = self.images.cuda()
     def __len__(self):
         return len(self.images)
 

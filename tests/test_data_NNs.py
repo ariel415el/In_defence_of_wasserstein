@@ -7,7 +7,7 @@ from tqdm import tqdm
 from torchvision import utils as vutils
 import torch.nn.functional as F
 
-from utils.metrics import VggDistCalculator, DiscriminatorDistCalculator, L2, compute_nearest_neighbors_batches
+from utils.metrics import VggDistCalculator, DiscriminatorDistCalculator, L2, compute_nearest_neighbors_in_batches
 from tests.test_utils import cut_around_center, pixel_distance, sample_patch_centers
 
 
@@ -82,7 +82,7 @@ def find_nns_percept(fake_images, data, outputs_dir, device, netD=None, layer_id
             feature_loss = DiscriminatorDistCalculator(netD, layer_idx, device=device)
         out_path = f'{outputs_dir}/nns/{"vgg" if netD is None else "Discriminator"}_im.png'
 
-        nn_indices = compute_nearest_neighbors_batches(fake_images, data, feature_loss, bx=64, by=64)
+        nn_indices = compute_nearest_neighbors_in_batches(fake_images, data, feature_loss, bx=64, by=64)
         debug_img = torch.cat([fake_images, data[nn_indices]], dim=-2)
 
         os.makedirs(os.path.dirname(out_path), exist_ok=True)
@@ -91,7 +91,7 @@ def find_nns_percept(fake_images, data, outputs_dir, device, netD=None, layer_id
 
 def find_nns(fake_images, data, outputs_dir):
     with torch.no_grad():
-        nn_indices = compute_nearest_neighbors_batches(fake_images, data, L2(), bx=64, by=64)
+        nn_indices = compute_nearest_neighbors_in_batches(fake_images, data, L2(), bx=64, by=64)
         debug_img = torch.cat([fake_images, data[nn_indices]], dim=-2)
 
         os.makedirs(f'{outputs_dir}/nns', exist_ok=True)

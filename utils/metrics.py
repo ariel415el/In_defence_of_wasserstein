@@ -11,8 +11,6 @@ def get_metric(name):
         metric = L2()
     elif name == 'vgg':
          metric = VggDistCalculator()
-    elif name == 'inception':
-        metric = InceptionDistCalculator()
     else:
         raise ValueError(f"No such metric name {name}")
     return metric
@@ -36,26 +34,6 @@ class L2:
         dist = torch.sqrt(torch.clamp(dist, min=1e-10)) # When loss is 0 the gradient of sqrt is nan
         # dist = (X[:, None] - Y[None, :]).pow(2).sum(-1).sqrt()
         return dist
-
-
-class InceptionDistCalculator:
-    def __init__(self, device=None):
-        from benchmarking.inception import myInceptionV3
-        self.device = device
-        self.inception = myInceptionV3()
-        self.inception.eval()
-
-    def extract(self, X):
-        X = X.to(self.device)
-        if self.device is None:
-            self.device = torch.device("cpu")
-            self.inception.to(self.device)
-        return self.inception(X)
-
-    def __call__(self, X, Y):
-        features_x = self.extract(X).reshape(len(X), -1)
-        features_y = self.extract(Y).reshape(len(Y), -1)
-        return L2()(features_x, features_y)
 
 
 class VggDistCalculator:
@@ -126,8 +104,11 @@ def get_batche_slices(n, b):
     return slices
 
 
-def compute_nearest_neighbors_in_batches(X, Y, loss_function, bx=64, by=64):
-    """Compute distance matrix in features of a function f(X) but restrict maximum inference batch to 'b'"""
+def compute_nearest_neighbors_in_batches(X, Y, nn_function, bx=64, by=64):
+    """
+    Compute nearest-neighbor index from Y for each X but restrict maximum inference batch to 'b'
+    :param nn_function: a function that computes the nearest neighbor
+    """
     X = X.cpu()
     Y = Y.cpu()
     x_slices = get_batche_slices(len(X), bx)
@@ -136,14 +117,17 @@ def compute_nearest_neighbors_in_batches(X, Y, loss_function, bx=64, by=64):
     for x_slice in x_slices:
         dists = torch.zeros(len(x_slice), len(Y), device=X.device, dtype=X.dtype)
         for y_slice in y_slices:
-            dists[:, y_slice] = loss_function(X[x_slice], Y[y_slice])
+            dists[:, y_slice] = nn_function(X[x_slice], Y[y_slice]).cpu()
         NNs[x_slice] = dists.argmin(1).long()
 
     return NNs
 
 
-def compute_pairwise_distances_in_batches(X, Y, loss_function, bx=64, by=64):
-    """Compute distance matrix in features of a function f(X) but restrict maximum inference batch to 'b'"""
+def compute_pairwise_distances_in_batches(X, Y, dist_function, bx=64, by=64):
+    """
+    Compute pairwise distances between X and Y in batches
+    :param dist_function: a function that computes parwise distances
+    """
     X = X.cpu()
     Y = Y.cpu()
     x_slices = get_batche_slices(len(X), bx)
@@ -151,13 +135,7 @@ def compute_pairwise_distances_in_batches(X, Y, loss_function, bx=64, by=64):
     dists = torch.zeros(len(X), len(Y), device=X.device)
     for x_slice in x_slices:
         for y_slice in y_slices:
-            dists[x_slice][:, y_slice] = loss_function(X[x_slice], Y[y_slice])
+            dists[x_slice][:, y_slice] = dist_function(X[x_slice], Y[y_slice])
     return dists
 
 
-if __name__ == '__main__':
-    vgg_dist = InceptionDistCalculator()
-    x = torch.ones(16,3,128,128)
-    y = torch.zeros(16,3,128,128)
-    d = vgg_dist.__call__(x,y)
-    print(d)

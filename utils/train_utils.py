@@ -14,7 +14,6 @@ def parse_train_args(arguments_string=None):
     # Data
     parser.add_argument('--data_path', default="/mnt/storage_ssd/datasets/FFHQ/FFHQ_1000/FFHQ_1000",
                         help="Path to train images")
-    parser.add_argument('--augmentation', default='', help="comma separated data augmentation ('color,translation')")
     parser.add_argument('--limit_data', default=None, type=int, help="limit the size of the dataset")
     parser.add_argument('--center_crop', default=None, help='center_crop_data to specified size', type=int)
     parser.add_argument('--gray_scale', action='store_true', default=False, help="Load data as grayscale")
@@ -46,9 +45,9 @@ def parse_train_args(arguments_string=None):
     parser.add_argument('--wandb', action='store_true', default=False, help="Otherwise use PLT localy")
     parser.add_argument('--log_freq', default=1000, type=int)
     parser.add_argument('--save_every', action='store_true', default=False)
-    parser.add_argument('--fid_freq', default=10000, type=int)
-    parser.add_argument('--fid_n_batches', default=0, type=int, help="How many batches batches for reference FID"
-                                                                     " statistics (0 turns off FID)")
+    parser.add_argument('--full_batch_evaluations', action='store_true', default=False)
+    parser.add_argument('--full_batch_metrics', nargs='+', default=[],
+                        help="Options: ['MiniBatchLoss-dist=w1', 'MiniBatchPatchLoss-dist=swd-p=16-s=8']")
 
     # Other
     parser.add_argument('--project_name', default='GANs')
