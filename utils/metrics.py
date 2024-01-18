@@ -3,14 +3,18 @@ import torch
 from torchvision import transforms, models
 
 
-def get_metric(name):
+def get_metric(name, **kwargs):
     """Choose how to calulate pairwise distances for EMD"""
     if name == 'L1':
         metric = L1()
     elif name == 'L2':
         metric = L2()
+    elif name == 'mean':
+        metric = MeanL2()
+    elif name == 'edge':
+        metric = EdgeL2()
     elif name == 'vgg':
-         metric = VggDistCalculator()
+         metric = VggDistCalculator(**kwargs)
     else:
         raise ValueError(f"No such metric name {name}")
     return metric
@@ -36,6 +40,26 @@ class L2:
         return dist
 
 
+class MeanL2(L2):
+    def __call__(self, X, Y):
+        return super().__call__(X.mean(1), Y.mean(1))
+
+
+class EdgeL2(L2):
+    def __init__(self):
+        super().__init__()
+        self.filter = torch.Tensor([[1, 0, -1],
+                                      [2, 0, -2],
+                                      [1, 0, -1]]).view((1, 1, 3, 3))
+
+    def get_edge_map(self , X):
+        self.filter = self.filter.to(X.device)
+        return torch.nn.functional.conv2d(torch.mean(X, dim=1, keepdim=True), self.filter)
+
+    def __call__(self, X, Y):
+        return super().__call__(self.get_edge_map(X), self.get_edge_map(Y))
+
+
 class VggDistCalculator:
     def __init__(self,  layer_idx=18, device=None):
         self.layer_idx = layer_idx  # [4, 9, 18]
@@ -56,6 +80,9 @@ class VggDistCalculator:
             X = layer(X)
             if i == layer_idx:
                 return X
+
+    def batch_extract(self, x, b=16):
+        return torch.cat([self.extract(x[slice]).cpu() for slice in get_batche_slices(len(x), b)], dim=0)
 
     def __call__(self, X, Y):
         features_x = self.extract(X).reshape(len(X), -1)
@@ -138,4 +165,6 @@ def compute_pairwise_distances_in_batches(X, Y, dist_function, bx=64, by=64):
             dists[x_slice][:, y_slice] = dist_function(X[x_slice], Y[y_slice])
     return dists
 
-
+if __name__ == '__main__':
+    x = torch.ones((1,3,8,7))
+    print(VggDistCalculator(layer_idx=18).extract(x).shape)

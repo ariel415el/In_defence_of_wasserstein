@@ -1,6 +1,7 @@
 import numpy as np
 import ot
 import torch
+from scipy import linalg
 from tqdm import tqdm
 from utils.metrics import get_metric
 
@@ -15,80 +16,6 @@ def w1(x, y, epsilon=0, **kwargs):
     OTPlan = _compute_ot_plan(C.detach().cpu().numpy(), int(epsilon))
     OTPlan = torch.from_numpy(OTPlan).to(C.device)
     W1 = torch.sum(OTPlan * C)
-    return W1, {"W1-L2": W1}
-
-
-def nn(x, y, alpha=None, **kwargs):
-    """some over distances to nearest neighbor in the other set
-        param x: (b1,d) shaped tensor
-        param y: (b2,d) shaped tensor
-    """
-    base_metric = get_metric("L2")
-    C = base_metric(x, y)
-    if alpha is not None:
-        C = C / (C.min(dim=0)[0] + float(alpha))  # compute_normalized_scores
-    nn_loss = C.min(dim=1)[0].mean()
-    return nn_loss, {"nn_loss": nn_loss}
-
-
-def remd(x, y, **kwargs):
-    """Releaxed EMD: Style transfer by re-laxed optimal transport and self-similarity
-        This is basicly bidirectional NN loss
-        param x: (b1,d) shaped tensor
-        param y: (b2,d) shaped tensor
-    """
-    base_metric = get_metric("L2")
-    C = base_metric(x, y)
-    nn_loss = max(C.min(dim=0)[0].mean(), C.min(dim=1)[0].mean())
-    return nn_loss, {"remd_loss": nn_loss}
-
-
-def projected_w1(x, y, epsilon=0, dim=64, num_proj=16, **kwargs):
-    """Project points to 'dim' dimensions and compute OT there. Avearage over 'num_proj' such projections
-        param x: (b1,d) shaped tensor
-        param y: (b2,d) shaped tensor
-    """
-    num_proj = int(num_proj)
-    dim = int(dim)
-    b, d = x.shape
-
-    dists = []
-    for i in range(num_proj):
-        # Sample random normalized projections
-        rand = torch.randn(d, dim).to(x.device)  # (slice_size**2*ch)
-        rand = rand / torch.norm(rand, dim=0, keepdim=True)  # noramlize to unit directions
-
-        # Project images
-        projx = torch.mm(x, rand)
-        projy = torch.mm(y, rand)
-
-        base_metric = get_metric("L2")
-        C = base_metric(projx, projy)
-        OTPlan = _compute_ot_plan(C.detach().cpu().numpy().copy(), int(epsilon))
-        OTPlan = torch.from_numpy(OTPlan).to(C.device)
-        W1 = torch.sum(OTPlan * C)
-
-        # projx = projx.T
-        # projy = projy.T
-        # sorted_projx, arsortx = torch.sort(projx, dim=1)
-        # sorted_projy, arsorty = torch.sort(projy, dim=1)
-        # SWD = (sorted_projx - sorted_projy).pow(2).sum(1).sqrt().div(projx.shape[1]).mean()
-        #
-        # arx = arsortx[0]
-        # ary = arsorty[0]
-        # ary_r = np.ones_like(ary)
-        # ary_r[ary] = np.arange(len(ary_r))
-        # ot_map = arx[ary_r]
-        # SWD2 = (projx[:,ot_map] - projy).pow(2).sqrt().mean()
-        #
-        # OTPlan2 = torch.zeros_like(OTPlan)
-        # OTPlan2[ot_map, torch.arange(projx.shape[1])] = 1 / projx.shape[1]
-        #
-        # W12 =  torch.sum(OTPlan2 * C)
-        # W13 =  C[ot_map, torch.arange(projx.shape[1])].sum() / projx.shape[1]
-
-        dists.append(W1)
-    W1 = torch.stack(dists).mean()
     return W1, {"W1-L2": W1}
 
 
@@ -119,14 +46,6 @@ def swd(x, y, num_proj=128, **kwargs):
     SWD = (projx - projy).abs().mean() # This is same for L2 and L1 since in 1d: .pow(2).sum(1).sqrt() == .pow(2).sqrt() == .abs()
 
     return SWD, {"SWD": SWD}
-
-
-def sinkhorn(x, y, epsilon=1, **kwargs):
-    """Compute Sinkhorn on GPU with geomloss package"""
-    from geomloss import SamplesLoss
-    sinkhorn_loss = SamplesLoss(loss="sinkhorn", p=1, blur=int(epsilon))
-    SH = sinkhorn_loss(x.reshape(len(x), -1), y.reshape(len(y), -1))
-    return SH, {"Sinkhorm-eps=1": SH}
 
 
 def discrete_dual(x, y, n_steps=500, batch_size=None, lr=0.001, verbose=False, nnb=256, dist="L2"):
@@ -165,6 +84,19 @@ def discrete_dual(x, y, n_steps=500, batch_size=None, lr=0.001, verbose=False, n
         return dual_estimate, {"dual": dual_estimate.item()}
 
 
+def fd(x, y):
+    # TODO make differenctiable
+    """Model each set with a MV Gaussian distribution and compute the OT between them (Frechet distance)
+        param x: (b1,d) shaped tensor
+        param y: (b2,d) shaped tensor
+    """
+
+    stats_x = torch.mean(x, 0).cpu().numpy(), np.cov(x.cpu().numpy(), rowvar=False)  # torch.matmul(x.T, x).cpu().numpy()
+    stats_y = torch.mean(y, 0).cpu().numpy(), np.cov(y.cpu().numpy(), rowvar=False)  # torch.matmul(y.T, x).cpu().numpy()
+    fd = _frechet_distance(stats_x, stats_y)
+    return fd, {'Frechet-distance': fd}
+
+
 def _batch_NN(X, Y, f, b, dist_function):
     """
     For each x find the best index i s.t i = argmin_i(x,y_i)-f_i
@@ -183,6 +115,35 @@ def _batch_NN(X, Y, f, b, dist_function):
         NN_dists[s], NNs[s] = dists.min(1)
 
     return NN_dists, NNs
+
+
+def _frechet_distance(stats1, stats2, eps=1e-6):
+    mean1, cov1 = stats1
+    mean2, cov2 = stats2
+    cov_sqrt, _ = linalg.sqrtm(cov1 @ cov2, disp=False)
+
+    if not np.isfinite(cov_sqrt).all():
+        print('product of cov matrices is singular')
+        offset = np.eye(cov1.shape[0]) * eps
+        cov_sqrt = linalg.sqrtm((cov1 + offset) @ (cov1 + offset))
+
+    if np.iscomplexobj(cov_sqrt):
+        if not np.allclose(np.diagonal(cov_sqrt).imag, 0, atol=1e-3):
+            # m = np.max(np.abs(cov_sqrt.imag))
+            # raise ValueError(f'Imaginary component {m}')
+            return np.nan
+
+        cov_sqrt = cov_sqrt.real
+
+    mean_diff = mean1 - mean2
+    mean_norm = mean_diff @ mean_diff
+
+    trace = np.trace(cov1) + np.trace(cov2) - 2 * np.trace(cov_sqrt)
+
+    fd = mean_norm + trace
+
+    return fd
+
 
 def _compute_ot_plan(C, epsilon=0):
     """Use POT to compute optimal transport between two emprical (uniforms) distriutaion with distance matrix C"""

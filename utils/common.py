@@ -4,6 +4,8 @@ from math import sqrt
 import torch
 from torchvision.utils import save_image
 
+from utils.metrics import get_batche_slices
+
 
 def compose_experiment_name(args):
     return f"{os.path.basename(args.data_path)}_I-{args.im_size}x{args.im_size}_G-{args.gen_arch}_D-{args.disc_arch}" \
@@ -34,21 +36,14 @@ def batch_generation(netG, prior, n, b, device, org_device):
     netG.to(device)
     fake_data = []
     if "const" in prior.prior_type: # generate images for all 'm' zs
-        n = len(prior.z)
-        n_batches = n // b
-        for i in range(n_batches):
-            zs = prior.z[i * b: (i + 1) * b].to(device)
-            fake_data.append(netG(zs))
-        if n_batches * b < n:
-            zs = prior.z[n_batches * b:].to(device)
+        slices = get_batche_slices(len(prior.z), b)
+        for slice in slices:
+            zs = prior.z[slice].to(device)
             fake_data.append(netG(zs))
     else:  # Generate 'n' images for random zs in batches of size b
-        n_batches = n // b
-        for i in range(n_batches):
-            z = prior.sample(b).to(device)
-            fake_data.append(netG(z))
-        if n_batches * b < n:
-            z = prior.sample(n - n_batches * b).to(device)
+        slices = get_batche_slices(n, b)
+        for slice in slices:
+            z = prior.sample(len(slice)).to(device)
             fake_data.append(netG(z))
     fake_data = torch.cat(fake_data)
     netG.to(org_device)

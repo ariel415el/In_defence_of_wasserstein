@@ -92,13 +92,14 @@ def evaluate(prior, netG, fixed_noise, debug_fixed_reals, saved_image_folder,
     with torch.no_grad():
         if args.full_batch_metrics:
             debug_all_reals = next(iter(full_batch_loader)).to(device)
+            print("Generating images in minibatches")
             fake_images = batch_generation(netG, prior, len(debug_all_reals), args.f_bs, torch.device("cpu"), device)
-            other_metrics = [get_loss_function(metric_name) for metric_name in args.full_batch_metrics]
-
             print(f"Computing metrics between {len(debug_all_reals)} real and {len(fake_images)} fake images")
-            for metric in other_metrics:
+            for metric_name in args.full_batch_metrics:
+                print(f"\t - {metric_name}")
+                metric = get_loss_function(metric_name)
                 logger.log({
-                    f'{metric.name}_fixed_noise_gen_to_train': metric(fake_images.cpu(), debug_all_reals.cpu()),
+                    f'{metric_name}_fixed_noise_gen_to_train': metric(fake_images.cpu(), debug_all_reals.cpu()),
                 }, step=iteration)
 
         dump_images(netG(fixed_noise),  f'{saved_image_folder}/{iteration}.png')

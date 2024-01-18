@@ -6,7 +6,7 @@ import numpy as np
 import torch.multiprocessing as mp
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-from losses.optimal_transport import MiniBatchPatchLoss
+from losses.batch_losses import MiniBatchPatchLoss
 from utils.common import parse_classnames_and_kwargs
 from scripts.experiments.experiment_utils import get_data, batch_to_image
 from torchvision.transforms import transforms

@@ -27,12 +27,12 @@ def main():
                         "Real": real_batch1[:bs],
                         # "Means": torch.mean(ref_data, dim=0, keepdim=True).repeat(bs, 1, 1, 1),
                         # "KMeans": get_centroids(ref_data, bs, use_faiss=False)
-                        # "OTMeans": ot_mean(ref_data.clone(), bs, n_iters=4, minimization_method=weisfeld_minimization, verbose=False).reshape(-1, *data.shape[1:])
+                        "OTMeans": ot_mean(ref_data.clone(), bs, n_iters=4, minimization_method=weisfeld_minimization, verbose=False).reshape(-1, *data.shape[1:])
                     }
         dump_images(named_batches[bs]["Real"], os.path.join(output_dir, f"Real-{bs}.png"))
         # dump_images(named_batches[bs]["Means"], os.path.join(output_dir, f"Means-{bs}.png"))
         # dump_images(named_batches[bs]["KMeans"], os.path.join(output_dir, f"KMeans-{bs}.png"))
-        # dump_images(named_batches[bs]["OTMeans"], os.path.join(output_dir, f"OTMeans-{bs}.png"))
+        dump_images(named_batches[bs]["OTMeans"], os.path.join(output_dir, f"OTMeans-{bs}.png"))
 
     for metric_name, metric in metrics.items():
         distances = defaultdict(list)
@@ -64,7 +64,7 @@ def plot(metric_name, distances, batch_sizes):
 if __name__ == '__main__':
     output_dir = os.path.join(os.path.dirname(__file__), "outputs", "batch_size_effect")
     device = torch.device('cpu')
-    batch_sizes = [10, 100, 500, 1000, 35000]
+    batch_sizes = [512, 1024]#, 1000, 35000]
     im_size = 64
     n = batch_sizes[-1]
 
@@ -72,18 +72,25 @@ if __name__ == '__main__':
     c = 3
     gray_scale = False
     center_crop = 90
-    limit_data = 2 * n
+    limit_data = 10000 + n
     data = get_data(data_path, im_size, c=c, center_crop=center_crop,
                     gray_scale=gray_scale, flatten=False, limit_data=limit_data).to(device)
 
     shuffle(data)
-    ref_data = data[n:]
     real_batch1 = data[:n]
+    ref_data = data[n:]
 
-    metric_names = ['MiniBatchLoss-dist=w1',
+    metric_names = [
+                    # 'MiniBatchLoss-dist=swd',
+                    'MiniBatchNeuralLoss-dist=fd-device=cuda:0-b=64',
+                    'MiniBatchNeuralPatchLoss-dist=fd-device=cuda:0-b=64',
+                    'MiniBatchPatchLoss-dist=swd-p=16-s=8',
+                    'MiniBatchPatchLoss-dist=fd-p=8-s=8',
+                    # 'MiniBatchPatchLoss-dist=swd-p=16-s=8',
+                    # 'MiniBatchPatchLoss-dist=fd-p=8-s=8',
                     # 'MiniBatchLoss-dist=swd',
                     # 'MiniBatchLocalPatchLoss-dist=w1-p=8-s=4-n_samples=2000',
-                    # 'MiniBatchLocalPatchLoss-dist=swd-p=8-s=4',
+                    # 'MiniBatchLocalPatchLoss-dist=swd-p=8-s=8',
                     # 'MiniBatchPatchLoss-dist=swd-p=8-s=4',
     ]
 

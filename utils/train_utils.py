@@ -46,8 +46,16 @@ def parse_train_args(arguments_string=None):
     parser.add_argument('--log_freq', default=1000, type=int)
     parser.add_argument('--save_every', action='store_true', default=False)
     parser.add_argument('--full_batch_evaluations', action='store_true', default=False)
-    parser.add_argument('--full_batch_metrics', nargs='+', default=[],
-                        help="Options: ['MiniBatchLoss-dist=w1', 'MiniBatchPatchLoss-dist=swd-p=16-s=8']")
+    parser.add_argument('--full_batch_metrics', nargs='*', default=[
+                                'MiniBatchLoss-dist=w1',
+                                'MiniBatchLoss-dist=swd',
+                                'MiniBatchPatchLoss-dist=swd-p=8-s=8',
+                                'MiniBatchPatchLoss-dist=fd-p=8-s=8',
+                                'MiniBatchNeuralLoss-dist=fd-device=cuda:0-b=64-layer_idx=9',
+                                'MiniBatchNeuralLoss-dist=fd-device=cuda:0-b=64-layer_idx=18',
+                                'MiniBatchNeuralPatchLoss-dist=fd-device=cuda:0-b=64-layer_idx=9',
+                                'MiniBatchNeuralPatchLoss-dist=fd-device=cuda:0-b=64-layer_idx=18',
+    ])
 
     # Other
     parser.add_argument('--project_name', default='GANs')

@@ -1,5 +1,6 @@
 import os
 
+import numpy as np
 import torch
 from matplotlib import pyplot as plt
 from tqdm import tqdm
@@ -7,8 +8,9 @@ from tqdm import tqdm
 from torchvision import utils as vutils
 import torch.nn.functional as F
 
-from utils.metrics import VggDistCalculator, DiscriminatorDistCalculator, L2, compute_nearest_neighbors_in_batches
-from tests.test_utils import cut_around_center, pixel_distance, sample_patch_centers
+from utils.metrics import VggDistCalculator, DiscriminatorDistCalculator, L2, compute_nearest_neighbors_in_batches, \
+    get_batche_slices, get_metric
+from tests.test_utils import cut_around_center, sample_patch_centers
 
 
 def imshow(img, axs, title="img"):
@@ -18,56 +20,108 @@ def imshow(img, axs, title="img"):
     axs.set_title(title)
 
 
-def search_for_nn_patches_in_locality(img, data, center, p, search_margin, dist="edge"):
+def search_for_nn_patches_in_locality_in_batches(img, data, center, p, stride, search_margin, metric, b=64):
     """
     for a given patch location and size, search the nearest patch from data (only in the same patch location) to
     the patch in img in that location"""
+    n = len(data)
+    max_n_patches_in_crop = F.unfold(torch.ones(1,3,p+2*search_margin, p+2*search_margin), kernel_size=p, stride=stride).shape[-1]
     query_patch = cut_around_center(img, center, p, margin=0)
     # Cut a larger area around the center and  split to patches
-    refs = cut_around_center(data, center, p, margin=search_margin)
-    refs = F.unfold(refs, kernel_size=p, stride=1)  # shape (b, c*p*p, N_patches)
-    n_patches = refs.shape[-1]
-    c = img.shape[1]
-    refs = refs.permute(0, 2, 1).reshape(-1, c, p, p)
+    dists = torch.ones((n, max_n_patches_in_crop)) * np.inf
+    slices = get_batche_slices(n, b)
+    for slice in slices:
+        refs = cut_around_center(data[slice], center, p, margin=search_margin)
+        refs = F.unfold(refs, kernel_size=p, stride=stride)  # shape (b, c*p*p, n_patches_in_crop)
+        n_patches_in_crop = refs.shape[-1]
+        c = img.shape[1]
+        refs = refs.permute(0, 2, 1).reshape(-1, c, p, p)
 
-    # Search in RGB values
-    print(f"Searching for NN patch in {len(refs)} patches at center {center}:")
+        dists[slice, :n_patches_in_crop] = metric(refs.cuda(), query_patch.cuda())[:, 0].reshape(len(slice), -1).cpu()
 
-    dists = pixel_distance(refs, query_patch, dist)
-    patch_index = torch.sort(torch.norm(dists, dim=1, p=1))[1][0]
+    patch_index = torch.argmin(dists.reshape(-1)).item()
+    img_index = patch_index // max_n_patches_in_crop
+    patch_index = patch_index % max_n_patches_in_crop
 
-    img_index = patch_index // n_patches
+    return img_index, patch_index
+
+
+def search_neural_patch_nn(vgg, img, data, center, p, search_margin, b=64):
+    """
+    for a given patch location and size, search the nearest patch from data (only in the same patch location) to
+    the patch in img in that location"""
+    n = len(data)
+    max_n_patches_in_crop = vgg.extract(torch.ones(1,3,p+2*search_margin, p+2*search_margin).cuda()).shape[-1]**2
+    query_patch = cut_around_center(img, center, p, margin=0)
+    query_patch = vgg.extract(query_patch.cuda())
+    c = query_patch.shape[1]
+    neural_patch_size = query_patch.shape[-1]
+    query_patch = query_patch.reshape(len(query_patch), -1)
+    # Cut a larger area around the center and  split to patches
+    dists = torch.ones((n, max_n_patches_in_crop)) * np.inf
+    slices = get_batche_slices(n, b)
+    for slice in slices:
+        refs = cut_around_center(data[slice], center, p, margin=search_margin)
+        refs = vgg.extract(refs.cuda())
+        refs = F.unfold(refs, kernel_size=neural_patch_size, stride=1)  # shape (b, c*p*p, n_patches_in_crop)
+        n_patches_in_crop = refs.shape[-1]
+        refs = refs.permute(0, 2, 1).reshape(-1, c, neural_patch_size, neural_patch_size)
+        dists[slice, :n_patches_in_crop] = L2()(refs, query_patch)[:, 0].reshape(len(slice), -1).cpu()
+
+    patch_index = torch.argmin(dists.reshape(-1)).item()
+    img_index = patch_index // max_n_patches_in_crop
     return img_index
 
 
-def find_patch_nns(fake_images, data, patch_size, search_margin, outputs_dir, n_centers=10, dist="rgb"):
+
+def crop_specific_patch(image, center, p, stride, search_margin, patch_index):
+    crop = cut_around_center(image, center, p, margin=search_margin)
+    patches = F.unfold(crop, kernel_size=p, stride=stride)  # shape (b, c*p*p, n_patches_in_crop)
+    patch = patches[..., patch_index]
+    return patch.reshape(image.shape[0], p, p)
+
+
+def find_patch_nns(fake_images, data, patch_size, stride, search_margin, outputs_dir, n_centers=10, b=64, metric_name='L2'):
     """
     Search for nearest patch in data to patches from generated images.
     Search is performed in a constrained locality of the query patch location
     @parm: search_margin: how many big will the search area be (in pixels)
+    @parm: stride: search patches inside the search area with this stride
     """
     with torch.no_grad():
         s = 3
-        out_dir = f'{outputs_dir}/patch_nns(p-{patch_size}_s-{search_margin})'
+        out_dir = f'{outputs_dir}/{metric_name}-patch_nns(p-{patch_size}_s-{search_margin})'
         os.makedirs(out_dir, exist_ok=True)
 
         centers = sample_patch_centers(data.shape[-1], patch_size, n_centers)
+
+        metric = get_metric(metric_name)
 
         for j in range(len(fake_images)):
             query_image = fake_images[j]
             fig, ax = plt.subplots(nrows=len(centers), ncols=4, figsize=(s * 3, s * len(centers)))
             for i, center in enumerate(tqdm(centers)):
-                ref_nn_index = search_for_nn_patches_in_locality(query_image.unsqueeze(0),
+                ref_nn_index, patch_index = search_for_nn_patches_in_locality_in_batches(query_image.unsqueeze(0),
                                                                   data, center,
                                                                   p=patch_size,
+                                                                  stride=stride,
                                                                   search_margin=search_margin,
-                                                                 dist=dist)
+                                                                  b=b,
+                                                                  metric=metric)
+
+                # ref_nn_index = search_neural_patch_nn(vgg, query_image.unsqueeze(0),
+                #                                                   data, center,
+                #                                                   p=patch_size,
+                #                                                   search_margin=search_margin,
+                #                                                   b=1024)
+
                 q_patch = cut_around_center(query_image, center, patch_size)
-                r_patch = cut_around_center(data[ref_nn_index], center, patch_size)
+
+                r_patch = crop_specific_patch(data[ref_nn_index], center, patch_size, stride, search_margin, patch_index)
                 imshow(q_patch, ax[i, 0], "Query-Patch")
-                imshow(r_patch, ax[i, 1], f"{dist}-NN-Patch: {(q_patch - r_patch).pow(2).sum().sqrt():.3f}")
+                imshow(r_patch, ax[i, 1], f"{metric_name}-NN-Patch: {(q_patch - r_patch).pow(2).sum().sqrt():.3f}")
                 imshow(query_image, ax[i, 2], "Query-Image")
-                imshow(data[ref_nn_index], ax[i, 3], f"{dist}-NN-Image")
+                imshow(data[ref_nn_index], ax[i, 3], f"{metric_name}-NN-Image")
 
             plt.tight_layout()
             fig.savefig(f'{out_dir}/patches-{j}.png')

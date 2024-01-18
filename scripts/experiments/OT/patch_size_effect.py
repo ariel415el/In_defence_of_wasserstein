@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 from utils.common import parse_classnames_and_kwargs
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-from losses.optimal_transport import MiniBatchPatchLoss
+from losses.batch_losses import MiniBatchPatchLoss
 from scripts.experiments.experiment_utils import get_data, get_centroids, batch_to_image
 
 COLORS =['r', 'g', 'b', 'k']

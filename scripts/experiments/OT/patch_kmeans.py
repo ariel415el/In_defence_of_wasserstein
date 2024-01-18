@@ -8,7 +8,7 @@ from matplotlib import pyplot as plt
 from scripts.experiments.OT.ot_means import ot_mean, weisfeld_minimization
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-from losses.optimal_transport import MiniBatchPatchLoss, MiniBatchLoss, to_patches
+from losses.batch_losses import MiniBatchPatchLoss, MiniBatchLoss, to_patches
 from scripts.experiments.experiment_utils import get_data, get_centroids
 from utils.common import dump_images
 

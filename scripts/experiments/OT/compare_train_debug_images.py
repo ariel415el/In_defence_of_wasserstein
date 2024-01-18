@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 from scripts.experiments.experiment_utils import get_data, batch_to_image, read_grid_batch, find_last_file
-from losses.optimal_transport import MiniBatchLoss, MiniBatchPatchLoss
+from losses.batch_losses import MiniBatchLoss, MiniBatchPatchLoss
 
 
 if __name__ == '__main__':

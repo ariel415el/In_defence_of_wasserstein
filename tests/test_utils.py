@@ -29,22 +29,6 @@ def get_data(data_root, im_size, center_crop, gray_scale, limit_data=None):
     return images
 
 
-def pixel_distance(x, y, dist='edges'):
-    if dist == "rgb":
-        dists = (x - y)
-    elif dist == "gray":
-        dists = (x.mean(1) - y.mean(1))  # Compare gray scale images
-    else:
-        a = torch.Tensor([[1, 0, -1],
-                          [2, 0, -2],
-                          [1, 0, -1]]).view((1, 1, 3, 3))
-        dists = (F.conv2d(torch.mean(x, dim=1, keepdim=True), a) -
-                 F.conv2d(torch.mean(y, dim=1, keepdim=True), a)
-                 )
-
-    return dists.reshape(x.shape[0], -1)
-
-
 def cut_around_center(img, center, size, margin=0):
     hs = size // 2
     r = img.shape[-2]
@@ -56,7 +40,7 @@ def cut_around_center(img, center, size, margin=0):
 
 def sample_patch_centers(img_dim, p, n_centers, stride=1, offset=0):
     h = p // 2
-    centers = np.arange(h, img_dim - h + 1, stride) + offset
+    centers = np.arange(h, img_dim - h - 1, stride) + offset
     centers = list(itertools.product(centers, repeat=2))
     shuffle(centers)
     centers = centers[:n_centers]

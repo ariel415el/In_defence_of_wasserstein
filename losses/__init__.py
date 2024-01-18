@@ -3,7 +3,7 @@ import sys
 
 from losses.c_transform_wgan import *
 from losses.non_saturating import *
-from losses.optimal_transport import *
+from losses.batch_losses import *
 from losses.soft_hinge_loss import *
 from losses.wgan import *
 from losses.adverserial_feature_matching import *

@@ -77,11 +77,14 @@ if __name__ == '__main__':
     #                                                                'MiniBatchPatchLoss-dist=w1-p=8-s=4-n_samples=10000',
     #                                                               ], outputs_dir=outputs_dir)
     # Nearest neighbor visualizations
-    fake_images = netG(prior.sample(16).cpu())
+    fake_images = netG(prior.sample(1).cpu())
 
     # find_nns(fake_images, data, outputs_dir=outputs_dir)
     # find_nns_percept(fake_images, data, outputs_dir, device, layer_idx=18)
     # find_nns_percept(fake_images, data, outputs_dir, device, netD, layer_idx=3)
-    find_patch_nns(fake_images, data, patch_size=32, search_margin=1, outputs_dir=outputs_dir, n_centers=1)
+    # find_patch_nns(fake_images, data, patch_size=32, stride=3, search_margin=21, outputs_dir=outputs_dir, n_centers=5, b=256, metric_name='L2')
+    find_patch_nns(fake_images, data, patch_size=32, stride=4, search_margin=24, outputs_dir=outputs_dir, n_centers=5, b=1024, metric_name='edge')
+    find_patch_nns(fake_images, data, patch_size=32, stride=4, search_margin=24, outputs_dir=outputs_dir, n_centers=5, b=1024, metric_name='mean')
+    # find_patch_nns(fake_images, data, patch_size=32, stride=7, search_margin=21, outputs_dir=outputs_dir, n_centers=5, b=16, metric_name='vgg')
     # find_patch_nns(fake_images, data, patch_size=22, search_margin=4, outputs_dir=outputs_dir, n_centers=4)
     # find_patch_nns(fake_images, data, patch_size=12, search_margin=2, outputs_dir=outputs_dir, n_centers=4)
