@@ -85,27 +85,6 @@ def batch_to_image(batch, d, c, n=16):
     return grid.mul(255).add_(0.5).clamp_(0, 255).permute(1, 2, 0).to("cpu", torch.uint8).cpu().numpy()
 
 
-def find_dir(root, names, disallowed_names=[]):
-    valid_dirs = []
-    for dname in os.listdir(root):
-        is_good = True
-        for name in names:
-            if name not in dname:
-                is_good = False
-                break
-        for name in disallowed_names:
-            if name in dname:
-                is_good = False
-        if is_good:
-            valid_dirs.append(dname)
-
-    assert len(valid_dirs) == 1, (f"Dir description is not unique:)"
-                                  f"\t-\nValid dirs: {valid_dirs}"
-                                  f"\t-\nnames: {names}"
-                                  f"\t-\ndisallowed_names: {disallowed_names}")
-    return valid_dirs[0]
-
-
 def find_last_file(dir, ext='.png'):
     files = glob.glob(f'{dir}/*{ext}')
     if files:
