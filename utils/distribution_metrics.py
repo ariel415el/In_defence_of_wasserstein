@@ -94,7 +94,7 @@ def fd(x, y):
     stats_x = torch.mean(x, 0).cpu().numpy(), np.cov(x.cpu().numpy(), rowvar=False)  # torch.matmul(x.T, x).cpu().numpy()
     stats_y = torch.mean(y, 0).cpu().numpy(), np.cov(y.cpu().numpy(), rowvar=False)  # torch.matmul(y.T, x).cpu().numpy()
     fd = _frechet_distance(stats_x, stats_y)
-    return fd, {'Frechet-distance': fd}
+    return torch.tensor(fd), {'Frechet-distance': fd}
 
 
 def _batch_NN(X, Y, f, b, dist_function):

@@ -73,7 +73,7 @@ def sgd_minimization(centroids, data, n_steps=100):
     return centroids
 
 
-def ot_mean(data, k, n_iters, minimization_method, init_from=None, verbose=True):
+def ot_means(data, k, n_iters, minimization_method, init_from=None, verbose=False, out_dir=None):
     print(f"Running OTmeans with k={k} on data of shape {data.shape}")
     if verbose:
         plots = defaultdict(list)
@@ -100,8 +100,9 @@ def ot_mean(data, k, n_iters, minimization_method, init_from=None, verbose=True)
                 print(f"\b {metric_name}: {dist:.4f}")
                 plots[metric_name].append(dist)
 
-            dump_images(centroids.reshape(args.k, -1, args.im_size, args.im_size),
-                        f"{out_dir}/images/otMeans-{i}.png")
+            if out_dir is not None:
+                dump_images(centroids.reshape(k, -1, data_shape[-2], data_shape[-1]),
+                            f"{out_dir}/images/otMeans-{i}.png")
     if verbose:
         return plots
     else:
@@ -156,6 +157,6 @@ if __name__ == "__main__":
 
     minimiztion_func = globals()[f"{args.min_method}_minimization"]
 
-    plots = ot_mean(data, args.k, 10, minimiztion_func, verbose=True)
+    plots = ot_means(data, args.k, 10, minimiztion_func, verbose=True, out_dir=out_dir)
 
     log(plots)
