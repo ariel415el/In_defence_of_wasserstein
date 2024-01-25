@@ -44,20 +44,6 @@ class SEBlock(nn.Module):
         return feat_big * self.main(feat_small)
 
 
-class DownBlock(nn.Module):
-    def __init__(self, in_planes, out_planes):
-        super(DownBlock, self).__init__()
-
-        self.main = nn.Sequential(
-            conv2d(in_planes, out_planes, 4, 2, 1, bias=False),
-            batchNorm2d(out_planes),
-            nn.LeakyReLU(0.2, inplace=True),
-        )
-
-    def forward(self, feat):
-        return self.main(feat)
-
-
 class DownBlockComp(nn.Module):
     def __init__(self, in_planes, out_planes, down_sample=True):
         super(DownBlockComp, self).__init__()
@@ -86,6 +72,7 @@ class Discriminator(nn.Module):
         super(Discriminator, self).__init__()
         self.input_dim = input_dim
         self.num_outputs = num_outputs
+        depth = int(depth)
 
         nfc_multi = {4: 32, 8: 16, 16: 8, 32: 4, 64: 2, 128: 1, 256: 0.5}
         nfc = {k: int(v * int(nf)) for k, v in nfc_multi.items()}
@@ -96,21 +83,20 @@ class Discriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True)]
         cur_dim = input_dim
         for i in range(depth):
-            layers.append(DownBlockComp(nfc[cur_dim], nfc[cur_dim // 2], down_sample=i < depth-1))
-            cur_dim = cur_dim // 2
+            layers.append(DownBlockComp(nfc[cur_dim], nfc[cur_dim // 2], down_sample=True))# i < depth-1))
+            cur_dim = cur_dim // 2  #  if i < depth-1 else cur_dim
 
         self.features = nn.Sequential(*layers)
 
         self.spatial_logits = nn.Sequential(
             conv2d(nfc[cur_dim], nfc[cur_dim // 2], 1, 1, 0, bias=False),
             batchNorm2d(nfc[cur_dim // 2]), nn.LeakyReLU(0.2, inplace=True),
-            conv2d(nfc[cur_dim // 2], 1, 4, 1, 0, bias=False))
+            conv2d(nfc[cur_dim // 2], 1, 3, 1, 0, bias=False))
 
         self.apply(weights_init)
 
     def forward(self, img):
         features = self.features(img)
-        print(features.shape)
         output = self.spatial_logits(features)
         if self.num_outputs == 1:
             output = output.view(-1)

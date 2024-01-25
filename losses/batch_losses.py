@@ -72,14 +72,12 @@ class MiniBatchLocalPatchLoss(MiniBatchLoss):
         # x_patches = to_patches(x, self.p, self.s, remove_locations=False)
         # y_patches = to_patches(y, self.p, self.s, remove_locations=False)
         # loss = torch.stack([self.metric(x_patches[l], y_patches[l], **self.kwargs)[0] for l in range(len(x_patches))]).mean()
-        x = x.contiguous()
-        y = y.contiguous()
         locs = patch_locations(x.shape[-1], self.p, self.s)
         loss = 0
         for r in locs:
             for c in locs:
-                loss += self.metric(x[..., r[0]:r[1], c[0]:c[1]].view(len(x), -1),
-                                    y[..., r[0]:r[1], c[0]:c[1]].view(len(y), -1),
+                loss += self.metric(x[..., r[0]:r[1], c[0]:c[1]].contiguous().view(len(x), -1),
+                                    y[..., r[0]:r[1], c[0]:c[1]].contiguous().view(len(y), -1),
                                     **self.kwargs)[0]
         loss = loss / len(locs)**2
         return loss, {f"Local-{self.dist_name}": loss.item()}

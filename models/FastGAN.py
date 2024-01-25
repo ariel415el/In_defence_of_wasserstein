@@ -16,7 +16,7 @@ def convTranspose2d(*args, **kwargs):
 
 
 def batchNorm2d(*args, **kwargs):
-    return nn.BatchNorm2d(*args, **kwargs)
+    return nn.InstanceNorm2d(*args, **kwargs)
 
 
 def conv2d(*args, **kwargs):

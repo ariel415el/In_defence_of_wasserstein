@@ -20,7 +20,7 @@ def imshow(img, axs, title="img"):
     axs.set_title(title)
 
 
-def search_for_nn_patches_in_locality_in_batches(img, data, center, p, stride, search_margin, metric, b=64):
+def search_for_nn_patches_in_locality_in_batches(img, data, center, p, stride, search_margin, metric, device, b):
     """
     for a given patch location and size, search the nearest patch from data (only in the same patch location) to
     the patch in img in that location"""
@@ -37,41 +37,13 @@ def search_for_nn_patches_in_locality_in_batches(img, data, center, p, stride, s
         c = img.shape[1]
         refs = refs.permute(0, 2, 1).reshape(-1, c, p, p)
 
-        dists[slice, :n_patches_in_crop] = metric(refs.cuda(), query_patch.cuda())[:, 0].reshape(len(slice), -1).cpu()
+        dists[slice, :n_patches_in_crop] = metric(refs.to(device), query_patch.to(device))[:, 0].reshape(len(slice), -1).cpu()
 
     patch_index = torch.argmin(dists.reshape(-1)).item()
     img_index = patch_index // max_n_patches_in_crop
     patch_index = patch_index % max_n_patches_in_crop
 
     return img_index, patch_index
-
-
-def search_neural_patch_nn(vgg, img, data, center, p, search_margin, b=64):
-    """
-    for a given patch location and size, search the nearest patch from data (only in the same patch location) to
-    the patch in img in that location"""
-    n = len(data)
-    max_n_patches_in_crop = vgg.extract(torch.ones(1,3,p+2*search_margin, p+2*search_margin).cuda()).shape[-1]**2
-    query_patch = cut_around_center(img, center, p, margin=0)
-    query_patch = vgg.extract(query_patch.cuda())
-    c = query_patch.shape[1]
-    neural_patch_size = query_patch.shape[-1]
-    query_patch = query_patch.reshape(len(query_patch), -1)
-    # Cut a larger area around the center and  split to patches
-    dists = torch.ones((n, max_n_patches_in_crop)) * np.inf
-    slices = get_batche_slices(n, b)
-    for slice in slices:
-        refs = cut_around_center(data[slice], center, p, margin=search_margin)
-        refs = vgg.extract(refs.cuda())
-        refs = F.unfold(refs, kernel_size=neural_patch_size, stride=1)  # shape (b, c*p*p, n_patches_in_crop)
-        n_patches_in_crop = refs.shape[-1]
-        refs = refs.permute(0, 2, 1).reshape(-1, c, neural_patch_size, neural_patch_size)
-        dists[slice, :n_patches_in_crop] = L2()(refs, query_patch)[:, 0].reshape(len(slice), -1).cpu()
-
-    patch_index = torch.argmin(dists.reshape(-1)).item()
-    img_index = patch_index // max_n_patches_in_crop
-    return img_index
-
 
 
 def crop_specific_patch(image, center, p, stride, search_margin, patch_index):
@@ -81,7 +53,7 @@ def crop_specific_patch(image, center, p, stride, search_margin, patch_index):
     return patch.reshape(image.shape[0], p, p)
 
 
-def find_patch_nns(fake_images, data, patch_size, stride, search_margin, outputs_dir, n_centers=10, b=64, metric_name='L2'):
+def find_patch_nns(fake_images, data, patch_size, stride, search_margin, outputs_dir, n_centers=10, b=64, metric_name='L2', device=torch.device('cpu')):
     """
     Search for nearest patch in data to patches from generated images.
     Search is performed in a constrained locality of the query patch location
@@ -107,13 +79,8 @@ def find_patch_nns(fake_images, data, patch_size, stride, search_margin, outputs
                                                                   stride=stride,
                                                                   search_margin=search_margin,
                                                                   b=b,
-                                                                  metric=metric)
-
-                # ref_nn_index = search_neural_patch_nn(vgg, query_image.unsqueeze(0),
-                #                                                   data, center,
-                #                                                   p=patch_size,
-                #                                                   search_margin=search_margin,
-                #                                                   b=1024)
+                                                                  metric=metric,
+                                                                  device=device)
 
                 q_patch = cut_around_center(query_image, center, patch_size)
 
