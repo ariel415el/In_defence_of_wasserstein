@@ -3,7 +3,7 @@ import ot
 import torch
 from scipy import linalg
 from tqdm import tqdm
-from utils.metrics import get_metric, compute_nearest_neighbors_in_batches
+from utils.metrics import get_metric, compute_pairwise_distances_in_batches
 
 
 def w1(x, y, epsilon=0., b=None,  **kwargs):
@@ -16,7 +16,7 @@ def w1(x, y, epsilon=0., b=None,  **kwargs):
         C = base_metric(x, y, **kwargs)
     else:
         b = int(b)
-        C = compute_nearest_neighbors_in_batches(x,y,base_metric, bx=b, by=b)
+        C = compute_pairwise_distances_in_batches(x,y,base_metric, bx=b, by=b)
     OTPlan = _compute_ot_plan(C.detach().cpu().numpy(), float(epsilon))
     OTPlan = torch.from_numpy(OTPlan).to(C.device)
     W1 = torch.sum(OTPlan * C)

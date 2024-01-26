@@ -93,7 +93,7 @@ def evaluate(prior, netG, fixed_noise, debug_fixed_reals, saved_image_folder,
         if args.full_batch_metrics:
             debug_all_reals = next(iter(full_batch_loader)).to(device)
             print("Generating images in minibatches")
-            fake_images = batch_generation(netG, prior, len(debug_all_reals), args.f_bs, torch.device("cpu"), device)
+            fake_images = batch_generation(netG, prior, len(debug_all_reals), args.f_bs, device)
             print(f"Computing metrics between {len(debug_all_reals)} real and {len(fake_images)} fake images")
             for metric_name in args.full_batch_metrics:
                 print(f"\t - {metric_name}")

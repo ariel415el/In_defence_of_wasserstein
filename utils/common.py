@@ -33,12 +33,13 @@ def dump_images(batch, fname):
     save_image(batch, fname, nrow=nrow, normalize=True, pad_value=1, scale_each=True)
 
 
-def batch_generation(netG, prior, n, b, inference_device, org_device, verbose=False):
+def batch_generation(netG, prior, n, b, inference_device, verbose=False):
     """
     Generate images in batches of size b on 'inference_device'
     # for a discrete prior generate images for all 'm' zs
     # for continous priors Generate 'n' images
     """
+    org_device = next(netG.parameters()).device
     netG.to(inference_device)
     fake_data = []
     is_const_prior = "const" in prior.prior_type
@@ -50,7 +51,7 @@ def batch_generation(netG, prior, n, b, inference_device, org_device, verbose=Fa
             zs = prior.z[slice].to(inference_device)
         else:
             zs = prior.sample(len(slice)).to(inference_device)
-        fake_data.append(netG(zs))
+        fake_data.append(netG(zs).cpu())
     fake_data = torch.cat(fake_data)
     netG.to(org_device)
     return fake_data

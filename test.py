@@ -6,6 +6,7 @@ import torch
 
 from models import get_models
 from scripts.experiment_utils import find_last_file
+from tests.compute_metrics import compute_metrics
 from tests.generate_images import generate_images
 from tests.interpolate import interpolate
 from tests.latent_inversion import inverse_image
@@ -49,7 +50,6 @@ if __name__ == '__main__':
     os.makedirs(outputs_dir, exist_ok=True)
 
     args = json.load(open(os.path.join(model_dir, "args.txt")))
-    cpu = torch.device("cpu")
     z_dim = args['z_dim']
     data_root = args['data_path']
     print("Loading models", end='...')
@@ -57,7 +57,7 @@ if __name__ == '__main__':
     print("Done")
 
     # No data tests
-    # generate_images(netG, prior, outputs_dir, device)
+    generate_images(netG, prior, outputs_dir, device)
     # find_mode_collapses(netG, netD, z_dim, outputs_dir, device)
     # interpolate(netG, z_dim, n_zs=15, seconds=60, fps=30, outputs_dir=outputs_dir, device=device)
 
@@ -71,11 +71,7 @@ if __name__ == '__main__':
     data = get_data(args['data_path'], args['im_size'], args['center_crop'], args['gray_scale'], limit_data=args['limit_data'])
     netG = netG.cpu()
 
-    # compare_real_fake_patch_dist(netG,  prior, data, metric_names=['MiniBatchLoss-dist=w1',
-    #                                                                'MiniBatchLoss-dist=swd',                                                                                                                      'MiniBatchPatchLoss-dist=swd-p=8-s=4'
-    #                                                                'MiniBatchPatchLoss-dist=swd-p=8-s=4',
-    #                                                                'MiniBatchPatchLoss-dist=w1-p=8-s=4-n_samples=10000',
-    #                                                               ], outputs_dir=outputs_dir)
+    compute_metrics(netG, prior, data, device)
     # Nearest neighbor visualizations
     fake_images = netG(prior.sample(16).cpu())
 
