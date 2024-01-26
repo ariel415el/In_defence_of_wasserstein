@@ -3,6 +3,7 @@ from math import sqrt
 
 import torch
 from torchvision.utils import save_image
+from tqdm import tqdm
 
 from utils.metrics import get_batche_slices
 
@@ -32,19 +33,24 @@ def dump_images(batch, fname):
     save_image(batch, fname, nrow=nrow, normalize=True, pad_value=1, scale_each=True)
 
 
-def batch_generation(netG, prior, n, b, device, org_device):
-    netG.to(device)
+def batch_generation(netG, prior, n, b, inference_device, org_device, verbose=False):
+    """
+    Generate images in batches of size b on 'inference_device'
+    # for a discrete prior generate images for all 'm' zs
+    # for continous priors Generate 'n' images
+    """
+    netG.to(inference_device)
     fake_data = []
-    if "const" in prior.prior_type: # generate images for all 'm' zs
-        slices = get_batche_slices(len(prior.z), b)
-        for slice in slices:
-            zs = prior.z[slice].to(device)
-            fake_data.append(netG(zs))
-    else:  # Generate 'n' images for random zs in batches of size b
-        slices = get_batche_slices(n, b)
-        for slice in slices:
-            z = prior.sample(len(slice)).to(device)
-            fake_data.append(netG(z))
+    is_const_prior = "const" in prior.prior_type
+    slices = get_batche_slices(len(prior.z) if is_const_prior else n, b)
+    if verbose:
+        slices = tqdm(slices)
+    for slice in slices:
+        if is_const_prior:
+            zs = prior.z[slice].to(inference_device)
+        else:
+            zs = prior.sample(len(slice)).to(inference_device)
+        fake_data.append(netG(zs))
     fake_data = torch.cat(fake_data)
     netG.to(org_device)
     return fake_data

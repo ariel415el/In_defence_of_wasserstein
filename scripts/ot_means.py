@@ -59,9 +59,9 @@ def weisfeld_minimization(centroids, data, n_steps=5):
     return centroids
 
 
-def sgd_minimization(centroids, data, n_steps=100):
+def sgd_minimization(centroids, data, n_steps=10):
     centroids.requires_grad_()
-    opt = torch.optim.Adam([centroids], lr=0.005)
+    opt = torch.optim.Adam([centroids], lr=0.1)
     for i in range(n_steps):
         C = dist_mat(centroids, data)
         ot_map = get_ot_plan(C.cpu().detach().numpy())
@@ -80,7 +80,7 @@ def ot_means(data, k, n_iters, minimization_method, init_from=None, verbose=Fals
         metrics = [
             'MiniBatchLoss-dist=w1',
             'MiniBatchLoss-dist=swd',
-            'MiniBatchPatchLoss-dist=swd-p=8-s=4',
+            # 'MiniBatchPatchLoss-dist=swd-p=8-s=4',
         ]
         metrics = {metric: get_loss_function(metric) for metric in metrics}
     data_shape = data.shape
@@ -139,6 +139,7 @@ if __name__ == "__main__":
 
 
     # Other
+    parser.add_argument('--n_iters', default=10, type=int)
     parser.add_argument('--project_name', default="OTMeans", type=str)
     parser.add_argument('--n_workers', default=4, type=int)
     parser.add_argument("--train_name", default=None, type=str)
@@ -157,6 +158,6 @@ if __name__ == "__main__":
 
     minimiztion_func = globals()[f"{args.min_method}_minimization"]
 
-    plots = ot_means(data, args.k, 10, minimiztion_func, verbose=True, out_dir=out_dir)
+    plots = ot_means(data, args.k, args.n_iters, minimiztion_func, verbose=True, out_dir=out_dir)
 
     log(plots)

@@ -3,16 +3,20 @@ import ot
 import torch
 from scipy import linalg
 from tqdm import tqdm
-from utils.metrics import get_metric
+from utils.metrics import get_metric, compute_nearest_neighbors_in_batches
 
 
-def w1(x, y, epsilon=0., **kwargs):
+def w1(x, y, epsilon=0., b=None,  **kwargs):
     """Compute Optimal transport with L2 norm as base metric
         param x: (b1,d) shaped tensor
         param y: (b2,d) shaped tensor
     """
     base_metric = get_metric("L2")
-    C = base_metric(x, y, **kwargs)
+    if b is None:
+        C = base_metric(x, y, **kwargs)
+    else:
+        b = int(b)
+        C = compute_nearest_neighbors_in_batches(x,y,base_metric, bx=b, by=b)
     OTPlan = _compute_ot_plan(C.detach().cpu().numpy(), float(epsilon))
     OTPlan = torch.from_numpy(OTPlan).to(C.device)
     W1 = torch.sum(OTPlan * C)
