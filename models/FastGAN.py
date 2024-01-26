@@ -72,9 +72,9 @@ class SEBlock(nn.Module):
 
 
 class Generator(nn.Module):
-    def __init__(self, output_dim=128, z_dim=100, channels=3, nf='64', skip_connections=True, **kwargs):
+    def __init__(self, output_dim=128, z_dim=100, channels=3, nf='64', skip_connections='True', **kwargs):
         super(Generator, self).__init__()
-        self.skip_connections = bool(skip_connections)
+        self.skip_connections = skip_connections == 'True'
         self.output_dim = output_dim
         nfc_multi = {4: 16, 8: 8, 16: 4, 32: 2, 64: 2, 128: 1, 256: 0.5}
         nfc = {k: int(v * int(nf)) for k, v in nfc_multi.items()}
@@ -158,10 +158,10 @@ class DownBlockComp(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, input_dim=128, num_outputs=1, channels=3, nf='64', skip_connections=True, **kwargs):
+    def __init__(self, input_dim=128, num_outputs=1, channels=3, nf='64', skip_connections='True', **kwargs):
         super(Discriminator, self).__init__()
         self.input_dim = input_dim
-        self.skip_connections = bool(skip_connections)
+        self.skip_connections = skip_connections == 'True'
         self.num_outputs = num_outputs
 
         nfc_multi = {4: 32, 8: 16, 16: 8, 32: 4, 64: 2, 128: 1, 256: 0.5}

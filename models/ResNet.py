@@ -24,12 +24,12 @@ def weights_init_G(m):
 
 
 class Generator(nn.Module):
-    def __init__(self, z_dim, output_dim, nfilter=64, nfilter_max=512, bn=True, res_ratio=0.1, c=3, **kwargs):
+    def __init__(self, z_dim, output_dim, nfilter=64, nfilter_max=512, bn='True', res_ratio=0.1, c=3, **kwargs):
         super().__init__()
         s0 = self.s0 = 4
         nf = self.nf = nfilter
         nf_max = self.nf_max = nfilter_max
-        self.bn = bool(bn)
+        self.bn = bn == 'True'
         self.z_dim = z_dim
 
         # Submodules

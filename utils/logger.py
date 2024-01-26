@@ -12,8 +12,9 @@ import wandb
 
 mpl.use('Agg')
 
+
 class PLTLogger:
-    def __init__(self, args, save_dir):
+    def __init__(self, save_dir):
         self.save_dir = save_dir
         os.makedirs(save_dir, exist_ok=True)
         self.data_avgs = defaultdict(list)
@@ -46,15 +47,15 @@ class PLTLogger:
             pickle.dump(self.data_avgs[k], f)
 
 
-class WandbLogger:
+class WandbLogger(PLTLogger):
     def __init__(self, args, save_dir):
+        super().__init__(save_dir)
         self.wandb = wandb.init(project=args.project_name, dir=save_dir, name=args.train_name)
 
     def log(self, val_dict, step):
+        super().log(val_dict, step)
         self.wandb.log(val_dict, step=step)
 
-    def plot(self):
-        pass
 
 def get_dir(args):
     task_name = os.path.join(f"outputs", args.project_name,   args.train_name)

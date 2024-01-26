@@ -6,14 +6,14 @@ from tqdm import tqdm
 from utils.metrics import get_metric
 
 
-def w1(x, y, epsilon=0, **kwargs):
+def w1(x, y, epsilon=0., **kwargs):
     """Compute Optimal transport with L2 norm as base metric
         param x: (b1,d) shaped tensor
         param y: (b2,d) shaped tensor
     """
     base_metric = get_metric("L2")
-    C = base_metric(x, y)
-    OTPlan = _compute_ot_plan(C.detach().cpu().numpy(), int(epsilon))
+    C = base_metric(x, y, **kwargs)
+    OTPlan = _compute_ot_plan(C.detach().cpu().numpy(), float(epsilon))
     OTPlan = torch.from_numpy(OTPlan).to(C.device)
     W1 = torch.sum(OTPlan * C)
     return W1, {"W1-L2": W1}

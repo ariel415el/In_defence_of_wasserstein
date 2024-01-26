@@ -11,7 +11,7 @@ from utils.logger import get_dir, PLTLogger, WandbLogger
 
 
 def train_GAN(args):
-    logger = (WandbLogger if args.wandb else PLTLogger)(args, plots_image_folder)
+    logger = WandbLogger(args, plots_image_folder) if args.wandb else PLTLogger(plots_image_folder)
 
     prior, netG, netD, optimizerG, optimizerD, start_iteration = get_models_and_optimizers(args, device, saved_model_folder)
 
@@ -116,8 +116,6 @@ if __name__ == "__main__":
         args.train_name = compose_experiment_name(args)
 
     saved_model_folder, saved_image_folder, plots_image_folder = get_dir(args)
-
-    logger = (WandbLogger if args.wandb else PLTLogger)(args, plots_image_folder)
 
     device = torch.device(args.device)
     if args.device != 'cpu':

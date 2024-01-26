@@ -6,7 +6,7 @@ from collections import defaultdict
 import torch
 from matplotlib import pyplot as plt
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from utils.common import dump_images
 from losses import get_loss_function
 from scripts.experiment_utils import get_data, get_centroids
@@ -25,12 +25,12 @@ def main():
     for bs in args.batch_sizes:
         named_batches[bs] = {
                         "Real": real_batch1[:bs],
-                        "Means": torch.mean(ref_data, dim=0, keepdim=True).repeat(bs, 1, 1, 1),
-                        "OTMeans": ot_means(ref_data.clone(), bs, n_iters=4, minimization_method=weisfeld_minimization).reshape(-1, *data.shape[1:])
+                        # "Means": torch.mean(ref_data, dim=0, keepdim=True).repeat(bs, 1, 1, 1),
+                        # "OTMeans": ot_means(ref_data.clone(), bs, n_iters=4, minimization_method=weisfeld_minimization).reshape(-1, *data.shape[1:])
                     }
         dump_images(named_batches[bs]["Real"], os.path.join(output_dir, f"Real-{bs}.png"))
-        dump_images(named_batches[bs]["Means"], os.path.join(output_dir, f"Means-{bs}.png"))
-        dump_images(named_batches[bs]["OTMeans"], os.path.join(output_dir, f"OTMeans-{bs}.png"))
+        # dump_images(named_batches[bs]["Means"], os.path.join(output_dir, f"Means-{bs}.png"))
+        # dump_images(named_batches[bs]["OTMeans"], os.path.join(output_dir, f"OTMeans-{bs}.png"))
 
     for metric_name, metric in metrics.items():
         distances = defaultdict(list)
@@ -77,19 +77,20 @@ if __name__ == '__main__':
 
     max_bs = args.batch_sizes[-1]
 
-    data = get_data(args.data_path, args.im_size, gray_scale=args.gray_scale, flatten=False,
-                    limit_data=args.n_data + max_bs, center_crop=args.center_crop)
+    # data = get_data(args.data_path, args.im_size, gray_scale=args.gray_scale, flatten=False,
+    #                 limit_data=args.n_data + max_bs, center_crop=args.center_crop)
+
+    data = torch.randn((args.n_data + max_bs, 20))
 
     ref_data = data[max_bs:]
     real_batch1 = data[:max_bs]
 
     metric_names = [
-        # 'MiniBatchLoss-dist=w1',
+        'MiniBatchLoss-dist=w1',
         # 'MiniBatchPatchLoss-dist=swd-p=8-s=4',
-        'MiniBatchNeuralLoss-dist=fd',
-        'MiniBatchNeuralPatchLoss-dist=fd-device=cuda:0-b=1024',
-        'MiniBatchNeuralPatchLoss-dist=swd',
-
+        # 'MiniBatchNeuralLoss-dist=fd',
+        # 'MiniBatchNeuralPatchLoss-dist=fd-device=cuda:0-b=1024',
+        # 'MiniBatchNeuralPatchLoss-dist=swd',
     ]
 
     metrics = {name: get_loss_function(name) for name in metric_names}

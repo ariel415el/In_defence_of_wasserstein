@@ -30,13 +30,16 @@ class L1:
 class L2:
     """
     Pytorch efficient way of computing distances between all vectors in X and Y, i.e sqrt((X[:, None] - Y[None, :])**2)
+    :param normalize: divide distance by the dimension
     """
-    def __call__(self, X, Y):
+    def __call__(self, X, Y, normalize=False):
         X = X.reshape(len(X), -1)
         Y = Y.reshape(len(Y), -1)
         dist = (X * X).sum(1)[:, None] + (Y * Y).sum(1)[None, :] - 2.0 * torch.mm(X, torch.transpose(Y, 0, 1))
         dist = torch.sqrt(torch.clamp(dist, min=1e-10)) # When loss is 0 the gradient of sqrt is nan
         # dist = (X[:, None] - Y[None, :]).pow(2).sum(-1).sqrt()
+        if normalize:
+            dist = dist / X.shape[-1]
         return dist
 
 
