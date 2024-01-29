@@ -51,7 +51,7 @@ def parse_train_args(arguments_string=None):
                                 # 'MiniBatchLoss-dist=swd',
                                 'MiniBatchPatchLoss-dist=swd-p=16-s=8',
                                 'MiniBatchLocalPatchLoss-dist=swd-p=16-s=8',
-                                'MiniBatchLocalPatchLoss-dist=w1-p=16-s=8',
+                                # 'MiniBatchLocalPatchLoss-dist=w1-p=16-s=8',
                                 # 'MiniBatchPatchLoss-dist=fd-p=8-s=8',
                                 # 'MiniBatchNeuralLoss-dist=fd-device=cuda:0-b=64-layer_idx=9',
                                 # 'MiniBatchNeuralLoss-dist=fd-device=cuda:0-b=64-layer_idx=18',

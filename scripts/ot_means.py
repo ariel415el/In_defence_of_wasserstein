@@ -16,11 +16,15 @@ from losses import get_loss_function
 from utils.common import dump_images
 
 
-def get_ot_plan(C):
+def get_ot_plan(C, epsilon=0):
     """Use POT to compute optimal transport between two emprical (uniforms) distriutaion with distance matrix C"""
     uniform_x = np.ones(C.shape[0]) / C.shape[0]
     uniform_y = np.ones(C.shape[1]) / C.shape[1]
-    OTplan = ot.emd(uniform_x, uniform_y, C).astype(np.float32)
+    if epsilon > 0:
+        OTplan = ot.sinkhorn(uniform_x, uniform_y, C, reg=epsilon)
+    else:
+        OTplan = ot.emd(uniform_x, uniform_y, C).astype(np.float32)
+
     return OTplan
 
 
@@ -59,7 +63,7 @@ def weisfeld_minimization(centroids, data, n_steps=5):
     return centroids
 
 
-def sgd_minimization(centroids, data, n_steps=10):
+def sgd_minimization(centroids, data, n_steps=5):
     centroids.requires_grad_()
     opt = torch.optim.Adam([centroids], lr=0.1)
     for i in range(n_steps):
@@ -136,7 +140,6 @@ if __name__ == "__main__":
     parser.add_argument('--k', default=64, type=int)
     parser.add_argument('--im_size', default=64, type=int)
     parser.add_argument('--min_method', default="weisfeld", type=str, help="[weisfeld, sgd, mean]")
-
 
     # Other
     parser.add_argument('--n_iters', default=10, type=int)
