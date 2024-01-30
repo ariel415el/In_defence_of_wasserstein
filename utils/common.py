@@ -27,11 +27,15 @@ def parse_classnames_and_kwargs(string, kwargs=None):
     return class_name, kwargs
 
 
-def dump_images(batch, fname):
-    nrow = int(sqrt(len(batch)))
-    # save_image((batch + 1)/2, fname, nrow=nrow, normalize=False, pad_value=1, scale_each=True)
-    save_image(batch, fname, nrow=nrow, normalize=True, pad_value=1, scale_each=True)
-
+def dump_images(batch, fname, separate_images=False):
+    if separate_images:
+        dir_name = os.path.splitext(fname)[0]
+        os.makedirs(dir_name, exist_ok=True)
+        for i, img in enumerate(range(len(batch))):
+            save_image(batch[i], os.path.join(dir_name, f'{i}.png'), normalize=True, pad_value=1, scale_each=True)
+    else:
+        nrow = int(sqrt(len(batch)))
+        save_image(batch, fname, nrow=nrow, normalize=True, pad_value=1, scale_each=True)
 
 def batch_generation(netG, prior, n, b, inference_device, verbose=False):
     """
