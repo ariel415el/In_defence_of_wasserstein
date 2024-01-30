@@ -52,42 +52,6 @@ def swd(x, y, num_proj=128, **kwargs):
     return SWD, {"SWD": SWD}
 
 
-def discrete_dual(x, y, n_steps=500, batch_size=None, lr=0.001, verbose=False, nnb=256, dist="L2"):
-    """Solve the discrete dual OT problem with minibatches and SGD:
-     Optimize n scalars (dual potentials) defining the dual formulation"""
-
-    pbar = range(n_steps)
-    if verbose:
-        print(f"Optimizing duals: {x.shape}, {y.shape}")
-        pbar = tqdm(pbar)
-
-    if batch_size is None:
-        batch_size = len(x)
-
-    with torch.enable_grad():
-        loss_func = get_metric(dist)
-        psi = torch.zeros(len(x), requires_grad=True, device=x.device)
-        opt_psi = torch.optim.Adam([psi], lr=lr)
-        # scheduler = ReduceLROnPlateau(opt_psi, 'min', threshold=0.0001, patience=200)
-        for _ in pbar:
-            opt_psi.zero_grad()
-
-            mini_batch = y[torch.randperm(len(y))[:batch_size]]
-
-            phi, outputs_idx = _batch_NN(mini_batch, x, psi, nnb, loss_func)
-
-            dual_estimate = torch.mean(phi) + torch.mean(psi)
-
-            loss = -1 * dual_estimate  # maximize over psi
-            loss.backward()
-            opt_psi.step()
-            # scheduler.step(dual_estimate)
-            if verbose:
-                pbar.set_description(f"dual estimate: {dual_estimate.item()}, LR: {opt_psi.param_groups[0]['lr']}")
-
-        return dual_estimate, {"dual": dual_estimate.item()}
-
-
 def fd(x, y):
     # TODO make differenctiable
     """Model each set with a MV Gaussian distribution and compute the OT between them (Frechet distance)
@@ -101,24 +65,13 @@ def fd(x, y):
     return torch.tensor(fd), {'Frechet-distance': fd}
 
 
-def _batch_NN(X, Y, f, b, dist_function):
-    """
-    For each x find the best index i s.t i = argmin_i(x,y_i)-f_i
-    return the value and the argmin
-    """
-    NNs = torch.zeros(X.shape[0], dtype=torch.long, device=X.device)
-    NN_dists = torch.zeros(X.shape[0], device=X.device)
-    n_batches = len(X) // b
-    for i in range(n_batches):
-        s = slice(i * b,(i + 1) * b)
-        dists = dist_function(X[s], Y) - f
-        NN_dists[s], NNs[s] = dists.min(1)
-    if len(X) % b != 0:
-        s = slice(n_batches * b, len(X))
-        dists = dist_function(X[s], Y) - f
-        NN_dists[s], NNs[s] = dists.min(1)
-
-    return NN_dists, NNs
+def mmd(X, Y, sigma=0.1):
+    base_metric = lambda x,y: torch.exp(get_metric("L2")(x, y) / -2*float(sigma)**2)
+    # base_metric = get_metric("L2")
+    mmd = base_metric(X, X).mean()
+    mmd += base_metric(Y, Y).mean()
+    mmd -= 2*base_metric(X, Y).mean()
+    return mmd, {'MMD': mmd.item()}
 
 
 def _frechet_distance(stats1, stats2, eps=1e-6):
