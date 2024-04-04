@@ -31,11 +31,15 @@ def dump_images(batch, fname, separate_images=False):
     if separate_images:
         dir_name = os.path.splitext(fname)[0]
         os.makedirs(dir_name, exist_ok=True)
+        batch = batch.detach()
+        batch = batch - batch.min()
+        batch = batch / batch.max()
         for i, img in enumerate(range(len(batch))):
-            save_image(batch[i], os.path.join(dir_name, f'{i}.png'), normalize=True, pad_value=1, scale_each=True)
+            save_image(batch[i], os.path.join(dir_name, f'{i}.png'), normalize=False, pad_value=1, scale_each=True)
     else:
         nrow = int(sqrt(len(batch)))
         save_image(batch, fname, nrow=nrow, normalize=True, pad_value=1, scale_each=True)
+
 
 def batch_generation(netG, prior, n, b, inference_device, verbose=False):
     """

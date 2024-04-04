@@ -8,6 +8,7 @@ import numpy as np
 import ot
 import torch
 from matplotlib import pyplot as plt
+from tqdm import tqdm
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from experiment_utils import get_data
@@ -29,7 +30,8 @@ def get_ot_plan(C, epsilon=0):
 
 
 def dist_mat(X, Y):
-    return ((X * X).sum(1)[:, None] + (Y * Y).sum(1)[None, :] - 2.0 * X @ Y.T)**0.5
+    dist = ((X * X).sum(1)[:, None] + (Y * Y).sum(1)[None, :] - 2.0 * X @ Y.T)**0.5
+    return dist / X.shape[-1]
 
 
 def compute_means(ot_map, data, k):
@@ -73,8 +75,12 @@ def sgd_minimization(centroids, data, n_steps=5):
         opt.zero_grad()
         loss.backward()
         opt.step()
-    centroids.detach().cpu().numpy()
-    return centroids
+    return centroids.detach().cpu()
+
+def loss(centroids, data):
+    C = dist_mat(centroids, data).cpu().detach().numpy()
+    ot_map = get_ot_plan(C)
+    return np.sum(ot_map*C)
 
 
 def ot_means(data, k, n_iters, minimization_method, init_from=None, verbose=False, out_dir=None):
@@ -93,7 +99,8 @@ def ot_means(data, k, n_iters, minimization_method, init_from=None, verbose=Fals
         centroids = torch.randn((k, data.shape[-1])) * 0.5
     else:
         centroids = init_from
-    for i in range(n_iters):
+    for i in tqdm(range(n_iters)):
+        # minimization_method = sgd_minimization if i < n_iters - 1 else weisfeld_minimization
         centroids = minimization_method(centroids, data)
 
         if verbose:
@@ -106,7 +113,9 @@ def ot_means(data, k, n_iters, minimization_method, init_from=None, verbose=Fals
 
             if out_dir is not None:
                 dump_images(centroids.reshape(k, -1, data_shape[-2], data_shape[-1]),
-                            f"{out_dir}/images/otMeans-{i}.png")
+                            f"{out_dir}/images/otMeans-{i}.png", separate_images=i==n_iters-1)
+
+    print(f"Loss: {loss(centroids, data)}")
     if verbose:
         return plots
     else:

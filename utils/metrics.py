@@ -168,6 +168,7 @@ def compute_pairwise_distances_in_batches(X, Y, dist_function, bx=64, by=64):
             dists[x_slice[0]:x_slice[-1]+1, y_slice[0]:y_slice[-1]+1] = dist_function(X[x_slice], Y[y_slice])
     return dists
 
+
 if __name__ == '__main__':
     x = torch.ones((1,3,8,7))
     print(VggDistCalculator(layer_idx=18).extract(x).shape)
