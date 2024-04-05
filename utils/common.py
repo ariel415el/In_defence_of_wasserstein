@@ -59,7 +59,7 @@ def batch_generation(netG, prior, n, b, inference_device, verbose=False):
             zs = prior.z[slice].to(inference_device)
         else:
             zs = prior.sample(len(slice)).to(inference_device)
-        fake_data.append(netG(zs).cpu())
+        fake_data.append(netG(zs))
     fake_data = torch.cat(fake_data)
     netG.to(org_device)
     return fake_data

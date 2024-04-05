@@ -41,6 +41,7 @@ def cut_around_center(img, center, size, margin=0):
 def sample_patch_centers(img_dim, p, n_centers, stride=1, offset=0):
     h = p // 2
     centers = np.arange(h, img_dim - h - 1, stride) + offset
+    centers = centers[np.random.permutation(len(centers))]
     centers = list(itertools.product(centers, repeat=2))
     shuffle(centers)
     centers = centers[:n_centers]
