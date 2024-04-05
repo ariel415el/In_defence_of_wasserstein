@@ -92,10 +92,10 @@ class SEBlock(nn.Module):
 
 
 class Generator(nn.Module):
-    def __init__(self, input_dim=128, z_dim=100, skip_connections='True', c=3, **kwargs):
+    def __init__(self, output_dim=128, z_dim=100, skip_connections='True', c=3, **kwargs):
         super(Generator, self).__init__()
         self.skip_connections = skip_connections == 'True'
-        self.input_dim = input_dim
+        self.output_dim = output_dim
         ngf = 64
         nfc_multi = {4 :16, 8 :8, 16 :4, 32 :2, 64 :2, 128 :1, 256:0.5}
         nfc = {}
@@ -108,19 +108,19 @@ class Generator(nn.Module):
         self.feat_16  = UpBlock(nfc[8], nfc[16])
         self.feat_32  = UpBlockComp(nfc[16], nfc[32])
         self.feat_64  = UpBlock(nfc[32], nfc[64])
-        if input_dim > 64:
+        if output_dim > 64:
             self.feat_128 = UpBlockComp(nfc[64], nfc[128])
-        if input_dim > 128:
+        if output_dim > 128:
             self.feat_256 = UpBlock(nfc[128], nfc[256])
 
         if self.skip_connections:
             self.se_64 = SEBlock(nfc[4], nfc[64])
-            if input_dim > 64:
+            if output_dim > 64:
                 self.se_128 = SEBlock(nfc[8], nfc[128])
-            if input_dim > 128:
+            if output_dim > 128:
                 self.se_256 = SEBlock(nfc[16], nfc[256])
 
-        self.to_full = conv2d(nfc[input_dim], c, 3, 1, 1, bias=False)
+        self.to_full = conv2d(nfc[output_dim], c, 3, 1, 1, bias=False)
         self.apply(weights_init)
 
     def forward(self, input):
