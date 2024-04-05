@@ -8,7 +8,7 @@ from torchvision.utils import save_image
 def compose_experiment_name(args):
     return f"{os.path.basename(args.data_path)}_I-{args.im_size}x{args.im_size}" \
                 f"{'_GS' if args.gray_scale else ''}{f'_CC-{args.center_crop}' if args.center_crop else ''}" \
-                f"_Z-{args.z_dim}_FZ-{args.forec_normevery}_ZS-{args.noise_sigma}_G-{args.gen_arch}_B-{args.r_bs}-{args.f_bs}"
+                f"_Z-{args.z_dim}_FZ-{args.force_norm_every}_ZS-{args.noise_sigma}_G-{args.gen_arch}_B-{args.r_bs}-{args.f_bs}"
 
 
 def parse_classnames_and_kwargs(string, kwargs=None):
