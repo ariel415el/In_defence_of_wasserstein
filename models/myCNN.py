@@ -68,7 +68,7 @@ class DownBlockComp(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, input_dim=128, num_outputs=1, channels=3, nf='48', depth=3, **kwargs):
+    def __init__(self, input_dim=128, channels=3, num_outputs=1, nf='48', depth=3, **kwargs):
         super(Discriminator, self).__init__()
         self.input_dim = input_dim
         self.num_outputs = num_outputs

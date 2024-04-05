@@ -21,7 +21,7 @@ def compute_final_feature_size(im_dim, depth, k):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, input_dim, depth=3, nf=64, normalize='none', channels=3, k=3, pad=0, GAP="True", **kwargs):
+    def __init__(self, input_dim, channels=3, depth=3, nf=64, normalize='none', k=3, pad=0, GAP="True", **kwargs):
         super(Discriminator, self).__init__()
         self.GAP = GAP == "True"
         self.input_dim = input_dim

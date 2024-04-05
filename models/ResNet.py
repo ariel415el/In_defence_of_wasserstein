@@ -24,7 +24,7 @@ def weights_init_G(m):
 
 
 class Generator(nn.Module):
-    def __init__(self, z_dim, output_dim, nfilter=64, nfilter_max=512, bn='True', res_ratio=0.1, c=3, **kwargs):
+    def __init__(self, z_dim, output_dim, channels=3, nfilter=64, nfilter_max=512, bn='True', res_ratio=0.1, **kwargs):
         super().__init__()
         s0 = self.s0 = 4
         nf = self.nf = nfilter
@@ -58,7 +58,7 @@ class Generator(nn.Module):
         ]
 
         self.resnet = nn.Sequential(*blocks)
-        self.conv_img = nn.Conv2d(nf, c, 3, padding=1)
+        self.conv_img = nn.Conv2d(nf, channels, 3, padding=1)
 
         self.apply(weights_init_G)
 

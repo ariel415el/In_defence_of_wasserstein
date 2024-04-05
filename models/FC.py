@@ -12,7 +12,7 @@ def block(in_feat, out_feat, normalize='in'):
 
 
 class Generator(nn.Module):
-    def __init__(self, z_dim, output_dim=64, nf=128, depth=2, normalize='none', channels=3):
+    def __init__(self, z_dim, output_dim=64, channels=3, nf=128, depth=2, normalize='none'):
         super(Generator, self).__init__()
         self.output_dim = output_dim
         self.c = channels
@@ -35,7 +35,7 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, input_dim=64,  nf=128, depth=4, normalize='none', channels=3, **kwargs):
+    def __init__(self, input_dim=64, channels=3,  nf=128, depth=4, normalize='none', **kwargs):
         super(Discriminator, self).__init__()
         self.c = channels
         nf = int(nf)

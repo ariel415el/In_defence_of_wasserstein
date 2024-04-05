@@ -1,7 +1,6 @@
 import importlib
 from utils.common import parse_classnames_and_kwargs
 
-
 def get_models(args, device):
     c = 1 if args.gray_scale else 3
     model_name, kwargs = parse_classnames_and_kwargs(args.gen_arch,
@@ -21,21 +20,15 @@ def get_models(args, device):
     return netG.to(device), netD.to(device)
 
 
-def human_format(num):
-    """
-    :param num: A number to print in a nice readable way.
-    :return: A string representing this number in a readable way (e.g. 1000 --> 1K).
-    """
-    magnitude = 0
-
-    while abs(num) >= 1000:
-        magnitude += 1
-        num /= 1000.0
-
-    return '%.2f%s' % (num, ['', 'K', 'M', 'G', 'T', 'P'][magnitude])  # add more suffices if you need them
-
-
 def print_num_params(model):
+    def human_format(num):
+        """Print a number in a nice readable way."""
+        magnitude = 0
+        while abs(num) >= 1000:
+            magnitude += 1
+            num /= 1000.0
+        return '%.2f%s' % (num, ['', 'K', 'M', 'G', 'T', 'P'][magnitude])  # add more suffices if you need them
+
     # n = sum(p.nelement() * p.element_size() for p in model.parameters() if p.requires_grad)
     # n += sum(p.nelement() * p.element_size() for p in model.buffers() if p.requires_grad)
     n = sum(p.nelement() for p in model.parameters() if p.requires_grad)

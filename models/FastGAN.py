@@ -92,7 +92,7 @@ class SEBlock(nn.Module):
 
 
 class Generator(nn.Module):
-    def __init__(self, output_dim=128, z_dim=100, skip_connections='True', c=3, **kwargs):
+    def __init__(self, z_dim=100, output_dim=128, channels=3, skip_connections='True', **kwargs):
         super(Generator, self).__init__()
         self.skip_connections = skip_connections == 'True'
         self.output_dim = output_dim
@@ -120,7 +120,7 @@ class Generator(nn.Module):
             if output_dim > 128:
                 self.se_256 = SEBlock(nfc[16], nfc[256])
 
-        self.to_full = conv2d(nfc[output_dim], c, 3, 1, 1, bias=False)
+        self.to_full = conv2d(nfc[output_dim], channels, 3, 1, 1, bias=False)
         self.apply(weights_init)
 
     def forward(self, input):
@@ -187,7 +187,7 @@ class DownBlockComp(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, input_dim=128, num_outputs=1, skip_connections='True', c=3, **kwargs):
+    def __init__(self, input_dim=128, num_outputs=1, channels=3, skip_connections='True', **kwargs):
         super(Discriminator, self).__init__()
         self.ndf = 32
         self.input_dim = input_dim
@@ -200,7 +200,7 @@ class Discriminator(nn.Module):
             nfc[k] = int(v * self.ndf)
 
         self.conv1 = nn.Sequential(
-            conv2d(c, nfc[input_dim], 3, 1, 1, bias=False),
+            conv2d(channels, nfc[input_dim], 3, 1, 1, bias=False),
             nn.LeakyReLU(0.2, inplace=True))
 
         self.down_2 = DownBlockComp(nfc[input_dim], nfc[input_dim//2])
@@ -268,8 +268,8 @@ if __name__ == '__main__':
     for d in [64, 128, 256]:
         for skip_connections in ['True', 'False']:
             for c in [1, 3]:
-                G = Generator(input_dim=d, z_dim=zd, skip_connections=skip_connections, c=c)
-                D = Discriminator(input_dim=d, num_outputs=1, skip_connections=skip_connections, c=c)
+                G = Generator(input_dim=d, z_dim=zd, skip_connections=skip_connections, channels=c)
+                D = Discriminator(input_dim=d, num_outputs=1, skip_connections=skip_connections, channels=c)
                 z = torch.randn(5, zd)
                 img = G(z)
-                print(f"d={d}, skip_connections={skip_connections}, c={c}, img={img.shape}, score={D(img).shape}")
+                print(f"d={d}, skip_connections={skip_connections}, channels={c}, img={img.shape}, score={D(img).shape}")

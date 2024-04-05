@@ -18,7 +18,7 @@ def conv_block(c_in, c_out, k_size, stride, pad, normalize='in', transpose=False
 
 
 class Generator(nn.Module):
-    def __init__(self, z_dim, output_dim=64, nf=64,  normalize='none', channels=3, **kwargs):
+    def __init__(self, z_dim, output_dim=64, channels=3, nf=64,  normalize='none', **kwargs):
         super(Generator, self).__init__()
         nf = int(nf)
         normalize = str(normalize)
