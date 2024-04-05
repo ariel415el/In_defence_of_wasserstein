@@ -38,10 +38,10 @@ def swd(x, y, num_proj=128, **kwargs):
     rand = rand / torch.norm(rand, dim=0, keepdim=True)  # noramlize to unit directions
 
     # Project images
-    projx = torch.mm(x, rand)
-    projy = torch.mm(y, rand)
+    projx = torch.mm(x, rand).T
+    projy = torch.mm(y, rand).T
 
-    projx, projy = _duplicate_to_match_lengths(projx.T, projy.T)
+    projx, projy = _duplicate_to_match_lengths(projx, projy)
 
     # Sort and compute L1 loss
     projx, _ = torch.sort(projx, dim=1)
@@ -49,6 +49,36 @@ def swd(x, y, num_proj=128, **kwargs):
 
     SWD = (projx - projy).abs().mean() # This is same for L2 and L1 since in 1d: .pow(2).sum(1).sqrt() == .pow(2).sqrt() == .abs()
 
+    return SWD, {"SWD": SWD}
+
+
+def full_dim_swd(x, y, num_proj=16, **kwargs):
+    """
+    Project samples to 1d and compute OT there with the sorting trick. Average over num_proj directions
+    param x: (b1,d) shaped tensor
+    param y: (b2,d) shaped tensor
+    """
+    num_proj = int(num_proj)
+    assert (len(x) == len(y)) and (len(x.shape) == len(y.shape)) and x.shape[1] == y.shape[1]
+    n, d = x.shape
+
+    # Sample random normalized projections
+    rand = torch.randn(d, num_proj).to(x.device)  # (slice_size**2*ch)
+    rand = rand / torch.norm(rand, dim=0, keepdim=True)  # noramlize to unit directions
+
+    # Project images
+    projx = torch.mm(x, rand).T
+    projy = torch.mm(y, rand).T
+
+    # Sort and compute L1 loss
+    projx, permx = torch.sort(projx, dim=1)
+    projy, permy = torch.sort(projy, dim=1)
+
+    SWD = 0
+    for i in range(num_proj):
+        SWD += (x[permx[i]] - y[permy[i]]).pow(2).sum(1).sqrt().sum()
+    SWD /= num_proj
+    SWD /= n  # OTMAp sums to 1/n (OTMap rows sums to 1)
     return SWD, {"SWD": SWD}
 
 
@@ -134,3 +164,12 @@ def _duplicate_to_match_lengths(arr1, arr2):
         arr2 = torch.cat([arr2, arr2[:, indices]], dim=1)
 
     return arr1, arr2
+
+
+if __name__ == '__main__':
+    x = torch.randn(10, 32)
+    y = torch.randn(10, 32)
+    print(w1(x,y))
+    print(full_dim_swd(x,y))
+
+

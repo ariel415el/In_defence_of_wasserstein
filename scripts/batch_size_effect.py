@@ -88,7 +88,7 @@ if __name__ == '__main__':
     parser.add_argument('--center_crop', default=None, type=int)
     parser.add_argument('--gray_scale', action='store_true', default=False)
     parser.add_argument('--im_size', default=64, type=int)
-    parser.add_argument('--batch_sizes', nargs='+', default=[16, 128, 512, 1024, 5000, 10000], type=int)
+    parser.add_argument('--batch_sizes', nargs='+', default=[16, 128, 512, 1024, 5000], type=int)
     args = parser.parse_args()
 
     output_dir = os.path.join(os.path.dirname(__file__), "..", "outputs", "batch_size_effect_blur", os.path.basename(args.data_path))
@@ -97,15 +97,16 @@ if __name__ == '__main__':
     max_bs = args.batch_sizes[-1]
 
     data = get_data(args.data_path, args.im_size, gray_scale=args.gray_scale, flatten=False,
-                    limit_data=20000, center_crop=args.center_crop)
+                    limit_data=2*max_bs, center_crop=args.center_crop)
 
     test_split = data[:max_bs]
     train_split = data[max_bs:]
 
     metric_names = [
         'MiniBatchLoss-dist=w1',
-        'MiniBatchLoss-dist=swd',
-        'MiniBatchPatchLoss-dist=swd-p=16-s=8',
+        'MiniBatchLoss-dist=full_dim_swd',
+        # 'MiniBatchLoss-dist=swd',
+        # 'MiniBatchPatchLoss-dist=swd-p=16-s=8',
         # 'MiniBatchNeuralLoss-dist=fd',
         # 'MiniBatchNeuralPatchLoss-dist=fd-device=cuda:0-b=1024',
         # 'MiniBatchNeuralPatchLoss-dist=swd',
