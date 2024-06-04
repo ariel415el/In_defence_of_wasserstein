@@ -132,13 +132,13 @@ class Generator(nn.Module):
         feat_64 = self.feat_64(feat_32)
         if self.skip_connections:
             feat_64  = self.se_64(feat_4, feat_64)
-        if self.input_dim == 64:
+        if self.output_dim == 64:
             return self.to_full(feat_64)
 
         feat_128 = self.feat_128(feat_64)
         if self.skip_connections:
             feat_128 = self.se_128(feat_8, feat_128)
-        if self.input_dim == 128:
+        if self.output_dim == 128:
             return self.to_full(feat_128)
 
         feat_256 = self.feat_256(feat_128)
@@ -146,7 +146,6 @@ class Generator(nn.Module):
             feat_256 = self.se_256(feat_16, feat_256)
         return torch.tanh(self.to_full(feat_256))
         # return self.to_full(feat_256)
-
 
 
 class DownBlock(nn.Module):
