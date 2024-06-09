@@ -54,7 +54,7 @@ def swd(x, y, num_proj=128, **kwargs):
 
 def full_dim_swd(x, y, num_proj=16, **kwargs):
     """
-    Project samples to 1d and compute OT there with the sorting trick. Average over num_proj directions
+    Solve the OT in 1-D in with projected points but compute the distances in original dimension
     param x: (b1,d) shaped tensor
     param y: (b2,d) shaped tensor
     """
@@ -71,8 +71,8 @@ def full_dim_swd(x, y, num_proj=16, **kwargs):
     projy = torch.mm(y, rand).T
 
     # Sort and compute L1 loss
-    projx, permx = torch.sort(projx, dim=1)
-    projy, permy = torch.sort(projy, dim=1)
+    _, permx = torch.sort(projx, dim=1)
+    _, permy = torch.sort(projy, dim=1)
 
     SWD = 0
     for i in range(num_proj):
@@ -80,6 +80,36 @@ def full_dim_swd(x, y, num_proj=16, **kwargs):
     SWD /= num_proj
     SWD /= n  # OTMAp sums to 1/n (OTMap rows sums to 1)
     return SWD, {"SWD": SWD}
+
+
+def projected_w1(x, y, epsilon=0, dim=64, num_proj=16, **kwargs):
+    """Project points to 'dim' dimensions and compute OT there. Avearage over 'num_proj' such projections
+        param x: (b1,d) shaped tensor
+        param y: (b2,d) shaped tensor
+    """
+    num_proj = int(num_proj)
+    dim = int(dim)
+    b, d = x.shape
+
+    dists = []
+    for i in range(num_proj):
+        # Sample random normalized projections
+        rand = torch.randn(d, dim).to(x.device)  # (slice_size**2*ch)
+        rand = rand / torch.norm(rand, dim=0, keepdim=True)  # noramlize to unit directions
+
+        # Project images
+        projx = torch.mm(x, rand)
+        projy = torch.mm(y, rand)
+
+        base_metric = get_metric("L2")
+        C = base_metric(projx, projy)
+        OTPlan = _compute_ot_plan(C.detach().cpu().numpy().copy(), int(epsilon))
+        OTPlan = torch.from_numpy(OTPlan).to(C.device)
+        W1 = torch.sum(OTPlan * C)
+
+        dists.append(W1)
+    W1 = torch.stack(dists).mean()
+    return W1, {"W1-L2": W1}
 
 
 def fd(x, y):

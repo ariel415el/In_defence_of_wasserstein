@@ -71,7 +71,7 @@ if __name__ == '__main__':
     data = get_data(args['data_path'], args['im_size'], args['center_crop'], args['gray_scale'], limit_data=args['limit_data'])
     netG = netG.cpu()
 
-    compute_metrics(netG, prior, data, device)
+    # compute_metrics(netG, prior, data, device)
     # Nearest neighbor visualizations
     fake_images = netG(prior.sample(16).cpu())
 
@@ -80,7 +80,7 @@ if __name__ == '__main__':
     # find_nns_percept(fake_images, data, outputs_dir, device, netD, layer_idx=3)
     # find_patch_nns(fake_images, data, patch_size=32, stride=3, search_margin=21, outputs_dir=outputs_dir, n_centers=5, b=256, metric_name='L2')
     find_patch_nns(fake_images, data, patch_size=16, stride=1, search_margin=12, outputs_dir=outputs_dir, n_centers=12, b=1024, metric_name='edge', device=device)
-    find_patch_nns(fake_images, data, patch_size=16, stride=1, search_margin=12, outputs_dir=outputs_dir, n_centers=12, b=1024, metric_name='mean', device=device)
+    # find_patch_nns(fake_images, data, patch_size=16, stride=1, search_margin=12, outputs_dir=outputs_dir, n_centers=12, b=1024, metric_name='mean', device=device)
     # find_patch_nns(fake_images, data, patch_size=32, stride=7, search_margin=21, outputs_dir=outputs_dir, n_centers=5, b=16, metric_name='vgg', device=torch.device("cuda:0"))
     # find_patch_nns(fake_images, data, patch_size=22, search_margin=4, outputs_dir=outputs_dir, n_centers=4)
     # find_patch_nns(fake_images, data, patch_size=12, search_margin=2, outputs_dir=outputs_dir, n_centers=4)
