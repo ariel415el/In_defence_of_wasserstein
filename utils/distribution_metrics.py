@@ -59,12 +59,14 @@ def full_dim_swd(x, y, num_proj=16, **kwargs):
     param y: (b2,d) shaped tensor
     """
     num_proj = int(num_proj)
-    assert (len(x) == len(y)) and (len(x.shape) == len(y.shape)) and x.shape[1] == y.shape[1]
     n, d = x.shape
 
     # Sample random normalized projections
     rand = torch.randn(d, num_proj).to(x.device)  # (slice_size**2*ch)
     rand = rand / torch.norm(rand, dim=0, keepdim=True)  # noramlize to unit directions
+
+    xt, yt = _duplicate_to_match_lengths(x.T, y.T)
+    x, y = xt.T, yt.T
 
     # Project images
     projx = torch.mm(x, rand).T
@@ -79,7 +81,7 @@ def full_dim_swd(x, y, num_proj=16, **kwargs):
         SWD += (x[permx[i]] - y[permy[i]]).pow(2).sum(1).sqrt().sum()
     SWD /= num_proj
     SWD /= n  # OTMAp sums to 1/n (OTMap rows sums to 1)
-    return SWD, {"SWD": SWD}
+    return SWD, {"Bounded-W1": SWD}
 
 
 def projected_w1(x, y, epsilon=0, dim=64, num_proj=16, **kwargs):
@@ -109,7 +111,7 @@ def projected_w1(x, y, epsilon=0, dim=64, num_proj=16, **kwargs):
 
         dists.append(W1)
     W1 = torch.stack(dists).mean()
-    return W1, {"W1-L2": W1}
+    return W1, {"Projected-W1": W1}
 
 
 def fd(x, y):
@@ -198,7 +200,7 @@ def _duplicate_to_match_lengths(arr1, arr2):
 
 if __name__ == '__main__':
     x = torch.randn(10, 32)
-    y = torch.randn(10, 32)
+    y = torch.randn(50, 32)
     print(w1(x,y))
     print(full_dim_swd(x,y))
 

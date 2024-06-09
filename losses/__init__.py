@@ -18,3 +18,8 @@ def get_loss_function(loss_description):
     loss = getattr(sys.modules[__name__], loss_name)(**kwargs)
     loss.name = loss_description
     return loss
+
+
+if __name__ == '__main__':
+    func = get_loss_function('MiniBatchLocalPatchLoss-dist=full_dim_swd-p=16-s=8')
+    print(func)
