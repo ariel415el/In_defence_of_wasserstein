@@ -52,8 +52,8 @@ class NPDataset(Dataset):
 
 
 if __name__ == '__main__':
-    mode = "Circular"; num_centroids = 32; samples_per_centroid = 10; radius = 10; std = 0.01
-    mode = "Uniform"; num_centroids = 32; samples_per_centroid = 10; radius = 10; std = 0.01
+    mode = "Circular"; num_centroids = 8; samples_per_centroid = 256; radius = 10; std = 0.3
+    # mode = "Uniform"; num_centroids = 32; samples_per_centroid = 10; radius = 10; std = 0.01
 
 
     points = generate_data(num_centroids, samples_per_centroid, radius, std, mode)

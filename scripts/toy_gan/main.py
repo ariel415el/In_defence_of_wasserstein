@@ -9,11 +9,10 @@ from torch.utils.data import DataLoader
 
 
 from data import NPDataset, generate_data
-from models import FCGenerator, PixelGenerator, Discriminator
-from utils import draw_points
+from toy_models import FCGenerator, PixelGenerator, Discriminator
+from toy_utils import draw_points
 
 import sys
-
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "utils"))
@@ -24,11 +23,11 @@ from logger import PLTLogger
 
 def train_GAN(args):
     logger = PLTLogger(args, saved_image_folder)
-    debug_fixed_noise = torch.randn((args.batch_size, args.z_dim)).to(device)
-    debug_fixed_reals = next(iter(dataloader)).to(device).float()
+    debug_fixed_noise = torch.randn((args.eval_batch_size, args.z_dim)).to(device)
+    debug_fixed_reals = torch.from_numpy(dataset.np_data).to(device).float()
 
     other_metrics = [
-        get_loss_function("BatchEMD-dist=L1"),
+        get_loss_function("MiniBatchLoss-dist=w1"),
     ]
 
     loss_function = get_loss_function(args.loss_function)
@@ -95,9 +94,8 @@ def evaluate(netG, netD, other_metrics, fixed_noise, fixed_reals, iteration, log
                 f'{metric.name}_fixed_noise_gen_to_train': metric(fixed_noise_fake_images, fixed_reals),
             }, step=iteration)
 
-        draw_points(fixed_noise_fake_images.detach().cpu().numpy(), f'{saved_image_folder}/{iteration}.png', ref_data=dataset.np_data)
-        if iteration == 0:
-            draw_points(fixed_reals.detach().cpu().numpy(), f'{saved_image_folder}/debug_fixed_reals.png', ref_data=dataset.np_data)
+        draw_points(fixed_noise_fake_images.detach().cpu().numpy(), f'{saved_image_folder}/{iteration}.png',
+                    ref_data=dataset.np_data)
 
     netG.train()
     netD.train()
@@ -107,33 +105,33 @@ def evaluate(netG, netD, other_metrics, fixed_noise, fixed_reals, iteration, log
 if __name__ == "__main__":
     device = torch.device("cuda:0")
     args = argparse.Namespace()
-    args.data_path = "Circular-points-(NC-32_NS=10_R=10_STD=0.01)"
-    args.batch_size = 16
-    args.z_dim = 64
-    args.lrG = 0.001
-    args.lrD = 0.01
-    args.n_iterations = 100000
+    args.data_path = "scripts/toy_gan/Circular-points-(NC-8_NS=256_R=10_STD=0.3)"
+    args.batch_size = 512
+    args.eval_batch_size = 1024
+    args.z_dim = 8
+    args.lrG = 0.0001
+    args.lrD = 0.0002
+    args.n_iterations = 1000000
     args.num_workers = 0
     args.gp_weight = 0
     args.weight_clipping  = None
     args.spectral_normalization  = False
     args.D_step_every = 1
-    args.G_step_every = 1
+    args.G_step_every = 5
     args.log_freq = 1000
     args.tag = "test"
-    # args.loss_function = "WGANLoss"; args.gp_weight  = 10
-    args.loss_function = "CtransformLoss"
+    args.loss_function = "WGANLoss"; args.gp_weight  = 10
+    # args.loss_function = "CtransformLoss"
     # args.loss_function = "BatchEMD-dist=L1"; args.D_step_every = -1
 
     saved_image_folder = os.path.join("outputs", f"toyGAN-L-{args.loss_function}_D-{os.path.basename(args.data_path)}_{args.tag}")
-
 
     dataset = NPDataset(args.data_path)
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True)
 
     # netG = PixelGenerator(args.z_dim, n=args.batch_size, b=args.batch_size).to(device)
-    netG = FCGenerator(args.z_dim, out_dim=2, depth=5, nf=32).to(device)
-    netD = Discriminator(input_dim=2,  nf=32, depth=2).to(device)
+    netG = FCGenerator(args.z_dim, out_dim=2, depth=6, nf=1024).to(device)
+    netD = Discriminator(input_dim=2, depth=6,  nf=1024).to(device)
     optimizerG = optim.Adam(netG.parameters(), lr=args.lrG, betas=(0.5, 0.9))
     optimizerD = optim.Adam(netD.parameters(), lr=args.lrD, betas=(0.5, 0.9))
 
