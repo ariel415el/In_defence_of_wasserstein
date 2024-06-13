@@ -104,7 +104,7 @@ if __name__ == '__main__':
 
     metric_names = [
         'MiniBatchLoss-dist=w1',
-        'MiniBatchLoss-dist=full_dim_swd',
+        'MiniBatchLoss-dist=full_dim_swd-num_proj=128',
         # 'MiniBatchLoss-dist=swd',
         # 'MiniBatchPatchLoss-dist=swd-p=16-s=8',
         # 'MiniBatchNeuralLoss-dist=fd',

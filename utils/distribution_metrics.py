@@ -59,7 +59,8 @@ def full_dim_swd(x, y, num_proj=16, **kwargs):
     param y: (b2,d) shaped tensor
     """
     num_proj = int(num_proj)
-    n, d = x.shape
+    d = x.shape[1]
+    n = max(x.shape[0], y.shape[0])
 
     # Sample random normalized projections
     rand = torch.randn(d, num_proj).to(x.device)  # (slice_size**2*ch)
@@ -199,9 +200,9 @@ def _duplicate_to_match_lengths(arr1, arr2):
 
 
 if __name__ == '__main__':
-    x = torch.randn(10, 32)
-    y = torch.randn(50, 32)
+    x = (torch.randn(64, 1024) * 127).clamp(-127,127)
+    y = (torch.randn(64, 1024) * 127).clamp(-127,127)
     print(w1(x,y))
-    print(full_dim_swd(x,y))
+    print(full_dim_swd(x,y, num_proj=1024))
 
 
