@@ -35,11 +35,12 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, input_dim=64, channels=3,  nf=128, depth=4, normalize='none', **kwargs):
+    def __init__(self, input_dim=64, channels=3,  nf=128, depth=4, normalize='none', num_outputs=1, **kwargs):
         super(Discriminator, self).__init__()
         self.c = channels
         nf = int(nf)
         depth = int(depth)
+        num_outputs = int(num_outputs)
         assert depth >= 2, "At least two layers please"
 
         layers = block(self.c*input_dim**2, nf, normalize='none') # bn is not good for RGB values
@@ -47,11 +48,14 @@ class Discriminator(nn.Module):
         for i in range(depth - 2):
             layers += block(nf, nf, normalize=normalize)
 
-        layers += [nn.Linear(nf, 1)]
+        self.num_outputs = num_outputs
+        layers += [nn.Linear(nf, num_outputs)]
         self.model = nn.Sequential(*layers)
 
     def forward(self, img):
         img_flat = img.view(img.size(0), -1)
-        validity = self.model(img_flat).view(img.size(0))
-
+        if self.num_outputs == 1:
+            validity = self.model(img_flat).view(img.size(0))
+        else:
+            validity = self.model(img_flat).view(img.size(0), self.num_outputs)
         return validity

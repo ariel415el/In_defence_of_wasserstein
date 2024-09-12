@@ -96,5 +96,6 @@ class Discriminator(nn.Module):
 
 
 if __name__ == '__main__':
-    netD = Discriminator(bn=False)
-    netD(torch.ones(5,3,32,32))
+    netD = Discriminator(bn=False, num_outputs=128)
+    netG = Generator(z_dim=128)
+    print(netG(netD(torch.ones(5,3,64,64))).shape)

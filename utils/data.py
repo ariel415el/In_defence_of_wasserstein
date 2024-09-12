@@ -19,7 +19,7 @@ def get_transforms(im_size, center_crop,  gray_scale):
         transforms += [T.Grayscale()]
     if im_size is not None:
         transforms += [T.Resize(im_size, antialias=True),]
-    transforms+=[T.Normalize((0.5,), (0.5,))]
+    transforms += [T.Normalize((0.5,), (0.5,))]
 
     return T.Compose(transforms)
 

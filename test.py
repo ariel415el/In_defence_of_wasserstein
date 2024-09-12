@@ -4,7 +4,7 @@ import os
 
 import torch
 
-from models import get_models
+from models import get_models, SD
 from scripts.experiment_utils import find_last_file
 from tests.compute_metrics import compute_metrics
 from tests.generate_images import generate_images
@@ -17,18 +17,22 @@ from utils.train_utils import Prior
 
 
 def load_pretrained_models(args, ckpt_path, device):
-    netG, netD = get_models(args, device)
+    # netG, netD = get_models(args, device)
+
+    conf = {'double_z': True, 'z_channels': args.z_dim, 'resolution': args.im_size, 'in_channels': 3, 'out_ch': 3, 'ch': 128,
+            'ch_mult': [1, 2, 4], 'num_res_blocks': 2, 'attn_resolutions': [], 'dropout': 0.0, 'double_z':False}
+
+    netD = SD.Encoder(**conf).to(device)
+    netG = SD.Decoder(**conf).to(device)
 
     weights = torch.load(ckpt_path, map_location=device)
-    netG.load_state_dict(weights['netG'])
+    netG.load_state_dict(weights['decoder'])
+    netD.load_state_dict(weights['encoder'])
     netG.to(device)
-    netG.eval()
-
-    netD.load_state_dict(weights['netD'])
     netD.to(device)
+    netG.eval()
     netD.eval()
     prior = Prior(args.z_prior, args.z_dim)
-    prior.z = weights['prior']
 
     return netG, netD, prior
 
@@ -57,15 +61,15 @@ if __name__ == '__main__':
     print("Done")
 
     # No data tests
-    generate_images(netG, prior, outputs_dir, device)
+    # generate_images(netG, prior, outputs_dir, device)
     # find_mode_collapses(netG, netD, z_dim, outputs_dir, device)
-    # interpolate(netG, z_dim, n_zs=15, seconds=60, fps=30, outputs_dir=outputs_dir, device=device)
-
     # Partial data tests
-    # data = get_data(args['data_path'], args['im_size'], args['center_crop'], args['gray_scale'], limit_data=9).to(device)
+    data = get_data(args['data_path'], args['im_size'], args['center_crop'], args['gray_scale'], limit_data=9).to(device)
     # saliency_maps(netG, netD, z_dim, data, outputs_dir, device)
     # test_range(netG, netD, z_dim, data, outputs_dir, device)
     # inverse_image(netG, z_dim, data, outputs_dir=outputs_dir)
+    interpolate(netD, netG, data, seconds=60, fps=15, outputs_dir=outputs_dir)
+    exit()
 
     # Full data tests
     data = get_data(args['data_path'], args['im_size'], args['center_crop'], args['gray_scale'], limit_data=args['limit_data'])

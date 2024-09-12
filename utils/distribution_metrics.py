@@ -200,9 +200,9 @@ def _duplicate_to_match_lengths(arr1, arr2):
 
 
 if __name__ == '__main__':
-    x = (torch.randn(64, 1024) * 127).clamp(-127,127)
-    y = (torch.randn(64, 1024) * 127).clamp(-127,127)
+    x = (torch.randn(64, 1024) * 127)
+    y = (torch.randn(64, 1024) * 127)
     print(w1(x,y))
-    print(full_dim_swd(x,y, num_proj=1024))
+    print(full_dim_swd(x,y, num_proj=128))
 
 

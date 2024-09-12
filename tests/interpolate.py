@@ -24,19 +24,19 @@ def read_img_and_make_video(dist, video_name, fps):
     out.release()
 
 
-def interpolate(G, z_dim, n_zs, seconds, fps, outputs_dir, device):
+def interpolate(encoder, decoder, data, seconds, fps, outputs_dir):
     with torch.no_grad():
         """Sample n_zs images and linearly interpolate between them in the latent space """
         os.makedirs(f'{outputs_dir}/interpolations', exist_ok=True)
-        cur_z = torch.randn((1, z_dim)).to(device)
-        steps = int(fps * seconds / n_zs)
+        steps = int(fps * seconds / len(data) - 1)
         frame = 0
         f = 1 / (steps - 1)
-        for i in range(n_zs):
-            next_z = torch.randn((1, z_dim)).to(device)
+        cur_z = encoder(data[0].unsqueeze(0))
+        for i in range(len(data) - 1):
+            next_z = encoder(data[i+1].unsqueeze(0))
             for a in range(steps):
                 noise = next_z * a * f + cur_z * (1 - a * f)
-                fake_imgs = G(noise).add(1).mul(0.5)
+                fake_imgs = decoder(noise).add(1).mul(0.5)
                 vutils.save_image(fake_imgs, f'{outputs_dir}/interpolations/fakes-{frame}.png', normalize=False)
                 frame += 1
             cur_z = next_z

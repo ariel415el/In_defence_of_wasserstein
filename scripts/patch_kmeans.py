@@ -36,10 +36,10 @@ def compute_patch_kmeans(data, ):
 
     # init_centroids = ot_means(data, n_centroids , n_iters=1, minimization_method=weisfeld_minimization, verbose=False).reshape(-1, *data.shape[1:])
     # init_centroids = to_patches(init_centroids, p=p, s=s, remove_locations=True)
-    patch_centroids = get_centroids(patches, n_centroids * locs, use_faiss=True)
-    # patch_centroids = ot_means(patches, n_centroids * locs, init_from=None,
-    #                           n_iters=4, minimization_method=weisfeld_minimization, verbose=False
-    #                           ).reshape(-1, *patches.shape[1:])
+    # patch_centroids = get_centroids(patches, n_centroids * locs, use_faiss=True)
+    patch_centroids = ot_means(patches, n_centroids * locs, init_from=None,
+                              n_iters=4, minimization_method=weisfeld_minimization, verbose=False
+                              ).reshape(-1, *patches.shape[1:])
 
     # patch_centroids = patch_centroids.reshape(locs, n_centroids, -1).permute(1, 2, 0)
     patch_centroids = patch_centroids.reshape(n_centroids, locs, -1).permute(0, 2, 1)
@@ -108,17 +108,17 @@ if __name__ == '__main__':
     os.makedirs(output_dir, exist_ok=True)
     device = torch.device('cpu')
     im_size = 64
-    p = 8
-    s = 8
-    n_centroids = 64
+    p = 16
+    s = 16
+    n_centroids = 16
 
-    data_path = '../../data/FFHQ/FFHQ'
+    data_path = '/mnt/storage_ssd/datasets/FFHQ/FFHQ_128'
     # data_path = '../../data/MNIST/MNIST/jpgs/training'
     # data_path = '/mnt/storage_ssd/datasets/square_data/black_S-10_O-1_S-1'
-    c = 1
-    gray_scale = True
-    center_crop = None
-    limit_data = 1000
+    c = 3
+    gray_scale = False
+    center_crop = 90
+    limit_data = 10000
     data = get_data(data_path, im_size, c=c, center_crop=center_crop,
                     gray_scale=gray_scale, flatten=False, limit_data=limit_data).to(device)
 
