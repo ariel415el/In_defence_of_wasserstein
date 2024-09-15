@@ -1,5 +1,6 @@
 import itertools
 import os
+import sys
 from random import shuffle
 
 import numpy as np
@@ -7,7 +8,7 @@ import torch
 from tqdm import tqdm
 from PIL import Image
 
-import torch.nn.functional as F
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from utils.data import get_transforms
 
 

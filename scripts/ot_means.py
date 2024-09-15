@@ -10,7 +10,7 @@ import torch
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(os.path.dirname(__file__))
 from experiment_utils import get_data
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 from losses import get_loss_function
@@ -67,7 +67,7 @@ def weisfeld_minimization(centroids, data, n_steps=5):
 
 def sgd_minimization(centroids, data, n_steps=5):
     centroids.requires_grad_()
-    opt = torch.optim.Adam([centroids], lr=0.1)
+    opt = torch.optim.Adam([centroids], lr=1)
     for i in range(n_steps):
         C = dist_mat(centroids, data)
         ot_map = get_ot_plan(C.cpu().detach().numpy())
@@ -139,7 +139,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     # Data
-    parser.add_argument('--data_path', default="/mnt/storage_ssd/datasets/FFHQ/FFHQ/FFHQ",
+    parser.add_argument('--data_path', default="/mnt/storage_ssd/data/FFHQ/FFHQ_128",
                         help="Path to train images")
     parser.add_argument('--center_crop', default=None, type=int)
     parser.add_argument('--limit_data', default=None, type=int)

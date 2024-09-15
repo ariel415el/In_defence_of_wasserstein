@@ -7,7 +7,7 @@ from torchvision import utils as vutils
 from torchvision.transforms import InterpolationMode
 from tqdm import tqdm
 import torch.nn.functional as F
-from tests.test_utils import cut_around_center, sample_patch_centers
+from evaluate.test_utils import cut_around_center, sample_patch_centers
 
 
 def plot_torch(real_images, image_inversions, patch_inversion, crop, out_path):

@@ -10,7 +10,7 @@ import torch.nn.functional as F
 
 from utils.metrics import VggDistCalculator, DiscriminatorDistCalculator, L2, compute_nearest_neighbors_in_batches, \
     get_batche_slices, get_metric
-from tests.test_utils import cut_around_center, sample_patch_centers
+from evaluate.test_utils import cut_around_center, sample_patch_centers
 
 
 def imshow(img, axs, title="img"):

@@ -3,16 +3,21 @@ import json
 import os
 
 import torch
+from torchvision.transforms import transforms
 
+from losses import get_loss_function
 from models import get_models
-from scripts.experiment_utils import find_last_file
-from tests.compute_metrics import compute_metrics
-from tests.generate_images import generate_images
-from tests.interpolate import interpolate
-from tests.latent_inversion import inverse_image
-from tests.test_data_NNs import find_nns, find_patch_nns, find_nns_percept
-# from tests.latent_inversion import inverse_image
-from tests.test_utils import get_data
+from scripts.experiment_utils import find_last_file, get_centroids
+from scripts.ot_means import ot_means, weisfeld_minimization
+from evaluate.compute_metrics import compute_metrics
+from evaluate.generate_images import generate_images, generate_all_const_prior
+from evaluate.interpolate import interpolate
+from evaluate.latent_inversion import inverse_image
+from evaluate.local_patch_hist import local_patch_hist
+from evaluate.test_data_NNs import find_nns, find_patch_nns, find_nns_percept
+# from evaluate.latent_inversion import inverse_image
+from evaluate.test_utils import get_data
+from utils.common import dump_images
 from utils.train_utils import Prior
 
 
@@ -56,19 +61,21 @@ if __name__ == '__main__':
     netG, netD, prior = load_pretrained_models(argparse.Namespace(**args), ckpt_path, device)
     print("Done")
 
-    # No data tests
+    # No data evaluate
     generate_images(netG, prior, outputs_dir, device)
+    # generate_all_const_prior(netG, prior, outputs_dir, device)
     # find_mode_collapses(netG, netD, z_dim, outputs_dir, device)
     # interpolate(netG, z_dim, n_zs=15, seconds=60, fps=30, outputs_dir=outputs_dir, device=device)
 
-    # Partial data tests
+    # Partial data evaluate
     # data = get_data(args['data_path'], args['im_size'], args['center_crop'], args['gray_scale'], limit_data=9).to(device)
     # saliency_maps(netG, netD, z_dim, data, outputs_dir, device)
     # test_range(netG, netD, z_dim, data, outputs_dir, device)
     # inverse_image(netG, z_dim, data, outputs_dir=outputs_dir)
 
-    # Full data tests
+    # Full data evaluate
     data = get_data(args['data_path'], args['im_size'], args['center_crop'], args['gray_scale'], limit_data=args['limit_data'])
+
     netG = netG.cpu()
 
     # compute_metrics(netG, prior, data, device)
