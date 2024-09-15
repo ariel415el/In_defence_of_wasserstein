@@ -63,6 +63,9 @@ def create_plot(dataset_name):
     for i in range(len(raw_train_names)):
         for j in range(len(raw_train_names[0])):
             ax1 = axes[i, j]
+            if raw_train_names[i][j] is None:
+                ax1.axis("off")
+                continue
             model_name, filename = raw_train_names[i][j]
             dir_path = os.path.join(root_dir, f"{dataset_name}-{filename}")
             batch_image_path = find_last_file(os.path.join(dir_path, "images"))
@@ -71,7 +74,7 @@ def create_plot(dataset_name):
             plot_batch(ax1, batch_image_path, n)
 
             for k, (metric_name, metric_file_name, line_type) in enumerate(metrics[i]):
-                ax2 = axes[i, 2+k]
+                ax2 = axes[i, len(raw_train_names[0])+k]
                 patch_plot = os.path.join(dir_path, "plots", f"{metric_file_name}_fixed_noise_gen_to_train.pkl")
                 load_plot_and_anotate(ax2, patch_plot, label=f'{model_name}-{metric_name}', line_type=line_type, color=COLORS[j])
                 ax2.set_ylabel(metric_name, fontsize=3 * s)
@@ -106,17 +109,18 @@ def create_table(dataset_name):
 
 
 if __name__ == '__main__':
-    root_dir = 'outputs/paper_figures_9-6_G-FC'
+    root_dir = 'outputs/paper_figures_10-6_G-FC'
     prior = 'const=64'
     raw_train_names = [
-        [('WGAN_FC', f'{prior}_WGAN-GP-FC-nf=1024'), ('Direct_Image-W1', f'{prior}_DirectW1')],
-        [('WGAN_CNN-GAP', f'{prior}_WGAN-GP-CNN-GAP=True'), ('Direct_Patch-SWD-16-8', f'{prior}_DirectPatchSWD-16-8')],
-        [('WGAN_CNN-FC', f'{prior}_WGAN-GP-CNN-GAP=False'), ('Direct_LocalPatch-SWD-16-8', f'{prior}_DirectLocalPatchSWD-16-8')],
+        [('WGAN_FC', f'{prior}_WGAN-FC-nf=1024'), ('Direct_Image-W1', f'{prior}_DirectW1'), None],
+        [('WGAN_CNN-GAP', f'{prior}_WGAN-CNN-GAP=True'), ('WGAN_SCNN', f'{prior}_WGAN-SCNN-p=16-s=8'), ('Direct_Patch-SWD-16-8', f'{prior}_DirectPatchSWD-16-8')],
+        # [('WGAN_CNN-FC', f'{prior}_WGAN-CNN-GAP=False'), ('Direct_LocalPatch-SWD-16-8', f'{prior}_DirectLocalPatchSWD-16-8')],
     ]
     metrics = [
         [('Image-W1', 'MiniBatchLoss-dist=w1', '-'),],
         [('patch-SWD', 'MiniBatchPatchLoss-dist=swd-p=16-s=8', '--'),],
-        [('PatchLocal-SWD', 'MiniBatchLocalPatchLoss-dist=swd-p=16-s=8', '--')],
+        [('patch-SWD', 'MiniBatchPatchLoss-dist=swd-p=16-s=8', '--'),],
+        # [('PatchLocal-SWD', 'MiniBatchLocalPatchLoss-dist=swd-p=16-s=8', '--')],
     ]
     dataset_names = [
             'ffhq',
