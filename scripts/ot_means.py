@@ -112,7 +112,7 @@ def ot_means(data, k, n_iters, minimization_method, init_from=None, verbose=Fals
                 plots[metric_name].append(dist)
 
             if out_dir is not None:
-                dump_images(centroids.reshape(k, -1, data_shape[-2], data_shape[-1]),
+                dump_images((centroids if i==n_iters-1 else centroids[:64]).reshape(k, -1, data_shape[-2], data_shape[-1]),
                             f"{out_dir}/images/otMeans-{i}.png", separate_images=i==n_iters-1)
 
     print(f"Loss: {loss(centroids, data)}")
@@ -170,6 +170,6 @@ if __name__ == "__main__":
 
     minimiztion_func = globals()[f"{args.min_method}_minimization"]
 
-    plots = ot_means(data, args.k, args.n_iters, minimiztion_func, verbose=True, out_dir=out_dir)
+    plots = ot_means(data, args.k, args.n_iters, minimiztion_func, verbose=False, out_dir=out_dir)
 
     log(plots)
