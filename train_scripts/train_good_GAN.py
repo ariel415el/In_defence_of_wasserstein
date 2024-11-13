@@ -7,29 +7,30 @@ from train_scripts.send_experiment import run_sbatch
 if __name__ == '__main__':
     data_root = '/cs/labs/yweiss/ariel1/data'
     data_map = {
-        # "ffhq_hq": (f'{data_root}/FFHQ/FFHQ_HQ_cropped', f' --limit_data 70000'),
+        "ffhq_hq": (f'{data_root}/FFHQ/FFHQ_HQ_cropped', f' --limit_data 70000'),
         # "squares": (f'{data_root}/square_data/black_S-10_O-1_S-1', ' --gray_scale'),
         # "mnist": (f'{data_root}/MNIST/MNIST/jpgs/training', ' --gray_scale  --limit_data 10000'),
-        "color_mnist_hq": (f'{data_root}/MNIST/Color_MNIST_hq', ' --limit_data 10000'),
+        # "color_mnist_hq": (f'{data_root}/MNIST/Color_MNIST_hq', ' --limit_data 10000'),
     }
 
-    project_name = "trainDCGAN-18-9-2024_color_mnist_hq"
+    # project_name = "trainDCGAN-18-9-2024_color_mnist_hq"
+    project_name = "trainOldFastGAN_30_sep"
     loss_function = 'WGANLoss'
     for data_name, (data_path, args) in data_map.items():
         for z_prior in [
-                        'const=100',
-                        'const=1000',
+                        # 'const=100',
+                        # 'const=1000',
                         'const=10000',
-                        # 'const=70000',
+                        'const=70000',
                         'normal'
                         ]:
             for reg_name, reg in [('GP', '--gp_weight 10')]:
                 for dim in [128]:
                     for gen_arch, disc_arch in [
-                            ('DCGAN', 'DCGAN'),
+                            # ('DCGAN', 'DCGAN'),
                             # ('DCGAN-nf=256', 'DCGAN-nf=256'),
                             # ('FastGAN', 'FastGAN'),
-                            # ('FastGAN-skip_connections=False', 'FastGAN-skip_connections=False')
+                            ('OldFastGAN', 'OldFastGAN')
                     ]:
                             train_name = f"{data_name}_{z_prior}_I-{dim}_Z-{dim}_Reg-{reg_name}_G-{gen_arch}_D-{disc_arch}"
                             train_command = f"python3 train.py --data_path {data_path} {args}" \
@@ -42,5 +43,5 @@ if __name__ == '__main__':
                                             f" --disc_arch {disc_arch} --wandb --full_batch_metrics"
                             print(train_command)
                             run_sbatch(train_command, f'{train_name}',
-                                        hours=48, killable=True, gpu_memory=16, cpu_memory=64, task_name="sbatch")
+                                        hours=48, killable=False, gpu_memory=16, cpu_memory=64, task_name="sbatch")
 

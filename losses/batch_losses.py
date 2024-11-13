@@ -9,7 +9,10 @@ from utils.metrics import get_metric
 
 class MiniBatchLoss:
     def __init__(self, dist='w1', **kwargs):
-        self.metric = getattr(distribution_metrics, dist)
+        if type(dist) == str:
+            self.metric = getattr(distribution_metrics, dist)
+        else:
+            self.metric = dist
         self.kwargs = kwargs
 
     def compute(self, x, y):

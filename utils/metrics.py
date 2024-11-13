@@ -33,14 +33,14 @@ class L2:
     :param normalize: divide distance by the dimension
     """
     def __call__(self, X, Y, normalize=False):
-        X = X.reshape(len(X), -1)
-        Y = Y.reshape(len(Y), -1)
+        X = X.reshape(len(X), -1).double()
+        Y = Y.reshape(len(Y), -1).double()
         dist = (X * X).sum(1)[:, None] + (Y * Y).sum(1)[None, :] - 2.0 * torch.mm(X, torch.transpose(Y, 0, 1))
-        dist = torch.sqrt(torch.clamp(dist, min=1e-10)) # When loss is 0 the gradient of sqrt is nan
         # dist = (X[:, None] - Y[None, :]).pow(2).sum(-1).sqrt()
+        dist = torch.sqrt(torch.clamp(dist, min=1e-10)) # When loss is 0 the gradient of sqrt is nan
         if normalize:
             dist = dist / X.shape[-1]
-        return dist
+        return dist.float()
 
 
 class MeanL2(L2):

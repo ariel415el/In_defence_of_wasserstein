@@ -3,6 +3,10 @@ import ot
 import torch
 from scipy import linalg
 from tqdm import tqdm
+
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from utils.metrics import get_metric, compute_pairwise_distances_in_batches
 
 
@@ -21,6 +25,17 @@ def w1(x, y, epsilon=0., b=None,  **kwargs):
     OTPlan = torch.from_numpy(OTPlan).to(C.device)
     W1 = torch.sum(OTPlan * C)
     return W1, {"W1-L2": W1}
+
+
+def nn(x, y, **kwargs):
+    """Compute Optimal transport with L2 norm as base metric
+        param x: (b1,d) shaped tensor
+        param y: (b2,d) shaped tensor
+    """
+    base_metric = get_metric("L2")
+    C = base_metric(x, y, **kwargs)
+    dist = C.min(0)[0].mean()
+    return dist, {"nn-L2": dist}
 
 
 def swd(x, y, num_proj=128, **kwargs):
@@ -52,7 +67,7 @@ def swd(x, y, num_proj=128, **kwargs):
     return SWD, {"SWD": SWD}
 
 
-def full_dim_swd(x, y, num_proj=16, **kwargs):
+def full_dim_swd(x, y, num_proj=128, **kwargs):
     """
     Solve the OT in 1-D in with projected points but compute the distances in original dimension
     param x: (b1,d) shaped tensor
@@ -200,9 +215,17 @@ def _duplicate_to_match_lengths(arr1, arr2):
 
 
 if __name__ == '__main__':
-    x = (torch.randn(64, 1024) * 127).clamp(-127,127)
-    y = (torch.randn(64, 1024) * 127).clamp(-127,127)
-    print(w1(x,y))
-    print(full_dim_swd(x,y, num_proj=1024))
+    x = torch.randn(10000, 1024)
+    y = torch.randn(70000, 1024)
+    print(w1(x,y, epsilon=0.))
+    print(w1(x,y, epsilon=0.1))
+    print(w1(x,y, epsilon=1))
+    print(w1(x,y, epsilon=5))
+    # import geomloss
+    # print(geomloss.SamplesLoss(loss="sinkhorn", p=1, blur=.05)(x,y))
+    # print(w1(x,y, epsilon=0))
+    # print(sinkhorn(x,y))
+    # print(nn(x,y))
+    # print(full_dim_swd(x,y, num_proj=1024))
 
 

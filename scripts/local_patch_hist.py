@@ -1,18 +1,16 @@
 import os
 import sys
 
-from debian.debtags import output
-from torchvision.transforms import transforms
-
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-from utils.common import dump_images
-from evaluate.test_utils import get_data
+from matplotlib import pyplot as plt
+import pandas as pd
+import psutil
 
 import numpy as np
 import torch
-from matplotlib import pyplot as plt
 
-from losses import to_patches
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
+from losses import MiniBatchLocalPatchLoss, MiniBatchLoss, MiniBatchPatchLoss
 
 
 def get_random_mat(p, c):
@@ -28,96 +26,111 @@ def swd(projx, projy):
     return (projx - projy).abs().mean()
 
 
-def run():
-    data = get_data(list(paths.values())[0], im_size, crop, gray_scale, limit_data=1)
-    patches = to_patches(data, p=p, s=s, remove_locations=False)
+def get_random_locs(n_iters, c, dim):
     random_locs_and_mats = []
     for i in range(n_iters):
-        loc = np.random.randint(0, patches.shape[0])
-        mat = get_random_mat(p, data.shape[1])
-        random_locs_and_mats += [(loc, mat)]
+        x = np.random.randint(0, dim - p)
+        y = np.random.randint(0, dim - p)
+        mat = get_random_mat(p, c)
+        random_locs_and_mats += [(x, y, mat)]
+    return random_locs_and_mats
 
-    projs = dict()
 
-    for name, path in paths.items():
-        images = get_data(path, im_size, crop, gray_scale, limit_data=N)
-        patches = to_patches(images, p=p, s=s, remove_locations=False)
-        projs[name] = [patches[loc] @ mat for loc, mat in random_locs_and_mats]
-        dump_images(images[:4], f"{outputs_dir}/{name}.png")
-        del patches
+def get_local_hist(batch, x, y, mat):
+    return batch[..., x:x + p, y:y + p].reshape(len(batch), -1) @ mat
 
-        # if blur:
-        #     b = 128
-        #     n_batches = len(images) // b
-        #     for i in tqdm(range(n_batches)):
-        #         images[i*b:(i+1)*b] = transforms.GaussianBlur(kernel_size=9, sigma=100)(images[i*b: (i+1)*b])
-        #     if len(images) % b != 0:
-        #         images[n_batches * b:] = transforms.GaussianBlur(kernel_size=9, sigma=100)(images[n_batches * b:])
-        #     patches = to_patches(images, p=p, s=s, remove_locations=False)
-        #     projs[f'blured_{name}'] = [patches[loc] @ mat for loc, mat in random_locs_and_mats]
-        #     dump_images(images[:4], f"{outputs_diir}/blured_{name}.png")
-        #     del patches
 
-        del images
+def compute_local_patch_w1(plot_name, p):
+    with torch.no_grad():
+        metrics = [
+            # ("w1", MiniBatchLoss(dist='w1')),
+            # ("patch_swd-7-4", MiniBatchPatchLoss(dist='swd', p=7, s=4)),
+            ("Local_swd-7-4", MiniBatchLocalPatchLoss(dist='swd', p=p, s=4)),
+        ]
 
-    # Plot
+        data = torch.load(paths['FFHQ'])
+
+        random_locs_and_mats = get_random_locs(n_iters, c=data.shape[1], dim=data.shape[-1])
+        metrics_table = []
+        projections = {'FFHQ': [get_local_hist(data, x, y, mat) for x, y, mat in random_locs_and_mats]}
+        for j, name in enumerate(list(paths.keys())[1:]):
+            metrcs_row = []
+            fake = torch.load(paths[name])
+            from utils.common import dump_images
+            dump_images(fake[:4], f"{outputs_dir}/{name}")
+            projections[name] = [get_local_hist(fake, x, y, mat) for x, y, mat in random_locs_and_mats]
+            for metric_name, metric in metrics:
+                dist = metric(data, fake).item()
+                metrcs_row += [dist]
+                print(f"{metric_name} data vs {name}: {dist:.5f}. CPU: {psutil.cpu_percent()}%")
+            del fake
+            metrics_table += [metrcs_row]
+
+    # Dump table
+    print(metrics_table)
+    df = pd.DataFrame(metrics_table, index=list(paths.keys())[1:], columns=np.array(metrics)[:, 0])
+    df.to_csv(os.path.join(root, f"{plot_name}.csv"), sep=',', encoding='utf-8')
+
+    # Plot histograms
     for i in range(n_iters):
-        title = 'SWD: '
-        keys = list(projs.keys())
-        # for j, name1 in enumerate(keys[:-1]):
-            # for name2 in keys[j+1:]:
-            #     title += f"{name1} vs {name2}: {swd(projs[name1][i], projs[name2][i]):.2f}; "
-        for j, name1 in enumerate(keys[1:]):
-            title += f"data vs {name1}: {swd(projs['data'][i], projs[name1][i]):.2f}; "
-        for name in projs:
-            counts, bins = np.histogram(projs[name][i], bins=100,density=True)
+        # title = 'SWD: '
+        # keys = list(projs.keys())
+        # for j, name1 in enumerate(keys[1:]):
+        # title += f"data vs {name1}: {swd(projs['data'][i], projs[name1][i]):.2f}; "
+        # plt.title(title, fontsize=10)
+        for name in projections:
+            counts, bins = np.histogram(projections[name][i], bins=nbins, density=True)
             plt.plot(bins[:-1], counts, label=name)
-        plt.title(title, fontsize=10)
         plt.legend()
+        plt.axis('off')
+        plt.tight_layout()
         plt.savefig(f"{outputs_dir}/plot{i}.png")
         plt.clf()
 
-
 if __name__ == '__main__':
+    n_iters = 6
+    p=7
+    nbins = 30
 
-    im_size = 128
-    N = 10000
-    crop = None
-    gray_scale=False
-    outputs_dir = 'outputs/trainDCGAN-16-9-2024local_stats'
-    paths = {'data': '/cs/labs/yweiss/ariel1/data/FFHQ/FFHQ_HQ_cropped',
-             # 'fake_m=1K': 'outputs/trainDCGAN-16-9-2024/ffhq_hq_const=1000_I-128_Z-128_Reg-GP_G-DCGAN-nf=256_D-DCGAN-nf=256',
-             'fake_m=10K': 'outputs/trainDCGAN-16-9-2024/ffhq_hq_const=10000_I-128_Z-128_Reg-GP_G-DCGAN-nf=256_D-DCGAN-nf=256/test_outputs/fake_images',
-             'fake_m=70K': 'outputs/trainDCGAN-16-9-2024/ffhq_hq_const=70000_I-128_Z-128_Reg-GP_G-DCGAN-nf=256_D-DCGAN-nf=256/test_outputs/fake_images',
-             'fake_normal': 'outputs/trainDCGAN-16-9-2024/ffhq_hq_normal_I-128_Z-128_Reg-GP_G-DCGAN-nf=256_D-DCGAN-nf=256/test_outputs/fake_images',
+    root = 'outputs/trainDCGAN-16-9-2024'
+    outputs_dir = f'{root}/local_stats'
+    os.makedirs(outputs_dir, exist_ok=True)
+    paths = {'FFHQ': '/cs/labs/yweiss/ariel1/data/FFHQ/FFHQ_HQ_cropped.pth',
+             'otMeans': f'otMeans10K.pth',
+             'fake_m=10K': f'{root}/ffhq_hq_const=10000_I-128_Z-128_Reg-GP_G-DCGAN-nf=256_D-DCGAN-nf=256/test_outputs/fake_images.pth',
+             'fake_m=70K': f'{root}/ffhq_hq_const=70000_I-128_Z-128_Reg-GP_G-DCGAN-nf=256_D-DCGAN-nf=256/test_outputs/fake_images.pth',
+             'fake_normal': f'{root}/ffhq_hq_normal_I-128_Z-128_Reg-GP_G-DCGAN-nf=256_D-DCGAN-nf=256/test_outputs/fake_images.pth',
+             'afhq': f'afhq.pth',
+             'ImageNet': f'imagenette2.pth',
              }
 
-    # im_size = 64
-    # N = 10000
-    # crop = None
-    # gray_scale=True
-    # paths = {'data': '/cs/labs/yweiss/ariel1/data/MNIST/MNIST/jpgs/training',
-    #          # 'fake_m=1K': 'outputs/trainDCGAN-17-9-2024_mnist/mnist_const=1000_I-64_Z-64_Reg-GP_G-DCGAN_D-DCGAN/test_outputs/fake_images',
-    #          'fake_m=10K': 'outputs/trainDCGAN-17-9-2024_mnist/mnist_const=10000_I-64_Z-64_Reg-GP_G-DCGAN_D-DCGAN/test_outputs/fake_images',
-    #          'fake_Normal': 'outputs/trainDCGAN-17-9-2024_mnist/mnist_normal_I-64_Z-64_Reg-GP_G-DCGAN_D-DCGAN/test_outputs/fake_images',
-    #          }
-    #
-    # im_size = 128
-    # N = 10000
-    # crop = None
-    # gray_scale=False
-    # outputs_dir = 'outputs/trainDCGAN-18-9-2024_color_mnist_hq/local_stats'
-    # paths = {'data': '/cs/labs/yweiss/ariel1/data/MNIST/Color_MNIST_hq',
-    #          # 'fake_m=1K': 'outputs/trainDCGAN-17-9-2024_mnist/mnist_const=1000_I-64_Z-64_Reg-GP_G-DCGAN_D-DCGAN/test_outputs/fake_images',
-    #          'fake_m=10K': 'outputs/trainDCGAN-18-9-2024_color_mnist_hq/color_mnist_hq_const=10000_I-128_Z-128_Reg-GP_G-DCGAN_D-DCGAN/test_outputs/fake_images',
-    #          'fake_Normal': 'outputs/trainDCGAN-18-9-2024_color_mnist_hq/color_mnist_hq_normal_I-128_Z-128_Reg-GP_G-DCGAN_D-DCGAN/test_outputs/fake_images',
-    #          }
+    compute_local_patch_w1("DCGAN", p)
 
-    blur = False
-    n_iters = 5
-    p = 11
-    s = 11
-
+    root = 'outputs/trainOldFastGAN_30_sep'
+    outputs_dir = f'{root}/local_stats'
     os.makedirs(outputs_dir, exist_ok=True)
-    run()
+    paths = {'FFHQ': '/cs/labs/yweiss/ariel1/data/FFHQ/FFHQ_HQ_cropped.pth',
+             'otMeans': f'otMeans10K.pth',
+             'fake_m=10K': f'{root}/ffhq_hq_const=10000_I-128_Z-128_Reg-GP_G-OldFastGAN_D-OldFastGAN/test_outputs/fake_images.pth',
+             'fake_m=70K': f'{root}/ffhq_hq_const=70000_I-128_Z-128_Reg-GP_G-OldFastGAN_D-OldFastGAN/test_outputs/fake_images.pth',
+             'fake_normal': f'{root}/ffhq_hq_normal_I-128_Z-128_Reg-GP_G-OldFastGAN_D-OldFastGAN/test_outputs/fake_images.pth',
+             'afhq': f'afhq.pth',
+             'ImageNet': f'imagenette2.pth',
+             }
 
+    compute_local_patch_w1("FastGAN", p)
+
+    # for dataset_name in ['ffhq', 'mnist', 'squares']:
+    #     root = 'outputs/old/paper_figures/paper_figures_27-1'
+    #     outputs_dir = f'{root}/{dataset_name}_local_stats'
+    #     paths = {'data': f'{root}/{dataset_name}.pth',
+    #              'FC': f'{root}/{dataset_name}-const=64_WGAN-GP-FC-nf=1024/test_outputs/fake_images.pth',
+    #              'CNN-GAP': f'{root}/{dataset_name}-const=64_WGAN-GP-CNN-GAP=True/test_outputs/fake_images.pth',
+    #              'CNN-FC': f'{root}/{dataset_name}-const=64_WGAN-GP-CNN-GAP=False/test_outputs/fake_images.pth',
+    #              'OTMeans': f'{root}/{dataset_name}_otMeans.pth',
+    #              }
+    #
+    #     os.makedirs(outputs_dir, exist_ok=True)
+    #     compute_local_patch_w1()
+    #     # run()
+    #
