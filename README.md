@@ -1,7 +1,6 @@
 # In Defense of Wasserstein: Understanding WGANs Through Discrete Generators  
 
-[![ICLR 2025](https://img.shields.io/badge/ICLR-2025-blue)](https://iclr.cc/virtual/2025/poster/30814)  
-[![OpenReview](https://img.shields.io/badge/OpenReview-Paper-green)](https://openreview.net/forum?id=7YXaOvunqo)  
+[![ICLR 2025](https://img.shields.io/badge/ICLR-2025-blue)](https://iclr.cc/virtual/2025/poster/30814)  [![OpenReview](https://img.shields.io/badge/OpenReview-Paper-green)](https://openreview.net/forum?id=7YXaOvunqo)  [![Colab](https://img.shields.io/badge/Colab-Launch-ff69b4)](https://colab.research.google.com/drive/1Fhw-5XAhHKp_SkTkjW1sJP1FxH3sCOS4?usp=sharing)  
 
 ## 📜 Abstract  
 Since WGANs were first introduced, there has been considerable debate about whether their success in generating realistic images can be attributed to minimizing the Wasserstein distance between the generated and training distributions. In this paper, we present theoretical and experimental results showing that successful WGANs **do** minimize the Wasserstein distance, but the specific form of the distance minimized depends heavily on the discriminator architecture and its inductive biases.  
@@ -58,7 +57,7 @@ python3 train.py --data_path FFHQ_HQ_cropped  --limit_data 70000 --project_name 
 
 ```
 python3 train.py --data_path <data-path>  --z_prior const=64 --gen_arch FC --disc_arch FC-nf=1024 --lrD 0.001 --loss_function WGANLoss --gp_weight 10 --G_step_every 5
-python3 `other_scripts/ot_means.py` --data_path <data-path>  --k 64 
+python3 scripts/ot_means.py --data_path <data-path>  --k 64 
 ```
 
 ## Figure 6: DiscreteWGAN copies data when M=N
