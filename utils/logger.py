@@ -8,8 +8,6 @@ from matplotlib import pyplot as plt
 import json
 import matplotlib as mpl
 
-import wandb
-
 mpl.use('Agg')
 
 
@@ -49,6 +47,7 @@ class PLTLogger:
 
 class WandbLogger(PLTLogger):
     def __init__(self, args, save_dir):
+        import wandb
         super().__init__(save_dir)
         self.wandb = wandb.init(project=args.project_name, dir=save_dir, name=args.train_name)
 
