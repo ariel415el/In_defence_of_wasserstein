@@ -45,7 +45,6 @@ def parse_train_args(arguments_string=None):
     parser.add_argument('--wandb', action='store_true', default=False, help="Otherwise use PLT localy")
     parser.add_argument('--log_freq', default=1000, type=int)
     parser.add_argument('--save_every', action='store_true', default=False)
-    parser.add_argument('--full_batch_evaluations', action='store_true', default=False)
     parser.add_argument('--full_batch_metrics', nargs='*', default=[
                                 'MiniBatchLoss-dist=w1',
                                 'MiniBatchLoss-dist=swd',

@@ -102,9 +102,9 @@ def evaluate(prior, netG, fixed_noise, debug_fixed_reals, saved_image_folder,
                     f'{metric_name}_fixed_noise_gen_to_train': metric(fake_images.cpu(), debug_all_reals.cpu()),
                 }, step=iteration)
 
-        dump_images(netG(fixed_noise),  f'{saved_image_folder}/{iteration}.png')
+        dump_images(netG(fixed_noise),  f'{saved_image_folder}/{iteration}')
         if iteration == 0:
-            dump_images(debug_fixed_reals, f'{saved_image_folder}/debug_fixed_reals.png')
+            dump_images(debug_fixed_reals, f'{saved_image_folder}/debug_fixed_reals')
 
     netG.train()
     print(f"Evaluation finished in {time()-start} seconds")

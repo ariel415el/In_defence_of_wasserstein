@@ -1,7 +1,7 @@
 # In Defense of Wasserstein: Understanding WGANs Through Discrete Generators  
 
-[![ICLR 2025](https://img.shields.io/badge/ICLR-2025-blue)](https://iclr.cc/virtual/2025/poster/30814)  [![OpenReview](https://img.shields.io/badge/OpenReview-Paper-green)](https://openreview.net/forum?id=7YXaOvunqo)  [![Colab](https://img.shields.io/badge/Colab-Launch-ff69b4)](https://colab.research.google.com/drive/1Fhw-5XAhHKp_SkTkjW1sJP1FxH3sCOS4?usp=sharing)  
-
+- [![ICLR 2025](https://img.shields.io/badge/ICLR-2025-blue)](https://iclr.cc/virtual/2025/poster/30814) A link to our paper on ICLR25    
+- ![Colab](https://img.shields.io/badge/Colab-Launch-ff69b4) A colab notebook that reproduces most of our exxperiments
 ## 📜 Abstract  
 Since WGANs were first introduced, there has been considerable debate about whether their success in generating realistic images can be attributed to minimizing the Wasserstein distance between the generated and training distributions. In this paper, we present theoretical and experimental results showing that successful WGANs **do** minimize the Wasserstein distance, but the specific form of the distance minimized depends heavily on the discriminator architecture and its inductive biases.  
 
